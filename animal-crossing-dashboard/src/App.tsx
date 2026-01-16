@@ -32,6 +32,7 @@ import DataImportPage from './components/DataImportPage';
 import ViolationsPage from './components/ViolationsPage';
 import { HotspotMap } from './components/HotspotMap';
 import AccidentAnalysisPage from './components/AccidentAnalysisPage';
+import ElderlyPreventionPage from './components/ElderlyPreventionPage';
 
 // Import hooks
 import {
@@ -58,14 +59,11 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) => {
   const menuItems = [
     { id: 'dashboard', icon: Home, label: '總覽', emoji: '🏠', description: '整體統計概覽' },
-    { id: 'recommendations', icon: MapPin, label: 'Top 5 推薦', emoji: '🎯', description: '推薦執法點位' },
+    { id: 'accidents', icon: MapPin, label: '執法缺口分析', emoji: '🎯', description: '事故與違規綜合分析' },
+    { id: 'elderly', icon: Users, label: '高齡者事故防制專區', emoji: '👴', description: '高齡者事故防治' },
+    { id: 'monthly', icon: Calendar, label: '成效比較', emoji: '📊', description: '同期比較與報表' },
     { id: 'briefing', icon: FileText, label: '班前勤務卡', emoji: '📋', description: '勤務建議' },
-    { id: 'violations', icon: AlertTriangle, label: '違規分析', emoji: '📊', description: '違規統計分析' },
-    { id: 'accidents', icon: AlertTriangle, label: '事故分析', emoji: '🚧', description: '事故熱點與趨勢' },
-    { id: 'elderly', icon: Users, label: '高齡者防治', emoji: '👴', description: '高齡者事故防治' },
-    { id: 'monthly', icon: Calendar, label: '月度比較', emoji: '📅', description: '同期比較分析' },
     { id: 'import', icon: FileText, label: '資料匯入', emoji: '📥', description: '匯入 Excel 資料' },
-    { id: 'settings', icon: Settings, label: '系統設定', emoji: '⚙️', description: '系統配置' },
   ];
 
   return (
@@ -551,8 +549,8 @@ const RecommendationsView: React.FC = () => {
               <button
                 onClick={() => setCrossDistrict(null)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${crossDistrict === null
-                    ? 'bg-nook-leaf text-white'
-                    : 'bg-white/60 text-nook-text hover:bg-nook-leaf/10'
+                  ? 'bg-nook-leaf text-white'
+                  : 'bg-white/60 text-nook-text hover:bg-nook-leaf/10'
                   }`}
               >
                 全部區域
@@ -562,8 +560,8 @@ const RecommendationsView: React.FC = () => {
                   key={h.district}
                   onClick={() => setCrossDistrict(h.district)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${crossDistrict === h.district
-                      ? 'bg-nook-orange text-white'
-                      : 'bg-white/60 text-nook-text hover:bg-nook-orange/10'
+                    ? 'bg-nook-orange text-white'
+                    : 'bg-white/60 text-nook-text hover:bg-nook-orange/10'
                     }`}
                 >
                   {h.district}
@@ -628,6 +626,50 @@ const RecommendationsView: React.FC = () => {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* 前幾大事故地點輔助資訊 */}
+              {accidentHotspots && accidentHotspots.hotspots.length > 0 && (
+                <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl p-4">
+                  <h5 className="font-bold text-orange-700 mb-3">🚧 前幾大事故地點（輔助參考）</h5>
+                  <p className="text-xs text-orange-600/70 mb-3">
+                    依事故嚴重度權重排序，紅色數字為 A1 死亡事故
+                  </p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {accidentHotspots.hotspots.slice(0, 3).map((hotspot, idx) => (
+                      <div key={hotspot.district} className="bg-white rounded-xl p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${idx === 0 ? 'bg-red-500 text-white' :
+                            idx === 1 ? 'bg-orange-400 text-white' :
+                              'bg-yellow-400 text-white'
+                            }`}>
+                            {idx + 1}
+                          </span>
+                          <span className="font-bold text-nook-text text-sm">{hotspot.district}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1 text-xs">
+                          <div className="text-center">
+                            <p className="font-bold text-gray-700">{hotspot.accidents.total}</p>
+                            <p className="text-nook-text/50">總數</p>
+                          </div>
+                          <div className="text-center">
+                            <p className={`font-bold ${hotspot.accidents.a1_count > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                              {hotspot.accidents.a1_count}
+                            </p>
+                            <p className="text-red-500/70">A1</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="font-bold text-orange-500">{hotspot.accidents.a2_count}</p>
+                            <p className="text-orange-400/70">A2</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-orange-500/60 mt-2 text-center">
+                    共 {accidentHotspots.summary.total_accidents} 件事故 | A1:{accidentHotspots.summary.a1_total} A2:{accidentHotspots.summary.a2_total}
+                  </p>
                 </div>
               )}
 
@@ -749,22 +791,16 @@ const App: React.FC = () => {
     switch (activeView) {
       case 'dashboard':
         return <DashboardView />;
-      case 'recommendations':
-        return <RecommendationsView />;
-      case 'briefing':
-        return <BriefingView />;
-      case 'violations':
-        return <ViolationsPage />;
       case 'accidents':
         return <AccidentAnalysisPage />;
       case 'elderly':
-        return <PlaceholderView title="高齡者防治" emoji="👴" description="高齡駕駛人事故防治分析" />;
+        return <ElderlyPreventionPage />;
       case 'monthly':
-        return <PlaceholderView title="月度比較" emoji="📅" description="月度統計與同期比較" />;
+        return <PlaceholderView title="成效比較" emoji="📊" description="同期比較與報表 - 開發中" />;
+      case 'briefing':
+        return <BriefingView />;
       case 'import':
         return <DataImportPage />;
-      case 'settings':
-        return <PlaceholderView title="系統設定" emoji="⚙️" description="系統配置與偏好設定" />;
       default:
         return <DashboardView />;
     }

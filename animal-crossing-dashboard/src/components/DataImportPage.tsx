@@ -7,7 +7,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, Database, AlertCircle } from 'lucide-react';
 
 // API 基礎 URL
-const API_BASE = 'http://localhost:8080/api/v1';
+const API_BASE = '/api/v1';
 
 // ============================================
 // 型別定義
@@ -180,8 +180,8 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
       <div
         className={`
           relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-200 cursor-pointer
-          ${isDragging 
-            ? `border-${cfg.color} bg-${cfg.color}/10` 
+          ${isDragging
+            ? `border-${cfg.color} bg-${cfg.color}/10`
             : `border-nook-text/20 hover:border-${cfg.color}/50 hover:bg-${cfg.color}/5`
           }
           ${file ? 'border-nook-leaf bg-nook-leaf/5' : ''}
@@ -251,7 +251,7 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
                 <p>⏭️ 略過（重複）：<strong>{result.stats.skipped}</strong> 筆</p>
                 <p>⚠️ 錯誤：<strong>{result.stats.errors}</strong> 筆</p>
               </div>
-              
+
               {/* 主題分類統計（僅舉發） */}
               {result.topics_imported && (
                 <div className="mt-3 pt-3 border-t border-nook-text/10">
@@ -305,7 +305,7 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
             </>
           )}
         </button>
-        
+
         {(file || result) && (
           <button
             onClick={handleReset}

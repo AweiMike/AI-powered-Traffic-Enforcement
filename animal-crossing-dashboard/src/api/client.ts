@@ -3,7 +3,8 @@
  * 連接到 FastAPI 後端
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+// 使用相對路徑，讓 Vite 代理轉發請求到後端
+const API_BASE_URL = '';
 const API_VERSION = '/api/v1';
 
 // 主題代碼
@@ -276,6 +277,8 @@ export interface AccidentHotspotsResponse {
     a1_total: number;
     a2_total: number;
     a3_total: number;
+    dui_crash_total?: number;
+    total_dui_violations?: number;
   };
   note: string;
 }
@@ -287,6 +290,7 @@ export interface ShiftData {
   accident_severity: number;
   violations: number;
   combined_score: number;
+  dui_citations?: number;
 }
 
 export interface PeakTimesResponse {
@@ -508,12 +512,16 @@ class APIClient {
   // Accident Analysis API (事故分析)
   // ============================================
 
-  async getAccidentHotspots(days: number = 30): Promise<AccidentHotspotsResponse> {
-    return this.request(`/recommendations/accidents/hotspots?days=${days}`);
+  async getAccidentHotspots(days: number = 30, isElderly: boolean = false): Promise<AccidentHotspotsResponse> {
+    const params = new URLSearchParams({ days: days.toString() });
+    if (isElderly) params.append('is_elderly', 'true');
+    return this.request(`/recommendations/accidents/hotspots?${params}`);
   }
 
-  async getAccidentPeakTimes(district: string, days: number = 30): Promise<PeakTimesResponse> {
-    return this.request(`/recommendations/accidents/peak-times/${encodeURIComponent(district)}?days=${days}`);
+  async getAccidentPeakTimes(district: string, days: number = 30, isElderly: boolean = false): Promise<PeakTimesResponse> {
+    const params = new URLSearchParams({ days: days.toString() });
+    if (isElderly) params.append('is_elderly', 'true');
+    return this.request(`/recommendations/accidents/peak-times/${encodeURIComponent(district)}?${params}`);
   }
 
   async getAccidentHeatmap(shiftId?: string, days: number = 30): Promise<AccidentHeatmapResponse> {
@@ -532,6 +540,7 @@ class APIClient {
   // System API (root-level, no /api/v1 prefix)
   // ============================================
 
+
   async getSystemInfo(): Promise<any> {
     const response = await fetch(`${this.baseUrl}/`);
     if (!response.ok) throw new Error(`API Error: ${response.status}`);
@@ -539,6 +548,7 @@ class APIClient {
   }
 
   async healthCheck(): Promise<any> {
+    // /health 會被 Vite 代理轉發到後端
     const response = await fetch(`${this.baseUrl}/health`);
     if (!response.ok) throw new Error(`API Error: ${response.status}`);
     return response.json();

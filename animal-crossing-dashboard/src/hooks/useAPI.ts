@@ -218,10 +218,10 @@ export function useHealthCheck(): UseAPIState<any> {
 /**
  * 取得事故熱點分析
  */
-export function useAccidentHotspots(days: number = 30): UseAPIState<AccidentHotspotsResponse> {
+export function useAccidentHotspots(days: number = 30, isElderly: boolean = false): UseAPIState<AccidentHotspotsResponse> {
   return useAPI(
-    () => apiClient.getAccidentHotspots(days),
-    [days]
+    () => apiClient.getAccidentHotspots(days, isElderly),
+    [days, isElderly]
   );
 }
 
@@ -230,11 +230,12 @@ export function useAccidentHotspots(days: number = 30): UseAPIState<AccidentHots
  */
 export function useAccidentPeakTimes(
   district: string,
-  days: number = 30
+  days: number = 30,
+  isElderly: boolean = false
 ): UseAPIState<PeakTimesResponse> {
   return useAPI(
-    () => apiClient.getAccidentPeakTimes(district, days),
-    [district, days]
+    () => apiClient.getAccidentPeakTimes(district, days, isElderly),
+    [district, days, isElderly]
   );
 }
 

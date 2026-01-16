@@ -275,6 +275,54 @@ async def import_crash_file(
                 if severity not in ["A1", "A2", "A3"]:
                     severity = "A3"
 
+                # 嘗試讀取年齡資訊（支援原始完整檔案）
+                age_val = row.get("當事人年齡") or row.get("年齡") or row.get("Age")
+                birth_date_val = row.get("出生年月日") or row.get("出生日期") or row.get("生日")
+                
+                is_elderly = False
+                driver_age_group = "未知"
+                
+                # 優先使用年齡欄位
+                if not pd.isna(age_val):
+                    driver_age_group, is_elderly = classify_age(age_val)
+                # 其次嘗試從生日計算
+                elif not pd.isna(birth_date_val):
+                    birth_dt = parse_roc_datetime(birth_date_val)
+                    if birth_dt and occurred_dt:
+                        age = occurred_dt.year - birth_dt.year - ((occurred_dt.month, occurred_dt.day) < (birth_dt.month, birth_dt.day))
+                        if age >= 65:
+                            is_elderly = True
+                            driver_age_group = "65+"
+                        elif age < 18:
+                            driver_age_group = "<18"
+                        elif age < 25:
+                            driver_age_group = "18-24"
+                        elif age < 45:
+                            driver_age_group = "25-44"
+                        else:
+                            driver_age_group = "45-64"
+
+                # 提取額外資訊（若有）
+                party_type = str(row.get("當事人車種") or row.get("車種") or "").strip() or None
+                cause = str(row.get("肇事主要原因") or row.get("肇事原因") or "").strip() or None
+                driver_gender = str(row.get("當事人性別") or row.get("性別") or "").strip() or None
+                weather = str(row.get("天候") or "").strip() or None
+                light = str(row.get("光線") or "").strip() or None
+                
+                # 嘗試判斷酒駕
+                alcohol_val = row.get("酒測值") or row.get("飲酒情形")
+                suspected_alcohol = False
+                if alcohol_val:
+                    val_str = str(alcohol_val)
+                    if "飲酒" in val_str or "酒後" in val_str:
+                        suspected_alcohol = True
+                    else:
+                        try:
+                            if float(val_str) > 0:
+                                suspected_alcohol = True
+                        except:
+                            pass
+
                 crash = Crash(
                     case_id=case_id,
                     import_batch_id=batch_id,
@@ -283,11 +331,21 @@ async def import_crash_file(
                     shift_id=calculate_shift(occurred_dt),
                     district=district,
                     location_desc=location_desc,
+                    latitude=row.get("緯度") if not pd.isna(row.get("緯度")) else None,
+                    longitude=row.get("經度") if not pd.isna(row.get("經度")) else None,
                     severity=severity,
                     severity_weight=get_severity_weight(severity),
                     year=occurred_dt.year,
                     month=occurred_dt.month,
                     day_of_week=occurred_dt.weekday(),
+                    driver_age_group=driver_age_group,
+                    is_elderly=is_elderly,
+                    driver_gender=driver_gender,
+                    weather=weather,
+                    light=light,
+                    party_type=party_type,
+                    cause=cause,
+                    suspected_alcohol=suspected_alcohol,
                 )
 
                 db.add(crash)
@@ -431,6 +489,12 @@ async def import_ticket_file(
 
                 # 年齡處理
                 age_group, is_elderly = classify_age(row.get("違規人年齡"))
+                
+                # 性別可能會在 "違規人性別" 或 "性別"
+                driver_gender = str(row.get("違規人性別") or row.get("性別") or "").strip() or None
+
+                # 車種提取
+                vehicle_type = str(row.get("車種") or "").strip() or None
 
                 ticket = Ticket(
                     ticket_number=ticket_number,
@@ -455,6 +519,8 @@ async def import_ticket_file(
                     else None,
                     driver_age_group=age_group,
                     is_elderly=is_elderly,
+                    vehicle_type=vehicle_type,
+                    driver_gender=driver_gender,
                 )
 
                 db.add(ticket)

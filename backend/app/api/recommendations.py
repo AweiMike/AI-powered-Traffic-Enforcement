@@ -14,6 +14,19 @@ from app.models.dimension import Site
 router = APIRouter()
 
 
+def normalize_district(district: str) -> str:
+    """標準化區域名稱，移除「市」前綴"""
+    if district and district.startswith('市'):
+        return district[1:]
+    return district
+
+
+def get_district_variants(district: str) -> list:
+    """取得區域名稱的所有可能變體（用於查詢匹配）"""
+    base = normalize_district(district)
+    return [base, f"市{base}"]
+
+
 def get_data_end_date(db: Session):
     """
     取得資料庫中最新的事故/違規日期作為查詢結束日期。
@@ -169,20 +182,29 @@ async def get_top5_recommendations(
         coords = DISTRICT_COORDINATES.get(district, DEFAULT_COORDS)
         
         recommendations.append({
+            'rank': 0,  # Will be set after sorting
             'site_id': district,
             'site_name': district,
             'district': district,
-            'latitude': coords[0],
-            'longitude': coords[1],
-            'ticket_count': ticket_count,
-            'crash_count': crash_count,
-            'vpi': round(vpi, 2),
-            'cri': round(cri, 2),
-            'score': round(score, 2),
-            'rank': 0
+            'location_desc': district,
+            'coordinates': {
+                'latitude': coords[0],
+                'longitude': coords[1]
+            },
+            'metrics': {
+                'vpi': round(vpi, 2),
+                'cri': round(cri, 2),
+                'score': round(score, 2)
+            },
+            'statistics': {
+                'tickets': ticket_count,
+                'crashes': crash_count,
+                'a1_count': a1,
+                'a2_count': a2
+            }
         })
     
-    recommendations.sort(key=lambda x: x['score'], reverse=True)
+    recommendations.sort(key=lambda x: x['metrics']['score'], reverse=True)
     for i, rec in enumerate(recommendations[:5]):
         rec['rank'] = i + 1
     
@@ -294,12 +316,27 @@ async def get_briefing_card(
         Ticket.shift_id == shift_id
     ]
     
+    # 取得 Top 5 區域
     top_districts = db.query(
         Ticket.district,
         func.count(Ticket.id).label('count')
-    ).filter(and_(*conditions)).group_by(Ticket.district).order_by(desc('count')).limit(3).all()
+    ).filter(and_(*conditions)).group_by(Ticket.district).order_by(desc('count')).limit(5).all()
     
     total_violations = db.query(func.count(Ticket.id)).filter(and_(*conditions)).scalar() or 0
+    
+    # 取得事故統計
+    crash_conditions = [
+        Crash.occurred_date >= start_date,
+        Crash.occurred_date <= target_date
+    ]
+    crash_stats = db.query(
+        Crash.district,
+        func.count(Crash.id).label('crash_count'),
+        func.sum(case((Crash.severity == 'A1', 1), else_=0)).label('a1_count'),
+        func.sum(case((Crash.severity == 'A2', 1), else_=0)).label('a2_count')
+    ).filter(and_(*crash_conditions)).group_by(Crash.district).all()
+    
+    crash_dict = {s.district: (s.crash_count, s.a1_count or 0, s.a2_count or 0) for s in crash_stats}
     
     shift_names = {
         "01": "00:00-02:00", "02": "02:00-04:00", "03": "04:00-06:00",
@@ -308,24 +345,73 @@ async def get_briefing_card(
         "10": "18:00-20:00", "11": "20:00-22:00", "12": "22:00-24:00"
     }
     
-    topic_names = {
-        "DUI": "酒駕",
-        "RED_LIGHT": "闖紅燈",
-        "DANGEROUS_DRIVING": "危險駕駛"
+    topic_info = {
+        "DUI": {"name": "酒駕", "emoji": "🍺", "focus": "酒後駕車取締"},
+        "RED_LIGHT": {"name": "闘紅燈", "emoji": "🚦", "focus": "路口闖紅燈取締"},
+        "DANGEROUS_DRIVING": {"name": "危險駕駛", "emoji": "⚠️", "focus": "危險駕駛行為取締"}
     }
+    
+    # 建立 top5_sites 陣列 (與 SiteRecommendation 格式一致)
+    top5_sites = []
+    for i, (district, ticket_count) in enumerate(top_districts):
+        if not district:
+            continue
+        crash_count, a1, a2 = crash_dict.get(district, (0, 0, 0))
+        vpi = calculate_vpi(ticket_count, topic_code)
+        cri = calculate_cri(crash_count, a1, a2)
+        score = calculate_score(vpi, cri, topic_code)
+        coords = DISTRICT_COORDINATES.get(district, DEFAULT_COORDS)
+        
+        top5_sites.append({
+            'rank': i + 1,
+            'site_id': district,
+            'site_name': district,
+            'district': district,
+            'location_desc': district,
+            'coordinates': {
+                'latitude': coords[0],
+                'longitude': coords[1]
+            },
+            'metrics': {
+                'vpi': round(vpi, 2),
+                'cri': round(cri, 2),
+                'score': round(score, 2)
+            },
+            'statistics': {
+                'tickets': ticket_count,
+                'crashes': crash_count,
+                'violation_days': 30,
+                'avg_tickets_per_day': round(ticket_count / 30, 2)
+            }
+        })
+    
+    topic_data = topic_info.get(topic_code, {"name": topic_code, "emoji": "📋", "focus": "取締作業"})
     
     return {
         "date": target_date.isoformat(),
-        "shift_id": shift_id,
-        "shift_time": shift_names.get(shift_id, shift_id),
-        "topic_code": topic_code,
-        "topic_name": topic_names.get(topic_code, topic_code),
-        "top_locations": [
-            {"rank": i+1, "district": d, "count": c} 
-            for i, (d, c) in enumerate(top_districts)
+        "shift": {
+            "shift_id": shift_id,
+            "shift_number": int(shift_id) if shift_id.isdigit() else 0,
+            "time_range": shift_names.get(shift_id, shift_id)
+        },
+        "topic": {
+            "code": topic_code,
+            "name": topic_data["name"],
+            "emoji": topic_data["emoji"],
+            "focus": topic_data["focus"]
+        },
+        "top5_sites": top5_sites,
+        "statistics": {
+            "period_days": 30,
+            "total_sites": len(top_districts)
+        },
+        "notes": [
+            f"本班別共有 {total_violations} 件違規紀錄",
+            "建議優先巡邏排名前 3 區域",
+            "注意高齡駕駛人取締程序"
         ],
-        "total_violations": total_violations,
-        "recommendation": f"建議在{top_districts[0][0] if top_districts else '熱點區域'}加強{topic_names.get(topic_code, '')}取締"
+        "generated_at": datetime.now().isoformat(),
+        "privacy_note": "本建議卡無任何個資，僅統計分析資料"
     }
 
 
@@ -343,11 +429,23 @@ TOPIC_NAMES = {
 @router.get("/accidents/hotspots")
 async def get_accident_hotspots(
     days: int = Query(30, ge=1, le=365, description="統計天數"),
+    is_elderly: Optional[bool] = Query(False, description="是否僅統計高齡者事故"),
     db: Session = Depends(get_db)
 ):
     """事故熱點分析"""
     end_date = get_data_end_date(db)
     start_date = end_date - timedelta(days=days)
+    
+    # 建立基礎篩選條件
+    filters = [
+        Crash.occurred_date >= start_date,
+        Crash.occurred_date <= end_date,
+        Crash.district.isnot(None)
+    ]
+    
+    # 加入高齡者篩選
+    if is_elderly:
+        filters.append(Crash.is_elderly == True)
     
     crash_stats = db.query(
         Crash.district,
@@ -355,26 +453,31 @@ async def get_accident_hotspots(
         func.sum(case((Crash.severity == 'A1', 1), else_=0)).label('a1_count'),
         func.sum(case((Crash.severity == 'A2', 1), else_=0)).label('a2_count'),
         func.sum(case((Crash.severity == 'A3', 1), else_=0)).label('a3_count'),
-        func.sum(Crash.severity_weight).label('severity_score')
+        func.sum(Crash.severity_weight).label('severity_score'),
+        func.sum(case((Crash.suspected_alcohol == True, 1), else_=0)).label('dui_crashes')
     ).filter(
-        Crash.occurred_date >= start_date,
-        Crash.occurred_date <= end_date,
-        Crash.district.isnot(None)
+        *filters
     ).group_by(Crash.district).order_by(desc('severity_score')).all()
     
     hotspots = []
-    a1_total = a2_total = a3_total = 0
+    a1_total = a2_total = a3_total = dui_crash_total = 0
     
-    for district, total, a1, a2, a3, severity_score in crash_stats:
+    for district, total, a1, a2, a3, severity_score, dui_crashes in crash_stats:
         if not district:
             continue
+        
+        # 標準化區域名稱
+        normalized_district = normalize_district(district)
+        district_variants = get_district_variants(district)
         
         a1 = a1 or 0
         a2 = a2 or 0
         a3 = a3 or 0
+        dui_crashes = dui_crashes or 0
         a1_total += a1
         a2_total += a2
         a3_total += a3
+        dui_crash_total += dui_crashes
         
         violation_stats = db.query(
             func.count(Ticket.id).label('total_violations'),
@@ -384,7 +487,7 @@ async def get_accident_hotspots(
         ).filter(
             Ticket.violation_date >= start_date,
             Ticket.violation_date <= end_date,
-            Ticket.district == district
+            Ticket.district.in_(district_variants)  # 匹配兩種格式
         ).first()
         
         violation_counts = {
@@ -394,13 +497,13 @@ async def get_accident_hotspots(
         }
         priority_topic = max(violation_counts, key=violation_counts.get) if any(violation_counts.values()) else None
         
-        coords = DISTRICT_COORDINATES.get(district, DEFAULT_COORDS)
+        coords = DISTRICT_COORDINATES.get(normalized_district, DISTRICT_COORDINATES.get(district, DEFAULT_COORDS))
         enforcement_focus = "需要更多數據分析"
         if priority_topic:
             enforcement_focus = f"建議加強{TOPIC_NAMES.get(priority_topic, '')}取締"
         
         hotspots.append({
-            'district': district,
+            'district': normalized_district,  # 省略「市」前綴
             'latitude': coords[0],
             'longitude': coords[1],
             'accidents': {
@@ -413,8 +516,14 @@ async def get_accident_hotspots(
             'violations': {
                 'total': violation_stats.total_violations or 0,
                 'dui': violation_stats.dui or 0,
+                'dui_no_crash': (violation_stats.dui or 0) - dui_crashes,  # 酒駕無肇事
                 'red_light': violation_stats.red_light or 0,
                 'dangerous_driving': violation_stats.dangerous or 0
+            },
+            'dui_stats': {
+                'total_dui': violation_stats.dui or 0,
+                'dui_with_crash': dui_crashes,  # 酒駕有肇事
+                'dui_no_crash': max(0, (violation_stats.dui or 0) - dui_crashes)  # 酒駕無肇事告發
             },
             'recommendation': {
                 'priority_topic': priority_topic,
@@ -434,7 +543,9 @@ async def get_accident_hotspots(
             'total_accidents': sum(h['accidents']['total'] for h in hotspots),
             'a1_total': a1_total,
             'a2_total': a2_total,
-            'a3_total': a3_total
+            'a3_total': a3_total,
+            'dui_crash_total': dui_crash_total,
+            'total_dui_violations': sum(h['violations']['dui'] for h in hotspots)
         }
     }
 
@@ -443,6 +554,7 @@ async def get_accident_hotspots(
 async def get_accident_peak_times(
     district: str,
     days: int = Query(30, ge=1, le=365, description="統計天數"),
+    is_elderly: Optional[bool] = Query(False, description="是否僅統計高齡者事故"),
     db: Session = Depends(get_db)
 ):
     """特定區域的時段分布分析"""
@@ -456,13 +568,25 @@ async def get_accident_peak_times(
         "10": "18:00-20:00", "11": "20:00-22:00", "12": "22:00-24:00"
     }
     
+    # 使用區域名稱變體匹配（支援「新化區」和「市新化區」兩種格式）
+    district_variants = get_district_variants(district)
+    
+    # 建立基礎篩選條件
+    filters = [
+        Crash.occurred_date >= start_date,
+        Crash.occurred_date <= end_date,
+        Crash.district.in_(district_variants)
+    ]
+    
+    # 加入高齡者篩選
+    if is_elderly:
+        filters.append(Crash.is_elderly == True)
+    
     crash_by_shift = db.query(
         Crash.shift_id,
         func.count(Crash.id).label('count')
     ).filter(
-        Crash.occurred_date >= start_date,
-        Crash.occurred_date <= end_date,
-        Crash.district == district
+        *filters
     ).group_by(Crash.shift_id).all()
     
     violation_by_shift = db.query(
@@ -471,21 +595,34 @@ async def get_accident_peak_times(
     ).filter(
         Ticket.violation_date >= start_date,
         Ticket.violation_date <= end_date,
-        Ticket.district == district
+        Ticket.district.in_(district_variants)
+    ).group_by(Ticket.shift_id).all()
+
+    dui_by_shift = db.query(
+        Ticket.shift_id,
+        func.count(Ticket.id).label('count')
+    ).filter(
+        Ticket.violation_date >= start_date,
+        Ticket.violation_date <= end_date,
+        Ticket.district.in_(district_variants),
+        Ticket.topic_dui == True
     ).group_by(Ticket.shift_id).all()
     
     crash_dict = {s.shift_id: s.count for s in crash_by_shift}
     violation_dict = {s.shift_id: s.count for s in violation_by_shift}
+    dui_dict = {s.shift_id: s.count for s in dui_by_shift}
     
     shifts = []
     for shift_id in sorted(shift_names.keys()):
         accidents = crash_dict.get(shift_id, 0)
         violations = violation_dict.get(shift_id, 0)
+        dui_citations = dui_dict.get(shift_id, 0)
         shifts.append({
             'shift_id': shift_id,
             'time_range': shift_names[shift_id],
             'accidents': accidents,
-            'violations': violations
+            'violations': violations,
+            'dui_citations': dui_citations
         })
     
     peak_shifts = sorted(shifts, key=lambda x: x['accidents'], reverse=True)[:3]
@@ -582,7 +719,8 @@ async def get_cross_analysis(
         Crash.district.isnot(None)
     ]
     if district:
-        crash_conditions.append(Crash.district == district)
+        district_variants = get_district_variants(district)
+        crash_conditions.append(Crash.district.in_(district_variants))
     
     crash_stats = db.query(
         Crash.district,
@@ -596,7 +734,8 @@ async def get_cross_analysis(
         Ticket.district.isnot(None)
     ]
     if district:
-        ticket_conditions.append(Ticket.district == district)
+        district_variants = get_district_variants(district)
+        ticket_conditions.append(Ticket.district.in_(district_variants))
     
     ticket_stats = db.query(
         Ticket.district,
@@ -604,11 +743,17 @@ async def get_cross_analysis(
         func.count(Ticket.id).label('violations')
     ).filter(and_(*ticket_conditions)).group_by(Ticket.district, Ticket.shift_id).all()
     
-    ticket_dict = {(t.district, t.shift_id): t.violations for t in ticket_stats}
+    # 建立 ticket_dict，標準化區域名稱
+    ticket_dict = {}
+    for t in ticket_stats:
+        normalized = normalize_district(t.district)
+        key = (normalized, t.shift_id)
+        ticket_dict[key] = ticket_dict.get(key, 0) + t.violations
     
     cross_analysis = []
     for c in crash_stats:
-        violations = ticket_dict.get((c.district, c.shift_id), 0)
+        normalized_district = normalize_district(c.district)
+        violations = ticket_dict.get((normalized_district, c.shift_id), 0)
         gap = c.accidents - (violations * 0.1) if violations else c.accidents
         
         priority = 'LOW'
@@ -618,7 +763,7 @@ async def get_cross_analysis(
             priority = 'MEDIUM'
         
         cross_analysis.append({
-            'district': c.district,
+            'district': normalized_district,  # 標準化區域名稱（省略「市」）
             'shift_id': c.shift_id,
             'time_range': shift_names.get(c.shift_id, c.shift_id),
             'accidents': c.accidents,

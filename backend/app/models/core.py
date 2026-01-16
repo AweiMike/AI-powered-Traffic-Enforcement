@@ -65,11 +65,15 @@ class Crash(Base):
     month = Column(Integer, nullable=False, index=True, comment="月份")
     day_of_week = Column(Integer, comment="星期幾 0-6")
     is_holiday = Column(Boolean, default=False, comment="是否假日")
+    weather = Column(String(50), index=True, comment="天候")
+    light = Column(String(50), index=True, comment="光線")
 
     # === 主題相關（可能無法判定） ===
     suspected_alcohol = Column(
         Boolean, default=False, comment="疑似酒駕（若有明確資訊）"
     )
+    cause = Column(String(200), index=True, comment="肇事主要原因")
+    party_type = Column(String(50), index=True, comment="當事人車種（如：自用小客車、機車、行人）")
 
     # === 駕駛人特徵（統計用，去識別化） ===
     driver_age_group = Column(
@@ -159,6 +163,7 @@ class Ticket(Base):
     is_elderly = Column(
         Boolean, default=False, index=True, comment="是否為高齡者（65歲以上）"
     )
+    vehicle_type = Column(String(50), index=True, comment="車種（如：汽車、機車）")
     driver_gender = Column(String(10), index=True, comment="性別：男/女/未知")
 
     # === 系統欄位 ===
