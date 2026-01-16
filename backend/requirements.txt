@@ -1,0 +1,37 @@
+# 精準執法儀表板系統 - 後端依賴
+# Python 3.10+
+
+# Web Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Database
+sqlalchemy==2.0.23
+# psycopg2-binary==2.9.9  # 只有使用 PostgreSQL 時才需要
+# geoalchemy2==0.14.2     # 只有使用 PostGIS 時才需要
+alembic==1.12.1
+
+# Data Processing
+pandas==2.1.3
+openpyxl==3.1.2
+numpy==1.26.2
+
+# Geospatial (SQLite 版本使用經緯度，不需要 shapely)
+# shapely==2.0.2
+
+# Utilities
+python-dotenv==1.0.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# CORS
+python-cors==1.0.0
+
+# Date/Time
+python-dateutil==2.8.2
+
+# Testing (optional)
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.1

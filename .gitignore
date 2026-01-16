@@ -1,0 +1,41 @@
+# 精準執法儀表板系統
+# Precision Law Enforcement Dashboard
+
+## Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+## Build outputs
+dist/
+build/
+*.egg-info/
+
+## Database
+*.db
+*.sqlite
+*.sqlite3
+
+## Environment
+.env
+.env.local
+
+## IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Logs
+*.log
+logs/
+
+## Temporary
+*.tmp
+temp/

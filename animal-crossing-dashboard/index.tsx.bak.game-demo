@@ -1,0 +1,456 @@
+import React, { useState, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
+import {
+  LayoutDashboard,
+  Car,
+  AlertTriangle,
+  FileText,
+  Settings,
+  TreePine,
+  Bell,
+  Search,
+  TrendingUp,
+  TrendingDown,
+  Clock,
+  Users,
+  MapPin,
+  Activity,
+  Leaf,
+  Star,
+  MessageCircle,
+  Sparkles,
+  ChevronRight,
+  Home,
+  Calendar,
+  BarChart3,
+  Shield,
+  Volume2
+} from 'lucide-react';
+
+// ============================================
+// 無人島生活管理中心 - 交通執法儀表板
+// Animal Crossing Style Traffic Dashboard
+// ============================================
+
+// Mock Data - 模擬資料
+const mockTrafficData = {
+  totalVehicles: 12847,
+  violations: 156,
+  incidents: 23,
+  clearanceRate: 94.2,
+  weeklyTrend: [
+    { day: '週一', vehicles: 1821, violations: 24 },
+    { day: '週二', vehicles: 1956, violations: 18 },
+    { day: '週三', vehicles: 2134, violations: 31 },
+    { day: '週四', vehicles: 1889, violations: 22 },
+    { day: '週五', vehicles: 2201, violations: 28 },
+    { day: '週六', vehicles: 1567, violations: 19 },
+    { day: '週日', vehicles: 1279, violations: 14 },
+  ],
+};
+
+const recentActivities = [
+  { id: 1, type: 'violation', icon: '🦝', message: 'Gulliver 違規停車睡覺中', time: '5分鐘前', location: '廣場前' },
+  { id: 2, type: 'event', icon: '🎸', message: 'KK 演唱會交通管制開始', time: '15分鐘前', location: '服務處前' },
+  { id: 3, type: 'report', icon: '🦊', message: '傑克回報：西海岸發現可疑車輛', time: '32分鐘前', location: '西海岸' },
+  { id: 4, type: 'patrol', icon: '🦆', message: '呱吉完成東區巡邏', time: '45分鐘前', location: '東區住宅' },
+  { id: 5, type: 'violation', icon: '🐻', message: '博達熊超速警告 (時速 3km!)', time: '1小時前', location: '北海灘' },
+];
+
+const weatherInfo = {
+  condition: '晴天',
+  temp: 24,
+  icon: '☀️',
+  forecast: '今日適合外出巡邏！'
+};
+
+// ============================================
+// Sidebar Component - 側邊欄
+// ============================================
+const Sidebar: React.FC = () => {
+  const [activeItem, setActiveItem] = useState('dashboard');
+
+  const menuItems = [
+    { id: 'dashboard', icon: Home, label: '總覽', emoji: '🏠' },
+    { id: 'traffic', icon: Car, label: '交通流量', emoji: '🚗' },
+    { id: 'violations', icon: AlertTriangle, label: '違規紀錄', emoji: '📋' },
+    { id: 'reports', icon: FileText, label: '報告中心', emoji: '📊' },
+    { id: 'patrol', icon: MapPin, label: '巡邏地圖', emoji: '🗺️' },
+    { id: 'residents', icon: Users, label: '島民名單', emoji: '🐾' },
+    { id: 'calendar', icon: Calendar, label: '活動日曆', emoji: '📅' },
+    { id: 'settings', icon: Settings, label: '設定', emoji: '⚙️' },
+  ];
+
+  return (
+    <aside className="w-72 bg-white/80 backdrop-blur-sm h-screen fixed left-0 top-0 nook-shadow z-50">
+      {/* Logo */}
+      <div className="p-6 border-b border-nook-leaf/20">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-nook-leaf rounded-2xl flex items-center justify-center">
+            <Leaf className="w-7 h-7 text-white" />
+          </div>
+          <div>
+            <h1 className="font-bold text-nook-text text-lg">無人島管理中心</h1>
+            <p className="text-sm text-nook-text/60">交通執法系統</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Menu */}
+      <nav className="p-4 space-y-2">
+        {menuItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeItem === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setActiveItem(item.id)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 ${
+                isActive
+                  ? 'bg-nook-leaf text-white shadow-lg shadow-nook-leaf/30'
+                  : 'text-nook-text hover:bg-nook-leaf/10'
+              }`}
+            >
+              <span className="text-xl">{item.emoji}</span>
+              <span className="font-medium">{item.label}</span>
+              {isActive && <ChevronRight className="w-4 h-4 ml-auto" />}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Nook Phone */}
+      <div className="absolute bottom-6 left-4 right-4">
+        <div className="bg-nook-sky/20 rounded-2xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-nook-sky rounded-xl flex items-center justify-center">
+              <TreePine className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-nook-text">狸端機</p>
+              <p className="text-xs text-nook-text/60">已連線 ✓</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+};
+
+// ============================================
+// Header Component - 頂部導覽列
+// ============================================
+const Header: React.FC = () => {
+  return (
+    <header className="h-20 bg-white/60 backdrop-blur-sm border-b border-nook-leaf/10 flex items-center justify-between px-8">
+      {/* Search */}
+      <div className="flex items-center gap-4">
+        <div className="relative">
+          <Search className="w-5 h-5 text-nook-text/40 absolute left-4 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="搜尋島民或地點..."
+            className="w-80 pl-12 pr-4 py-3 bg-nook-cream/50 border border-nook-leaf/20 rounded-2xl text-nook-text placeholder:text-nook-text/40 focus:outline-none focus:ring-2 focus:ring-nook-leaf/30"
+          />
+        </div>
+      </div>
+
+      {/* Right section */}
+      <div className="flex items-center gap-4">
+        {/* Weather */}
+        <div className="flex items-center gap-2 px-4 py-2 bg-nook-sky/10 rounded-2xl">
+          <span className="text-2xl">{weatherInfo.icon}</span>
+          <span className="text-nook-text font-medium">{weatherInfo.temp}°C</span>
+        </div>
+
+        {/* Notifications */}
+        <button className="relative p-3 bg-nook-cream rounded-2xl hover:bg-nook-bell/20 transition-colors">
+          <Bell className="w-5 h-5 text-nook-text" />
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-nook-red rounded-full text-white text-xs flex items-center justify-center">
+            3
+          </span>
+        </button>
+
+        {/* User */}
+        <div className="flex items-center gap-3 pl-4 border-l border-nook-leaf/20">
+          <div className="w-10 h-10 bg-nook-leaf rounded-full flex items-center justify-center text-xl">
+            🦝
+          </div>
+          <div>
+            <p className="text-sm font-medium text-nook-text">狸克</p>
+            <p className="text-xs text-nook-text/60">島長</p>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+};
+
+// ============================================
+// StatCard Component - 統計卡片
+// ============================================
+interface StatCardProps {
+  title: string;
+  value: string | number;
+  change?: number;
+  icon: React.ReactNode;
+  emoji: string;
+  color: string;
+}
+
+const StatCard: React.FC<StatCardProps> = ({ title, value, change, icon, emoji, color }) => {
+  const isPositive = change && change > 0;
+  
+  return (
+    <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 nook-shadow hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+      <div className="flex items-start justify-between mb-4">
+        <div className={`w-14 h-14 ${color} rounded-2xl flex items-center justify-center text-2xl shadow-lg`}>
+          {emoji}
+        </div>
+        {change !== undefined && (
+          <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-sm ${
+            isPositive ? 'bg-nook-leaf/10 text-nook-leaf' : 'bg-nook-red/10 text-nook-red'
+          }`}>
+            {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+            <span>{Math.abs(change)}%</span>
+          </div>
+        )}
+      </div>
+      <p className="text-nook-text/60 text-sm mb-1">{title}</p>
+      <p className="text-3xl font-bold text-nook-text">{value.toLocaleString()}</p>
+    </div>
+  );
+};
+
+// ============================================
+// TrafficChart Component - 交通圖表
+// ============================================
+const TrafficChart: React.FC = () => {
+  const maxVehicles = Math.max(...mockTrafficData.weeklyTrend.map(d => d.vehicles));
+
+  return (
+    <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 nook-shadow">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h3 className="text-lg font-bold text-nook-text flex items-center gap-2">
+            📈 本週交通流量
+          </h3>
+          <p className="text-sm text-nook-text/60">過去7天的車輛通行紀錄</p>
+        </div>
+        <div className="flex gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-nook-leaf rounded-full"></div>
+            <span className="text-nook-text/60">車輛數</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-nook-orange rounded-full"></div>
+            <span className="text-nook-text/60">違規數</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-end justify-between gap-4 h-48">
+        {mockTrafficData.weeklyTrend.map((day, index) => (
+          <div key={day.day} className="flex-1 flex flex-col items-center gap-2">
+            <div className="w-full flex flex-col items-center gap-1">
+              <div
+                className="w-full bg-nook-leaf/80 rounded-t-lg transition-all duration-500"
+                style={{ 
+                  height: `${(day.vehicles / maxVehicles) * 150}px`,
+                  animationDelay: `${index * 100}ms`
+                }}
+              ></div>
+              <div
+                className="w-full bg-nook-orange/80 rounded-b-lg"
+                style={{ height: `${(day.violations / 35) * 30}px` }}
+              ></div>
+            </div>
+            <span className="text-xs text-nook-text/60 font-medium">{day.day}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// IsabelleBroadcastWidget - 西施惠廣播
+// ============================================
+const IsabelleBroadcastWidget: React.FC = () => {
+  const [broadcast, setBroadcast] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const generateBroadcast = async () => {
+    setIsLoading(true);
+    
+    // Simulated AI response (replace with actual Gemini API call)
+    const broadcasts = [
+      '大家早安！今天天氣晴朗，非常適合外出散步呢～請大家行車時注意安全，遵守交通規則喔！🌸',
+      '各位島民好！廣場前目前有 KK 演唱會交通管制，請繞道通行。祝大家有美好的一天！🎵',
+      '特別提醒：西海岸今日有釣魚大會，預計車輛會比較多，請大家耐心等待喔～🐟',
+      '午安！目前島上交通順暢，一路順風！記得開車不超速，平安最重要～💚',
+    ];
+    
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setBroadcast(broadcasts[Math.floor(Math.random() * broadcasts.length)]);
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    generateBroadcast();
+  }, []);
+
+  return (
+    <div className="isabelle-gradient rounded-3xl p-6 nook-shadow">
+      <div className="flex items-start gap-4">
+        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-3xl shadow-lg flex-shrink-0">
+          🐕
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="font-bold text-nook-text">西施惠的廣播</h3>
+            <Volume2 className="w-4 h-4 text-nook-text/60" />
+          </div>
+          <div className="bg-white/60 rounded-2xl p-4 min-h-[80px]">
+            {isLoading ? (
+              <div className="flex items-center gap-2 text-nook-text/60">
+                <Sparkles className="w-4 h-4 animate-spin" />
+                <span>正在準備廣播內容...</span>
+              </div>
+            ) : (
+              <p className="text-nook-text leading-relaxed">{broadcast}</p>
+            )}
+          </div>
+          <button
+            onClick={generateBroadcast}
+            disabled={isLoading}
+            className="mt-3 flex items-center gap-2 px-4 py-2 bg-nook-bell/80 hover:bg-nook-bell rounded-xl text-nook-text text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            <MessageCircle className="w-4 h-4" />
+            重新廣播
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// RecentActivity Component - 最近活動
+// ============================================
+const RecentActivity: React.FC = () => {
+  return (
+    <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 nook-shadow">
+      <h3 className="text-lg font-bold text-nook-text flex items-center gap-2 mb-4">
+        🔔 最近動態
+      </h3>
+      <div className="space-y-3">
+        {recentActivities.map((activity) => (
+          <div
+            key={activity.id}
+            className="flex items-start gap-3 p-3 bg-nook-cream/30 rounded-2xl hover:bg-nook-cream/50 transition-colors"
+          >
+            <span className="text-2xl">{activity.icon}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-nook-text font-medium">{activity.message}</p>
+              <div className="flex items-center gap-2 mt-1 text-xs text-nook-text/60">
+                <MapPin className="w-3 h-3" />
+                <span>{activity.location}</span>
+                <span>•</span>
+                <Clock className="w-3 h-3" />
+                <span>{activity.time}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// Main App Component
+// ============================================
+const App: React.FC = () => {
+  return (
+    <div className="min-h-screen">
+      <Sidebar />
+      
+      <main className="ml-72 min-h-screen">
+        <Header />
+        
+        <div className="p-8">
+          {/* Welcome Banner */}
+          <div className="bg-gradient-to-r from-nook-leaf to-nook-leaf-dark rounded-3xl p-8 mb-8 text-white nook-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold mb-2">🌴 歡迎回來，狸克島長！</h2>
+                <p className="text-white/80">今天是個適合巡邏的好日子，目前島上交通順暢～</p>
+              </div>
+              <div className="flex items-center gap-2 bg-white/20 rounded-2xl px-4 py-2">
+                <Star className="w-5 h-5 text-nook-bell bell-icon" />
+                <span className="font-medium">島嶼評價：⭐⭐⭐⭐⭐</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-4 gap-6 mb-8">
+            <StatCard
+              title="今日車輛通行"
+              value={mockTrafficData.totalVehicles}
+              change={12}
+              icon={<Car />}
+              emoji="🚗"
+              color="bg-nook-sky"
+            />
+            <StatCard
+              title="違規案件"
+              value={mockTrafficData.violations}
+              change={-8}
+              icon={<AlertTriangle />}
+              emoji="📋"
+              color="bg-nook-orange"
+            />
+            <StatCard
+              title="交通事件"
+              value={mockTrafficData.incidents}
+              change={-15}
+              icon={<Activity />}
+              emoji="⚠️"
+              color="bg-nook-red"
+            />
+            <StatCard
+              title="案件處理率"
+              value={`${mockTrafficData.clearanceRate}%`}
+              change={5}
+              icon={<Shield />}
+              emoji="✅"
+              color="bg-nook-leaf"
+            />
+          </div>
+
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-3 gap-6">
+            <div className="col-span-2 space-y-6">
+              <TrafficChart />
+              <IsabelleBroadcastWidget />
+            </div>
+            <div>
+              <RecentActivity />
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+// ============================================
+// Render
+// ============================================
+const container = document.getElementById('root');
+if (container) {
+  const root = createRoot(container);
+  root.render(<App />);
+}
