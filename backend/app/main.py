@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 
 from app.config import settings
 from app.database import init_db
-from app.api import topics, stats, recommendations, imports
+from app.api import topics, stats, recommendations, imports, admin
 
 
 # ============================================
@@ -103,6 +103,12 @@ app.include_router(
     imports.router,
     prefix=f"{settings.API_V1_PREFIX}/import",
     tags=["資料匯入"],
+)
+
+app.include_router(
+    admin.router,
+    prefix=f"{settings.API_V1_PREFIX}/admin",
+    tags=["系統管理"],
 )
 
 

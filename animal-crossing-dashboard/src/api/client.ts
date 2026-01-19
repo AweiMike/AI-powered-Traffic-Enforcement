@@ -537,6 +537,16 @@ class APIClient {
   }
 
   // ============================================
+  // System Admin API
+  // ============================================
+
+  async resetDatabase(): Promise<{ status: string; message: string }> {
+    return this.request('/admin/reset-database', {
+      method: 'POST',
+    });
+  }
+
+  // ============================================
   // System API (root-level, no /api/v1 prefix)
   // ============================================
 

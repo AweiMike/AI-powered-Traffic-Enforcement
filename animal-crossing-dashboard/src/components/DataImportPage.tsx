@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, Database, AlertCircle } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, Database, AlertCircle, Trash2 } from 'lucide-react';
+import { apiClient } from '../api/client';
 
 // API 基礎 URL
 const API_BASE = '/api/v1';
@@ -465,6 +466,24 @@ const DataImportPage: React.FC = () => {
     setRefreshTrigger(prev => prev + 1);
   };
 
+  const handleResetDatabase = async () => {
+    if (!confirm('警告：這將刪除系統內所有的事故與違規資料，且無法還原！\n\n確定要執行嗎？')) {
+      return;
+    }
+
+    try {
+      const res = await apiClient.resetDatabase();
+      if (res.status === 'success') {
+        alert('資料庫已重置成功！');
+        setRefreshTrigger(prev => prev + 1);
+      } else {
+        alert('重置失敗：' + res.message);
+      }
+    } catch (err) {
+      alert('請求失敗：' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
   return (
     <div className="p-8">
       {/* 標題區 */}
@@ -499,7 +518,26 @@ const DataImportPage: React.FC = () => {
       </div>
 
       {/* 資料庫狀態 */}
+      {/* 資料庫狀態 */}
       <DatabaseStatusCard refreshTrigger={refreshTrigger} />
+
+      {/* 系統維護區 */}
+      <div className="mt-8 border-t border-nook-text/10 pt-8">
+        <h3 className="text-xl font-bold text-nook-text mb-4">🔧 系統維護</h3>
+        <div className="bg-red-50 rounded-3xl p-6 border border-red-100 flex items-center justify-between">
+          <div>
+            <h4 className="font-bold text-red-700 mb-1">重置資料庫</h4>
+            <p className="text-sm text-red-600/80">移除所有已匯入的事故與違規資料。請謹慎使用。</p>
+          </div>
+          <button
+            onClick={handleResetDatabase}
+            className="flex items-center gap-2 px-6 py-3 bg-white text-red-600 border border-red-200 rounded-2xl font-bold hover:bg-red-50 transition-colors shadow-sm"
+          >
+            <Trash2 className="w-5 h-5" />
+            清空所有資料
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
