@@ -239,8 +239,24 @@ async def import_crash_file(
         raise HTTPException(status_code=500, detail=f"檔案儲存失敗: {str(e)}")
 
     try:
-        # 讀取 Excel
-        df = pd.read_excel(tmp_path)
+        # 讀取 Excel - 先不指定標題列以偵測結構
+        df_raw = pd.read_excel(tmp_path, header=None)
+        
+        # 自動偵測標題列：尋找包含「案件編號」或「發生時間」的列
+        header_row = 0
+        for i in range(min(10, len(df_raw))):
+            row_values = [str(v).strip() for v in df_raw.iloc[i] if pd.notna(v)]
+            row_text = ' '.join(row_values)
+            if '案件編號' in row_text or '發生時間' in row_text or '事故編號' in row_text:
+                header_row = i
+                break
+        
+        # 重新讀取，使用正確的標題列
+        df = pd.read_excel(tmp_path, header=header_row)
+        
+        # 清理欄位名稱（移除空白和換行）
+        df.columns = [str(c).strip().replace('\n', '').replace(' ', '') for c in df.columns]
+        
         batch_id = f"WEB_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
         stats = {"total": len(df), "new": 0, "skipped": 0, "errors": 0}
@@ -248,8 +264,23 @@ async def import_crash_file(
 
         for idx, row in df.iterrows():
             try:
-                case_id = str(row.get("案件編號", "")).strip()
+                # 支援多種案件編號欄位名稱
+                case_id = None
+                for col_name in ["案件編號", "案號", "事故編號", "編號", "案件序號", "序號", "CaseID", "case_id"]:
+                    if col_name in row.index and pd.notna(row.get(col_name)):
+                        val = str(row.get(col_name)).strip()
+                        # 只接受看起來像案件編號的值（包含數字）
+                        if val and any(c.isdigit() for c in val):
+                            case_id = val
+                            break
+                
+                # 如果沒有案件編號，靜默跳過（可能是空白列或標題列）
                 if not case_id:
+                    # 檢查整列是否大部分都是空的
+                    non_empty_count = sum(1 for v in row if pd.notna(v) and str(v).strip())
+                    if non_empty_count < 3:
+                        # 靜默跳過空白列
+                        continue
                     stats["errors"] += 1
                     error_messages.append(f"第 {idx + 2} 列：缺少案件編號")
                     continue
@@ -260,18 +291,33 @@ async def import_crash_file(
                     stats["skipped"] += 1
                     continue
 
-                # 解析時間
-                occurred_dt = parse_roc_datetime(row.get("發生時間"))
+                # 解析時間 - 支援多種欄位名稱
+                occurred_dt = None
+                for time_col in ["發生時間", "事故時間", "發生日期時間", "日期時間", "時間", "發生日期"]:
+                    if time_col in row.index and pd.notna(row.get(time_col)):
+                        occurred_dt = parse_roc_datetime(row.get(time_col))
+                        if occurred_dt:
+                            break
+                
                 if not occurred_dt:
                     stats["errors"] += 1
-                    error_messages.append(f"第 {idx + 2} 列：發生時間格式錯誤")
+                    error_messages.append(f"第 {idx + 2} 列：發生時間格式錯誤或缺失")
                     continue
 
-                # 去識別化地址
-                district, location_desc = deidentify_address(row.get("發生地點"))
+                # 去識別化地址 - 支援多種欄位名稱
+                location_val = None
+                for loc_col in ["發生地點", "事故地點", "地點", "地址", "發生地址", "事故位置"]:
+                    if loc_col in row.index and pd.notna(row.get(loc_col)):
+                        location_val = row.get(loc_col)
+                        break
+                district, location_desc = deidentify_address(location_val)
 
-                # 事故類別
-                severity = str(row.get("交通事故類別", "A3")).strip().upper()
+                # 事故類別 - 支援多種欄位名稱
+                severity = "A3"
+                for sev_col in ["交通事故類別", "事故類別", "類別", "嚴重程度", "事故等級"]:
+                    if sev_col in row.index and pd.notna(row.get(sev_col)):
+                        severity = str(row.get(sev_col)).strip().upper()
+                        break
                 if severity not in ["A1", "A2", "A3"]:
                     severity = "A3"
 

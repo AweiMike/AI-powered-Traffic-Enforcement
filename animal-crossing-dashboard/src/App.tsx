@@ -33,6 +33,7 @@ import ViolationsPage from './components/ViolationsPage';
 import { HotspotMap } from './components/HotspotMap';
 import AccidentAnalysisPage from './components/AccidentAnalysisPage';
 import ElderlyPreventionPage from './components/ElderlyPreventionPage';
+import PerformanceComparisonPage from './components/PerformanceComparisonPage';
 
 // Import hooks
 import {
@@ -796,7 +797,7 @@ const App: React.FC = () => {
       case 'elderly':
         return <ElderlyPreventionPage />;
       case 'monthly':
-        return <PlaceholderView title="成效比較" emoji="📊" description="同期比較與報表 - 開發中" />;
+        return <PerformanceComparisonPage />;
       case 'briefing':
         return <BriefingView />;
       case 'import':
