@@ -547,6 +547,18 @@ class APIClient {
   }
 
   // ============================================
+  // Advanced Analysis API (進階分析)
+  // ============================================
+
+  async getElderlyVehicleAnalysis(days: number = 365): Promise<any> {
+    return this.request(`/recommendations/analysis/elderly-vehicle-types?days=${days}`);
+  }
+
+  async getDuiEnvironmentAnalysis(days: number = 365): Promise<any> {
+    return this.request(`/recommendations/analysis/dui-environment?days=${days}`);
+  }
+
+  // ============================================
   // System API (root-level, no /api/v1 prefix)
   // ============================================
 

@@ -1,9 +1,9 @@
 /**
  * 高齡者防治頁面 - 專注於高齡者事故分析與防治
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAccidentHotspots, useAccidentPeakTimes } from '../hooks/useAPI';
-import { AccidentHotspot, ShiftData } from '../api/client';
+import { AccidentHotspot, ShiftData, apiClient } from '../api/client';
 
 // 時段分析圖表 (簡化版，專注事故)
 const ShiftChart: React.FC<{ shifts: ShiftData[]; peakShifts: string[] }> = ({ shifts, peakShifts }) => {
@@ -78,9 +78,24 @@ const ElderlyHotspotCard: React.FC<{ hotspot: AccidentHotspot; rank: number; onS
 const ElderlyPreventionPage: React.FC = () => {
     const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
     const [days, setDays] = useState<number>(30);
+    const [vehicleData, setVehicleData] = useState<any>(null);
+
     // isElderly = true 強制篩選高齡者數據
     const { data: hotspots, loading: hotspotsLoading } = useAccidentHotspots(days, true);
     const { data: peakTimes, loading: peakLoading } = useAccidentPeakTimes(selectedDistrict || '__SKIP__', days, true);
+
+    // 載入車種分析數據
+    useEffect(() => {
+        const fetchVehicleData = async () => {
+            try {
+                const data = await apiClient.getElderlyVehicleAnalysis(days);
+                setVehicleData(data);
+            } catch (e) {
+                console.error('Failed to load vehicle analysis:', e);
+            }
+        };
+        fetchVehicleData();
+    }, [days]);
 
     const dayOptions = [
         { value: 30, label: '近 30 天' },
@@ -189,30 +204,68 @@ const ElderlyPreventionPage: React.FC = () => {
                     )}
                 </div>
 
-                {/* 右欄：宣導建議 (靜態/動態混合) */}
+                {/* 右欄：車種分析 + 宣導建議 */}
                 <div className="col-span-3 space-y-4">
+                    {/* 車種分析 */}
+                    <div className="bg-purple-100 rounded-2xl p-4">
+                        <h4 className="font-bold text-purple-800 mb-1">🚗 車種分析</h4>
+                        <p className="text-xs text-purple-600">高齡者涉及事故車種分佈</p>
+                    </div>
+
+                    {vehicleData && vehicleData.vehicle_breakdown && vehicleData.vehicle_breakdown.length > 0 ? (
+                        <div className="bg-white/80 rounded-2xl p-4 nook-shadow">
+                            <div className="space-y-2">
+                                {vehicleData.vehicle_breakdown.slice(0, 5).map((v: any, idx: number) => (
+                                    <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                                        <div className="flex items-center gap-2">
+                                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${idx === 0 ? 'bg-purple-500 text-white' : 'bg-purple-200 text-purple-700'
+                                                }`}>{idx + 1}</span>
+                                            <span className="text-sm font-medium text-nook-text">{v.vehicle_type}</span>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-lg font-bold text-purple-600">{v.count}</span>
+                                            <span className="text-xs text-gray-500 ml-1">({v.percentage}%)</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            {vehicleData.insights && (
+                                <div className="mt-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                                    <p className="text-xs text-purple-700">
+                                        💡 {vehicleData.insights.recommendation}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="bg-white/80 rounded-2xl p-4 nook-shadow text-center text-gray-400">
+                            暫無車種資料
+                        </div>
+                    )}
+
+                    {/* 宣導建議 */}
                     <div className="bg-green-100 rounded-2xl p-4">
                         <h4 className="font-bold text-green-800 mb-1">📢 防治宣導建議</h4>
                         <p className="text-xs text-green-600">針對長者特性之策略</p>
                     </div>
 
-                    <div className="bg-white/80 rounded-2xl p-4 nook-shadow space-y-4">
+                    <div className="bg-white/80 rounded-2xl p-4 nook-shadow space-y-3">
                         <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                            <span className="text-2xl mb-1 block">🦺</span>
-                            <h5 className="font-bold text-yellow-800 mb-1">亮衣與反光配件</h5>
-                            <p className="text-xs text-gray-600">晨昏外出時應穿著鮮豔衣物或配戴反光手環。</p>
+                            <span className="text-xl mb-1 block">🦺</span>
+                            <h5 className="font-bold text-yellow-800 mb-1 text-sm">亮衣與反光配件</h5>
+                            <p className="text-xs text-gray-600">晨昏外出時應穿著鮮豔衣物。</p>
                         </div>
 
                         <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                            <span className="text-2xl mb-1 block">🛵</span>
-                            <h5 className="font-bold text-blue-800 mb-1">兩段式左轉</h5>
-                            <p className="text-xs text-gray-600">騎乘機車應落實兩段式左轉，避免直接穿越馬路。</p>
+                            <span className="text-xl mb-1 block">🛵</span>
+                            <h5 className="font-bold text-blue-800 mb-1 text-sm">兩段式左轉</h5>
+                            <p className="text-xs text-gray-600">騎乘機車應落實兩段式左轉。</p>
                         </div>
 
                         <div className="bg-red-50 p-3 rounded-lg border border-red-200">
-                            <span className="text-2xl mb-1 block">🚌</span>
-                            <h5 className="font-bold text-red-800 mb-1">大型車視線死角</h5>
-                            <p className="text-xs text-gray-600">遠離大型車輛，避免進入內輪差與視線死角範圍。</p>
+                            <span className="text-xl mb-1 block">🚌</span>
+                            <h5 className="font-bold text-red-800 mb-1 text-sm">大型車視線死角</h5>
+                            <p className="text-xs text-gray-600">遠離大型車輛視線死角範圍。</p>
                         </div>
                     </div>
 

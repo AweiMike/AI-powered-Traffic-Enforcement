@@ -797,3 +797,144 @@ async def get_cross_analysis(
             'suggestion': '針對執法缺口高的區域/時段加強取締，可有效降低事故發生率'
         }
     }
+
+
+# ============================================
+# 進階分析 API
+# ============================================
+
+@router.get("/analysis/elderly-vehicle-types")
+async def get_elderly_vehicle_analysis(
+    days: int = Query(default=365, description="分析期間天數"),
+    db: Session = Depends(get_db)
+):
+    """
+    高齡者車種分析
+    分析高齡者事故中的車種分佈（機車、行人、自小客等）
+    """
+    end_date = get_data_end_date(db)
+    start_date = end_date - timedelta(days=days)
+    
+    # 查詢高齡者事故的車種分佈
+    vehicle_stats = db.query(
+        Crash.party_type,
+        func.count(Crash.id).label('count'),
+        func.sum(case((Crash.severity == 'A1', 1), else_=0)).label('a1_count'),
+        func.sum(case((Crash.severity == 'A2', 1), else_=0)).label('a2_count')
+    ).filter(
+        Crash.is_elderly == True,
+        Crash.occurred_date >= start_date,
+        Crash.occurred_date <= end_date,
+        Crash.party_type.isnot(None)
+    ).group_by(Crash.party_type).order_by(desc('count')).all()
+    
+    # 查詢總計
+    total_elderly = db.query(func.count(Crash.id)).filter(
+        Crash.is_elderly == True,
+        Crash.occurred_date >= start_date,
+        Crash.occurred_date <= end_date
+    ).scalar() or 0
+    
+    vehicle_breakdown = []
+    for v in vehicle_stats:
+        vehicle_breakdown.append({
+            'vehicle_type': v.party_type or '未知',
+            'count': v.count,
+            'a1_count': v.a1_count or 0,
+            'a2_count': v.a2_count or 0,
+            'percentage': round(v.count / total_elderly * 100, 1) if total_elderly > 0 else 0
+        })
+    
+    # 分析建議
+    top_vehicle = vehicle_breakdown[0]['vehicle_type'] if vehicle_breakdown else '未知'
+    
+    return {
+        'period': {
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat(),
+            'days': days
+        },
+        'total_elderly_accidents': total_elderly,
+        'vehicle_breakdown': vehicle_breakdown,
+        'insights': {
+            'most_common_vehicle': top_vehicle,
+            'recommendation': f'高齡者最常涉及的車種為「{top_vehicle}」，建議針對該車種加強宣導'
+        },
+        'note': '統計數據已去識別化，僅供執法參考'
+    }
+
+
+@router.get("/analysis/dui-environment")
+async def get_dui_environment_analysis(
+    days: int = Query(default=365, description="分析期間天數"),
+    db: Session = Depends(get_db)
+):
+    """
+    酒駕環境分析
+    分析酒駕事故的天候與光線分佈
+    """
+    end_date = get_data_end_date(db)
+    start_date = end_date - timedelta(days=days)
+    
+    # 天候分佈
+    weather_stats = db.query(
+        Crash.weather,
+        func.count(Crash.id).label('count')
+    ).filter(
+        Crash.suspected_alcohol == True,
+        Crash.occurred_date >= start_date,
+        Crash.occurred_date <= end_date,
+        Crash.weather.isnot(None)
+    ).group_by(Crash.weather).order_by(desc('count')).all()
+    
+    # 光線分佈
+    light_stats = db.query(
+        Crash.light,
+        func.count(Crash.id).label('count')
+    ).filter(
+        Crash.suspected_alcohol == True,
+        Crash.occurred_date >= start_date,
+        Crash.occurred_date <= end_date,
+        Crash.light.isnot(None)
+    ).group_by(Crash.light).order_by(desc('count')).all()
+    
+    # 總計
+    total_dui = db.query(func.count(Crash.id)).filter(
+        Crash.suspected_alcohol == True,
+        Crash.occurred_date >= start_date,
+        Crash.occurred_date <= end_date
+    ).scalar() or 0
+    
+    weather_breakdown = [
+        {'weather': w.weather or '未知', 'count': w.count, 
+         'percentage': round(w.count / total_dui * 100, 1) if total_dui > 0 else 0}
+        for w in weather_stats
+    ]
+    
+    light_breakdown = [
+        {'light': l.light or '未知', 'count': l.count,
+         'percentage': round(l.count / total_dui * 100, 1) if total_dui > 0 else 0}
+        for l in light_stats
+    ]
+    
+    # 分析夜間比例
+    night_keywords = ['夜間', '暗', '無照明', '晨昏']
+    night_count = sum(l.count for l in light_stats if any(k in (l.light or '') for k in night_keywords))
+    night_percentage = round(night_count / total_dui * 100, 1) if total_dui > 0 else 0
+    
+    return {
+        'period': {
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat(),
+            'days': days
+        },
+        'total_dui_crashes': total_dui,
+        'weather_breakdown': weather_breakdown,
+        'light_breakdown': light_breakdown,
+        'insights': {
+            'night_percentage': night_percentage,
+            'recommendation': f'酒駕事故有 {night_percentage}% 發生於視線不良環境，建議加強夜間稽查'
+        },
+        'note': '統計數據已去識別化，僅供執法參考'
+    }
+
