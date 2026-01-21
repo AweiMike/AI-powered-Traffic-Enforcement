@@ -192,27 +192,39 @@ const SimpleTrendChart: React.FC<SimpleTrendChartProps> = ({ data, dataKey, colo
 
     return (
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 nook-shadow">
-            <h4 className="text-sm font-medium text-nook-text/60 mb-3">{title}</h4>
-            <div className="flex items-end gap-1 h-24">
+            <h4 className="text-sm font-bold text-nook-text mb-4">{title}</h4>
+            <div className="flex items-end gap-2 h-32 pb-6">
                 {data.map((d, i) => {
                     const value = d[dataKey] as number;
-                    const height = Math.max((value / max) * 100, 5); // At least 5% height
+                    const height = Math.max((value / max) * 100, 4); // At least 4% height
+
+                    // Fallback colors if custom colors fail
+                    let barColor = color;
+                    if (title.includes('違規')) barColor = 'bg-blue-500';
+                    if (title.includes('事故')) barColor = 'bg-orange-500';
+
                     return (
-                        <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
-                            <div
-                                className={`w-full ${color} rounded-t transition-all duration-300 hover:opacity-80`}
-                                style={{ height: `${height}%` }}
-                            />
-                            {/* Value tooltip on hover */}
-                            <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                        <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative h-full justify-end">
+                            {/* Value Label */}
+                            <span className={`text-xs font-bold mb-1 ${value === 0 ? 'opacity-0' : 'text-nook-text'}`}>
                                 {value}
-                            </div>
-                            <span className="text-[10px] text-nook-text/40">{d.month.slice(-2)}</span>
+                            </span>
+
+                            {/* Bar */}
+                            <div
+                                className={`w-full ${barColor} rounded-t-md transition-all duration-300 hover:opacity-80 shadow-sm`}
+                                style={{ height: `${height}%`, minHeight: '4px' }}
+                            />
+
+                            {/* Month Label */}
+                            <span className="text-xs font-medium text-nook-text/70 mt-1 absolute -bottom-6 w-full text-center">
+                                {parseInt(d.month.split('/')[1])}月
+                            </span>
                         </div>
                     );
                 })}
             </div>
-            <div className="flex justify-between text-[10px] text-nook-text/40 mt-2">
+            <div className="flex justify-between text-xs font-medium text-nook-text/60 mt-4 px-1">
                 <span>最小: {Math.min(...values)}</span>
                 <span>最大: {Math.max(...values)}</span>
             </div>
