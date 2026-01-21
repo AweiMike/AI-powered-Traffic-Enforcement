@@ -42,6 +42,81 @@ TOPIC_RULES = {
 
 
 # ============================================
+# 區域中心座標對照表（用於無精確座標時的備援）
+# ============================================
+DISTRICT_COORDINATES = {
+    "新化區": (23.0386, 120.3108),
+    "山上區": (23.0975, 120.3547),
+    "左鎮區": (23.0578, 120.4014),
+    "玉井區": (23.1239, 120.4614),
+    "楠西區": (23.1814, 120.4853),
+    "南化區": (23.1417, 120.4731),
+    "善化區": (23.1322, 120.2967),
+    "大內區": (23.1203, 120.3508),
+    "仁德區": (22.9722, 120.2331),
+    "歸仁區": (22.9667, 120.2933),
+    "關廟區": (22.9617, 120.3278),
+    "龍崎區": (22.9622, 120.3847),
+    "永康區": (23.0264, 120.2567),
+    "東區": (22.9833, 120.2167),
+    "南區": (22.9500, 120.1833),
+    "北區": (23.0000, 120.2000),
+    "中西區": (22.9917, 120.1917),
+    "安南區": (23.0500, 120.1667),
+    "安平區": (22.9917, 120.1667),
+    "新營區": (23.3103, 120.3167),
+    "鹽水區": (23.3203, 120.2661),
+    "白河區": (23.3517, 120.4156),
+    "柳營區": (23.2778, 120.3114),
+    "後壁區": (23.3664, 120.3583),
+    "東山區": (23.3258, 120.4036),
+    "麻豆區": (23.1817, 120.2483),
+    "下營區": (23.2347, 120.2647),
+    "六甲區": (23.2314, 120.3472),
+    "官田區": (23.1944, 120.3139),
+    "佳里區": (23.1650, 120.1772),
+    "學甲區": (23.2328, 120.1803),
+    "西港區": (23.1222, 120.2028),
+    "七股區": (23.1450, 120.1267),
+    "將軍區": (23.1997, 120.1092),
+    "北門區": (23.2672, 120.1261),
+    "新市區": (23.0794, 120.2911),
+    "安定區": (23.1014, 120.2353),
+}
+
+
+def get_district_coordinates(district: str) -> tuple:
+    """根據區域名稱獲取中心座標"""
+    if not district:
+        return None, None
+    
+    # 移除「臺南市」「市」前綴
+    clean_district = district.replace("臺南市", "").replace("台南市", "")
+    if clean_district.startswith("市"):
+        clean_district = clean_district[1:]
+    
+    # 直接查找
+    if clean_district in DISTRICT_COORDINATES:
+        lat, lng = DISTRICT_COORDINATES[clean_district]
+        # 添加微小隨機偏移避免完全重疊（約 100-500 公尺）
+        import random
+        offset_lat = random.uniform(-0.003, 0.003)
+        offset_lng = random.uniform(-0.003, 0.003)
+        return lat + offset_lat, lng + offset_lng
+    
+    # 部分匹配
+    for name, coords in DISTRICT_COORDINATES.items():
+        if name in clean_district or clean_district in name:
+            lat, lng = coords
+            import random
+            offset_lat = random.uniform(-0.003, 0.003)
+            offset_lng = random.uniform(-0.003, 0.003)
+            return lat + offset_lat, lng + offset_lng
+    
+    return None, None
+
+
+# ============================================
 # 工具函數
 # ============================================
 
@@ -377,8 +452,9 @@ async def import_crash_file(
                     shift_id=calculate_shift(occurred_dt),
                     district=district,
                     location_desc=location_desc,
-                    latitude=row.get("緯度") if not pd.isna(row.get("緯度")) else None,
-                    longitude=row.get("經度") if not pd.isna(row.get("經度")) else None,
+                    # 座標：優先使用原始資料，否則使用區域中心座標
+                    latitude=row.get("緯度") if pd.notna(row.get("緯度")) else get_district_coordinates(district)[0],
+                    longitude=row.get("經度") if pd.notna(row.get("經度")) else get_district_coordinates(district)[1],
                     severity=severity,
                     severity_weight=get_severity_weight(severity),
                     year=occurred_dt.year,
