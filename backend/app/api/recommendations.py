@@ -1144,3 +1144,75 @@ async def get_precise_heatmap_data(
     }
 
 
+@router.put("/map/crash/{crash_id}/coordinates")
+async def update_crash_coordinates(
+    crash_id: int,
+    latitude: float = Query(..., description="新緯度"),
+    longitude: float = Query(..., description="新經度"),
+    db: Session = Depends(get_db)
+):
+    """
+    更新事故點位座標
+    用於手動校正自動分配的區域座標
+    """
+    crash = db.query(Crash).filter(Crash.id == crash_id).first()
+    if not crash:
+        raise HTTPException(status_code=404, detail="事故資料不存在")
+    
+    # 記錄舊座標
+    old_lat = crash.latitude
+    old_lng = crash.longitude
+    
+    # 更新座標
+    crash.latitude = latitude
+    crash.longitude = longitude
+    db.commit()
+    
+    return {
+        'success': True,
+        'crash_id': crash_id,
+        'old_coordinates': {'lat': old_lat, 'lng': old_lng},
+        'new_coordinates': {'lat': latitude, 'lng': longitude},
+        'message': '座標已更新'
+    }
+
+
+@router.put("/map/crashes/coordinates/batch")
+async def batch_update_crash_coordinates(
+    updates: list = [],
+    db: Session = Depends(get_db)
+):
+    """
+    批次更新多個事故點位座標
+    updates: [{'id': 1, 'lat': 23.0, 'lng': 120.0}, ...]
+    """
+    from fastapi import Body
+    
+    updated_count = 0
+    errors = []
+    
+    for item in updates:
+        crash_id = item.get('id')
+        lat = item.get('lat')
+        lng = item.get('lng')
+        
+        if not crash_id or lat is None or lng is None:
+            errors.append(f"無效資料: {item}")
+            continue
+        
+        crash = db.query(Crash).filter(Crash.id == crash_id).first()
+        if crash:
+            crash.latitude = lat
+            crash.longitude = lng
+            updated_count += 1
+        else:
+            errors.append(f"ID {crash_id} 不存在")
+    
+    db.commit()
+    
+    return {
+        'success': True,
+        'updated_count': updated_count,
+        'errors': errors if errors else None,
+        'message': f'已更新 {updated_count} 筆座標'
+    }

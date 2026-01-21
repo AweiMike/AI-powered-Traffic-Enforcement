@@ -573,6 +573,20 @@ class APIClient {
     return this.request(`/recommendations/map/heatmap-data?days=${days}&data_type=${dataType}`);
   }
 
+  async updateCrashCoordinates(crashId: number, lat: number, lng: number): Promise<any> {
+    return this.request(`/recommendations/map/crash/${crashId}/coordinates?latitude=${lat}&longitude=${lng}`, {
+      method: 'PUT'
+    });
+  }
+
+  async batchUpdateCrashCoordinates(updates: Array<{ id: number, lat: number, lng: number }>): Promise<any> {
+    return this.request('/recommendations/map/crashes/coordinates/batch', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+  }
+
   // ============================================
   // System API (root-level, no /api/v1 prefix)
   // ============================================
