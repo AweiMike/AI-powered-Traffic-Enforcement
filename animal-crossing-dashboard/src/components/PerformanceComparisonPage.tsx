@@ -359,6 +359,77 @@ const PerformanceComparisonPage: React.FC = () => {
                 />
             </div>
 
+            {/* 事故嚴重度比較 */}
+            {data.current.severity && (
+                <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 nook-shadow mb-8">
+                    <h3 className="text-lg font-bold text-nook-text mb-6 flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5 text-nook-red" />
+                        事故嚴重度比較
+                    </h3>
+                    <div className="grid grid-cols-2 gap-6">
+                        {/* A1 死亡事故 */}
+                        <div className="bg-red-50 rounded-2xl p-5 border-l-4 border-red-500">
+                            <div className="flex items-center gap-3 mb-4">
+                                <span className="text-3xl">💀</span>
+                                <div>
+                                    <span className="font-bold text-nook-text text-lg">A1 死亡事故</span>
+                                    <p className="text-xs text-nook-text/50">最高嚴重等級</p>
+                                </div>
+                            </div>
+                            <div className="flex items-end justify-between">
+                                <div>
+                                    <p className="text-4xl font-bold text-red-600">{data.current.severity.a1}</p>
+                                    <p className="text-sm text-nook-text/60">本期</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-2xl font-medium text-nook-text/60">{data.last_year.severity?.a1 || 0}</p>
+                                    <p className="text-sm text-nook-text/40">去年同期</p>
+                                </div>
+                            </div>
+                            <div className="mt-3 pt-3 border-t border-red-200">
+                                <div className={`text-sm font-medium ${data.current.severity.a1 < (data.last_year.severity?.a1 || 0) ? 'text-nook-leaf' :
+                                        data.current.severity.a1 > (data.last_year.severity?.a1 || 0) ? 'text-nook-red' : 'text-nook-text/60'
+                                    }`}>
+                                    {data.current.severity.a1 < (data.last_year.severity?.a1 || 0) ? '✓ 減少 ' :
+                                        data.current.severity.a1 > (data.last_year.severity?.a1 || 0) ? '↑ 增加 ' : '持平 '}
+                                    {Math.abs(data.current.severity.a1 - (data.last_year.severity?.a1 || 0))} 件
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* A2 受傷事故 */}
+                        <div className="bg-orange-50 rounded-2xl p-5 border-l-4 border-orange-500">
+                            <div className="flex items-center gap-3 mb-4">
+                                <span className="text-3xl">🏥</span>
+                                <div>
+                                    <span className="font-bold text-nook-text text-lg">A2 受傷事故</span>
+                                    <p className="text-xs text-nook-text/50">需送醫救護</p>
+                                </div>
+                            </div>
+                            <div className="flex items-end justify-between">
+                                <div>
+                                    <p className="text-4xl font-bold text-orange-600">{data.current.severity.a2}</p>
+                                    <p className="text-sm text-nook-text/60">本期</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-2xl font-medium text-nook-text/60">{data.last_year.severity?.a2 || 0}</p>
+                                    <p className="text-sm text-nook-text/40">去年同期</p>
+                                </div>
+                            </div>
+                            <div className="mt-3 pt-3 border-t border-orange-200">
+                                <div className={`text-sm font-medium ${data.current.severity.a2 < (data.last_year.severity?.a2 || 0) ? 'text-nook-leaf' :
+                                        data.current.severity.a2 > (data.last_year.severity?.a2 || 0) ? 'text-nook-red' : 'text-nook-text/60'
+                                    }`}>
+                                    {data.current.severity.a2 < (data.last_year.severity?.a2 || 0) ? '✓ 減少 ' :
+                                        data.current.severity.a2 > (data.last_year.severity?.a2 || 0) ? '↑ 增加 ' : '持平 '}
+                                    {Math.abs(data.current.severity.a2 - (data.last_year.severity?.a2 || 0))} 件
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* 主題分類比較 */}
             <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 nook-shadow mb-8">
                 <h3 className="text-lg font-bold text-nook-text mb-6 flex items-center gap-2">
@@ -384,7 +455,7 @@ const PerformanceComparisonPage: React.FC = () => {
                         </div>
                         <div className="mt-3 pt-3 border-t border-nook-text/10">
                             <div className={`text-sm font-medium ${data.current.topics.dui < data.last_year.topics.dui ? 'text-nook-leaf' :
-                                    data.current.topics.dui > data.last_year.topics.dui ? 'text-nook-red' : 'text-nook-text/60'
+                                data.current.topics.dui > data.last_year.topics.dui ? 'text-nook-red' : 'text-nook-text/60'
                                 }`}>
                                 {data.current.topics.dui < data.last_year.topics.dui ? '✓ 減少 ' :
                                     data.current.topics.dui > data.last_year.topics.dui ? '↑ 增加 ' : '持平 '}
@@ -411,7 +482,7 @@ const PerformanceComparisonPage: React.FC = () => {
                         </div>
                         <div className="mt-3 pt-3 border-t border-nook-text/10">
                             <div className={`text-sm font-medium ${data.current.topics.red_light < data.last_year.topics.red_light ? 'text-nook-leaf' :
-                                    data.current.topics.red_light > data.last_year.topics.red_light ? 'text-nook-red' : 'text-nook-text/60'
+                                data.current.topics.red_light > data.last_year.topics.red_light ? 'text-nook-red' : 'text-nook-text/60'
                                 }`}>
                                 {data.current.topics.red_light < data.last_year.topics.red_light ? '✓ 減少 ' :
                                     data.current.topics.red_light > data.last_year.topics.red_light ? '↑ 增加 ' : '持平 '}
@@ -438,7 +509,7 @@ const PerformanceComparisonPage: React.FC = () => {
                         </div>
                         <div className="mt-3 pt-3 border-t border-nook-text/10">
                             <div className={`text-sm font-medium ${data.current.topics.dangerous_driving < data.last_year.topics.dangerous_driving ? 'text-nook-leaf' :
-                                    data.current.topics.dangerous_driving > data.last_year.topics.dangerous_driving ? 'text-nook-red' : 'text-nook-text/60'
+                                data.current.topics.dangerous_driving > data.last_year.topics.dangerous_driving ? 'text-nook-red' : 'text-nook-text/60'
                                 }`}>
                                 {data.current.topics.dangerous_driving < data.last_year.topics.dangerous_driving ? '✓ 減少 ' :
                                     data.current.topics.dangerous_driving > data.last_year.topics.dangerous_driving ? '↑ 增加 ' : '持平 '}
@@ -473,7 +544,7 @@ const PerformanceComparisonPage: React.FC = () => {
                     <div className="bg-white/80 rounded-2xl p-4">
                         <p className="text-sm text-nook-text/60 mb-2">違規案件</p>
                         <p className={`text-lg font-bold ${data.comparison.tickets_trend === '下降' ? 'text-nook-leaf' :
-                                data.comparison.tickets_trend === '上升' ? 'text-nook-red' : 'text-nook-text'
+                            data.comparison.tickets_trend === '上升' ? 'text-nook-red' : 'text-nook-text'
                             }`}>
                             {data.comparison.tickets_trend === '下降' ? '✓ 下降' :
                                 data.comparison.tickets_trend === '上升' ? '↑ 上升' : '持平'} {Math.abs(data.comparison.tickets_change)}%
@@ -482,7 +553,7 @@ const PerformanceComparisonPage: React.FC = () => {
                     <div className="bg-white/80 rounded-2xl p-4">
                         <p className="text-sm text-nook-text/60 mb-2">交通事故</p>
                         <p className={`text-lg font-bold ${data.comparison.crashes_trend === '下降' ? 'text-nook-leaf' :
-                                data.comparison.crashes_trend === '上升' ? 'text-nook-red' : 'text-nook-text'
+                            data.comparison.crashes_trend === '上升' ? 'text-nook-red' : 'text-nook-text'
                             }`}>
                             {data.comparison.crashes_trend === '下降' ? '✓ 下降' :
                                 data.comparison.crashes_trend === '上升' ? '↑ 上升' : '持平'} {Math.abs(data.comparison.crashes_change)}%

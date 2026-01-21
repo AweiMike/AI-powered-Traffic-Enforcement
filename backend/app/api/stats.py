@@ -278,18 +278,46 @@ async def get_monthly_stats(
         or 0,
     }
 
+    # 事故嚴重度統計 - 當年
+    current_severity = {
+        "a1": db.query(func.count(Crash.id))
+        .filter(and_(Crash.year == year, Crash.month == month, Crash.severity == "A1"))
+        .scalar() or 0,
+        "a2": db.query(func.count(Crash.id))
+        .filter(and_(Crash.year == year, Crash.month == month, Crash.severity == "A2"))
+        .scalar() or 0,
+        "a3": db.query(func.count(Crash.id))
+        .filter(and_(Crash.year == year, Crash.month == month, Crash.severity == "A3"))
+        .scalar() or 0,
+    }
+
+    # 事故嚴重度統計 - 去年同期
+    last_year_severity = {
+        "a1": db.query(func.count(Crash.id))
+        .filter(and_(Crash.year == last_year, Crash.month == month, Crash.severity == "A1"))
+        .scalar() or 0,
+        "a2": db.query(func.count(Crash.id))
+        .filter(and_(Crash.year == last_year, Crash.month == month, Crash.severity == "A2"))
+        .scalar() or 0,
+        "a3": db.query(func.count(Crash.id))
+        .filter(and_(Crash.year == last_year, Crash.month == month, Crash.severity == "A3"))
+        .scalar() or 0,
+    }
+
     return {
         "period": {"year": year, "month": month},
         "current": {
             "tickets": current_tickets,
             "crashes": current_crashes,
             "topics": current_topics,
+            "severity": current_severity,
         },
         "last_year": {
             "year": last_year,
             "tickets": last_year_tickets,
             "crashes": last_year_crashes,
             "topics": last_year_topics,
+            "severity": last_year_severity,
         },
         "comparison": {
             "tickets_change": tickets_change,

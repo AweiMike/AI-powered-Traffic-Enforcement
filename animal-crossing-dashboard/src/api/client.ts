@@ -93,6 +93,11 @@ export interface MonthlyStats {
       red_light: number;
       dangerous_driving: number;
     };
+    severity?: {
+      a1: number;
+      a2: number;
+      a3: number;
+    };
   };
   last_year: {
     year: number;
@@ -102,6 +107,11 @@ export interface MonthlyStats {
       dui: number;
       red_light: number;
       dangerous_driving: number;
+    };
+    severity?: {
+      a1: number;
+      a2: number;
+      a3: number;
     };
   };
   comparison: {
