@@ -515,6 +515,32 @@ const MapViewPage: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* 違規篩選 */}
+                    {!editMode && (
+                        <div className="bg-white/80 rounded-2xl p-4 nook-shadow">
+                            <h3 className="font-bold text-nook-text mb-3">📋 違規類型</h3>
+                            <div className="flex flex-wrap gap-2">
+                                {[
+                                    { value: 'all', label: '全部', color: 'bg-gray-100 text-gray-700' },
+                                    { value: 'DUI', label: '🍺 酒駕', color: 'bg-purple-100 text-purple-700' },
+                                    { value: 'RED_LIGHT', label: '🚦 闘紅燈', color: 'bg-blue-100 text-blue-700' },
+                                    { value: 'DANGEROUS_DRIVING', label: '⚡ 危駕', color: 'bg-cyan-100 text-cyan-700' },
+                                ].map(opt => (
+                                    <button
+                                        key={opt.value}
+                                        onClick={() => setTopicFilter(opt.value)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${topicFilter === opt.value
+                                            ? 'ring-2 ring-nook-leaf ' + opt.color
+                                            : opt.color + ' opacity-60 hover:opacity-100'
+                                            }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* 圖例 */}
                     <div className="bg-nook-cream/30 rounded-2xl p-4">
                         <h3 className="font-bold text-nook-text mb-3">📌 圖例說明</h3>
