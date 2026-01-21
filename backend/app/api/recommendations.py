@@ -938,3 +938,193 @@ async def get_dui_environment_analysis(
         'note': '統計數據已去識別化，僅供執法參考'
     }
 
+
+@router.get("/map/points")
+async def get_map_points(
+    days: int = Query(default=90, description="分析期間天數"),
+    point_type: str = Query(default="all", description="資料類型: all, crash, ticket"),
+    severity: str = Query(default=None, description="嚴重度篩選: A1, A2, A3"),
+    topic: str = Query(default=None, description="主題篩選: DUI, RED_LIGHT, DANGEROUS_DRIVING"),
+    db: Session = Depends(get_db)
+):
+    """
+    取得地圖點位資料
+    返回帶有真實座標的事故/違規資料供地圖顯示
+    """
+    end_date = get_data_end_date(db)
+    start_date = end_date - timedelta(days=days)
+    
+    result = {
+        'period': {
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat(),
+            'days': days
+        },
+        'crash_points': [],
+        'ticket_points': [],
+        'summary': {
+            'total_crashes': 0,
+            'total_tickets': 0,
+            'crashes_with_coords': 0,
+            'tickets_with_coords': 0
+        }
+    }
+    
+    # 取得事故點位
+    if point_type in ['all', 'crash']:
+        crash_query = db.query(
+            Crash.id,
+            Crash.latitude,
+            Crash.longitude,
+            Crash.district,
+            Crash.location_desc,
+            Crash.severity,
+            Crash.occurred_date,
+            Crash.shift_id,
+            Crash.is_elderly,
+            Crash.suspected_alcohol,
+            Crash.party_type
+        ).filter(
+            Crash.occurred_date >= start_date,
+            Crash.occurred_date <= end_date
+        )
+        
+        if severity:
+            crash_query = crash_query.filter(Crash.severity == severity)
+        
+        crashes = crash_query.all()
+        result['summary']['total_crashes'] = len(crashes)
+        
+        for c in crashes:
+            if c.latitude and c.longitude:
+                result['crash_points'].append({
+                    'id': c.id,
+                    'lat': c.latitude,
+                    'lng': c.longitude,
+                    'district': c.district,
+                    'location': c.location_desc,
+                    'severity': c.severity,
+                    'date': c.occurred_date.isoformat() if c.occurred_date else None,
+                    'shift': c.shift_id,
+                    'is_elderly': c.is_elderly,
+                    'is_dui': c.suspected_alcohol,
+                    'vehicle_type': c.party_type
+                })
+        result['summary']['crashes_with_coords'] = len(result['crash_points'])
+    
+    # 取得違規點位
+    if point_type in ['all', 'ticket']:
+        ticket_query = db.query(
+            Ticket.id,
+            Ticket.latitude,
+            Ticket.longitude,
+            Ticket.district,
+            Ticket.location_desc,
+            Ticket.topic_code,
+            Ticket.violation_date,
+            Ticket.shift_id,
+            Ticket.is_elderly,
+            Ticket.vehicle_type
+        ).filter(
+            Ticket.violation_date >= start_date,
+            Ticket.violation_date <= end_date
+        )
+        
+        if topic:
+            ticket_query = ticket_query.filter(Ticket.topic_code == topic)
+        
+        tickets = ticket_query.all()
+        result['summary']['total_tickets'] = len(tickets)
+        
+        for t in tickets:
+            if t.latitude and t.longitude:
+                result['ticket_points'].append({
+                    'id': t.id,
+                    'lat': t.latitude,
+                    'lng': t.longitude,
+                    'district': t.district,
+                    'location': t.location_desc,
+                    'topic': t.topic_code,
+                    'date': t.violation_date.isoformat() if t.violation_date else None,
+                    'shift': t.shift_id,
+                    'is_elderly': t.is_elderly,
+                    'vehicle_type': t.vehicle_type
+                })
+        result['summary']['tickets_with_coords'] = len(result['ticket_points'])
+    
+    result['note'] = '點位資料已去識別化，座標僅供執法分析使用'
+    return result
+
+
+@router.get("/map/heatmap-data")
+async def get_precise_heatmap_data(
+    days: int = Query(default=90, description="分析期間天數"),
+    data_type: str = Query(default="crash", description="資料類型: crash 或 ticket"),
+    db: Session = Depends(get_db)
+):
+    """
+    取得精準熱力圖資料
+    基於真實座標聚合的熱點資料
+    """
+    end_date = get_data_end_date(db)
+    start_date = end_date - timedelta(days=days)
+    
+    if data_type == "crash":
+        # 聚合事故點位
+        points = db.query(
+            func.round(Crash.latitude, 3).label('lat'),
+            func.round(Crash.longitude, 3).label('lng'),
+            func.count(Crash.id).label('count'),
+            func.sum(case((Crash.severity == 'A1', 5), (Crash.severity == 'A2', 3), else_=1)).label('weight')
+        ).filter(
+            Crash.occurred_date >= start_date,
+            Crash.occurred_date <= end_date,
+            Crash.latitude.isnot(None),
+            Crash.longitude.isnot(None)
+        ).group_by(
+            func.round(Crash.latitude, 3),
+            func.round(Crash.longitude, 3)
+        ).order_by(desc('weight')).limit(200).all()
+    else:
+        # 聚合違規點位
+        points = db.query(
+            func.round(Ticket.latitude, 3).label('lat'),
+            func.round(Ticket.longitude, 3).label('lng'),
+            func.count(Ticket.id).label('count'),
+            func.count(Ticket.id).label('weight')
+        ).filter(
+            Ticket.violation_date >= start_date,
+            Ticket.violation_date <= end_date,
+            Ticket.latitude.isnot(None),
+            Ticket.longitude.isnot(None)
+        ).group_by(
+            func.round(Ticket.latitude, 3),
+            func.round(Ticket.longitude, 3)
+        ).order_by(desc('count')).limit(200).all()
+    
+    heatmap_points = []
+    max_weight = max([p.weight for p in points], default=1)
+    
+    for p in points:
+        if p.lat and p.lng:
+            heatmap_points.append({
+                'lat': float(p.lat),
+                'lng': float(p.lng),
+                'count': p.count,
+                'weight': p.weight,
+                'intensity': round(p.weight / max_weight, 2)
+            })
+    
+    return {
+        'period': {
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat(),
+            'days': days
+        },
+        'data_type': data_type,
+        'points': heatmap_points,
+        'total_points': len(heatmap_points),
+        'note': '熱力圖資料已去識別化'
+    }
+
+

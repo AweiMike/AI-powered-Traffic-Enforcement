@@ -34,6 +34,7 @@ import { HotspotMap } from './components/HotspotMap';
 import AccidentAnalysisPage from './components/AccidentAnalysisPage';
 import ElderlyPreventionPage from './components/ElderlyPreventionPage';
 import PerformanceComparisonPage from './components/PerformanceComparisonPage';
+import MapViewPage from './components/MapViewPage';
 
 // Import hooks
 import {
@@ -61,6 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) => {
   const menuItems = [
     { id: 'dashboard', icon: Home, label: '總覽', emoji: '🏠', description: '整體統計概覽' },
     { id: 'accidents', icon: MapPin, label: '執法缺口分析', emoji: '🎯', description: '事故與違規綜合分析' },
+    { id: 'map', icon: MapPin, label: '地圖視覺化', emoji: '🗺️', description: '精準座標點位分布' },
     { id: 'elderly', icon: Users, label: '高齡者事故防制專區', emoji: '👴', description: '高齡者事故防治' },
     { id: 'monthly', icon: Calendar, label: '成效比較', emoji: '📊', description: '同期比較與報表' },
     { id: 'briefing', icon: FileText, label: '班前勤務卡', emoji: '📋', description: '勤務建議' },
@@ -794,6 +796,8 @@ const App: React.FC = () => {
         return <DashboardView />;
       case 'accidents':
         return <AccidentAnalysisPage />;
+      case 'map':
+        return <MapViewPage />;
       case 'elderly':
         return <ElderlyPreventionPage />;
       case 'monthly':

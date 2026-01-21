@@ -559,6 +559,21 @@ class APIClient {
   }
 
   // ============================================
+  // Map Data API (地圖資料)
+  // ============================================
+
+  async getMapPoints(days: number = 90, pointType: string = 'all', severity?: string, topic?: string): Promise<any> {
+    const params = new URLSearchParams({ days: days.toString(), point_type: pointType });
+    if (severity) params.append('severity', severity);
+    if (topic) params.append('topic', topic);
+    return this.request(`/recommendations/map/points?${params}`);
+  }
+
+  async getPreciseHeatmapData(days: number = 90, dataType: string = 'crash'): Promise<any> {
+    return this.request(`/recommendations/map/heatmap-data?days=${days}&data_type=${dataType}`);
+  }
+
+  // ============================================
   // System API (root-level, no /api/v1 prefix)
   // ============================================
 
