@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Map, Filter, Layers, AlertTriangle, Circle, Eye, EyeOff, RefreshCw, Edit3, Save, X, Move } from 'lucide-react';
+import { Map as MapIcon, Filter, Layers, AlertTriangle, Circle, Eye, EyeOff, RefreshCw, Edit3, Save, X, Move } from 'lucide-react';
 import { apiClient } from '../api/client';
 
 // 台南市中心座標
@@ -67,7 +67,7 @@ const MapViewPage: React.FC = () => {
 
     // 編輯模式狀態
     const [editMode, setEditMode] = useState(false);
-    const [pendingUpdates, setPendingUpdates] = useState<Map<number, PendingUpdate>>(new Map());
+    const [pendingUpdates, setPendingUpdates] = useState<globalThis.Map<number, PendingUpdate>>(new globalThis.Map());
     const [saving, setSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
@@ -123,7 +123,7 @@ const MapViewPage: React.FC = () => {
     // 處理標記拖曳
     const handleMarkerDrag = useCallback((pointId: number, originalLat: number, originalLng: number, newLat: number, newLng: number) => {
         setPendingUpdates(prev => {
-            const updated = new Map(prev);
+            const updated = new globalThis.Map(prev);
             updated.set(pointId, {
                 id: pointId,
                 lat: newLat,
@@ -161,7 +161,7 @@ const MapViewPage: React.FC = () => {
             }
 
             setSaveMessage(`已儲存 ${successCount} 筆座標變更`);
-            setPendingUpdates(new Map());
+            setPendingUpdates(new globalThis.Map());
 
             // 重新載入資料
             await fetchData();
@@ -177,7 +177,7 @@ const MapViewPage: React.FC = () => {
     // 取消編輯
     const handleCancelEdit = () => {
         setEditMode(false);
-        setPendingUpdates(new Map());
+        setPendingUpdates(new globalThis.Map());
         // 重新渲染地圖以還原位置
         if (data) {
             setData({ ...data });
@@ -553,7 +553,7 @@ const MapViewPage: React.FC = () => {
                         {/* 地圖標題 */}
                         <div className={`p-3 border-b flex items-center justify-between ${editMode ? 'bg-amber-50 border-amber-200' : 'border-nook-cream/50 bg-white/50'}`}>
                             <div className="flex items-center gap-2">
-                                <Map className={`w-5 h-5 ${editMode ? 'text-amber-600' : 'text-nook-leaf'}`} />
+                                <MapIcon className={`w-5 h-5 ${editMode ? 'text-amber-600' : 'text-nook-leaf'}`} />
                                 <span className="font-bold text-nook-text">
                                     {editMode ? '📍 編輯模式 - 拖曳點位以校正位置' : '精準點位地圖'}
                                 </span>
