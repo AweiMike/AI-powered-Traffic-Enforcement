@@ -1020,7 +1020,9 @@ async def get_map_points(
             Ticket.longitude,
             Ticket.district,
             Ticket.location_desc,
-            Ticket.topic_code,
+            Ticket.topic_dui,
+            Ticket.topic_red_light,
+            Ticket.topic_dangerous,
             Ticket.violation_date,
             Ticket.shift_id,
             Ticket.is_elderly,
@@ -1031,20 +1033,34 @@ async def get_map_points(
         )
         
         if topic:
-            ticket_query = ticket_query.filter(Ticket.topic_code == topic)
+            if topic == 'DUI':
+                ticket_query = ticket_query.filter(Ticket.topic_dui == True)
+            elif topic == 'RED_LIGHT':
+                ticket_query = ticket_query.filter(Ticket.topic_red_light == True)
+            elif topic == 'DANGEROUS_DRIVING':
+                ticket_query = ticket_query.filter(Ticket.topic_dangerous == True)
         
         tickets = ticket_query.all()
         result['summary']['total_tickets'] = len(tickets)
         
         for t in tickets:
             if t.latitude and t.longitude:
+                # 判斷主題
+                topic_name = None
+                if t.topic_dui:
+                    topic_name = 'DUI'
+                elif t.topic_red_light:
+                    topic_name = 'RED_LIGHT'
+                elif t.topic_dangerous:
+                    topic_name = 'DANGEROUS_DRIVING'
+                
                 result['ticket_points'].append({
                     'id': t.id,
                     'lat': t.latitude,
                     'lng': t.longitude,
                     'district': t.district,
                     'location': t.location_desc,
-                    'topic': t.topic_code,
+                    'topic': topic_name,
                     'date': t.violation_date.isoformat() if t.violation_date else None,
                     'shift': t.shift_id,
                     'is_elderly': t.is_elderly,

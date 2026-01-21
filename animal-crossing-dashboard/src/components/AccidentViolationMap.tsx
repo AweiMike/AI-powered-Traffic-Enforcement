@@ -17,28 +17,64 @@ import { Map, AlertTriangle, FileText } from 'lucide-react';
 const TAINAN_CENTER: L.LatLngExpression = [23.04, 120.31];
 const DEFAULT_ZOOM = 11;
 
-// 區域座標對照表
+// 台南市完整區域座標對照表
 const DISTRICT_COORDS: Record<string, [number, number]> = {
+    // 新化分局轄區
     '新化區': [23.0383, 120.3108],
-    '市新化區': [23.0383, 120.3108],
     '左鎮區': [23.0581, 120.4028],
-    '市左鎮區': [23.0581, 120.4028],
     '山上區': [23.1003, 120.3858],
-    '市山上區': [23.1003, 120.3858],
     '南化區': [23.0421, 120.4683],
-    '市南化區': [23.0421, 120.4683],
     '玉井區': [23.1228, 120.4603],
-    '市玉井區': [23.1228, 120.4603],
     '楠西區': [23.1788, 120.4858],
-    '市楠西區': [23.1788, 120.4858],
     '善化區': [23.1322, 120.2967],
-    '市善化區': [23.1322, 120.2967],
     '大內區': [23.1203, 120.3508],
-    '市大內區': [23.1203, 120.3508],
+    // 歸仁分局轄區
     '歸仁區': [22.9672, 120.2939],
-    '市歸仁區': [22.9672, 120.2939],
     '仁德區': [22.9722, 120.2272],
-    '市仁德區': [22.9722, 120.2272],
+    '關廟區': [22.9617, 120.3278],
+    '龍崎區': [22.9622, 120.3847],
+    // 其他分局轄區
+    '永康區': [23.0264, 120.2567],
+    '東區': [22.9833, 120.2167],
+    '南區': [22.9500, 120.1833],
+    '北區': [23.0000, 120.2000],
+    '中西區': [22.9917, 120.1917],
+    '安南區': [23.0500, 120.1667],
+    '安平區': [22.9917, 120.1667],
+    '新營區': [23.3103, 120.3167],
+    '鹽水區': [23.3203, 120.2661],
+    '白河區': [23.3517, 120.4156],
+    '柳營區': [23.2778, 120.3114],
+    '後壁區': [23.3664, 120.3583],
+    '東山區': [23.3258, 120.4036],
+    '麻豆區': [23.1817, 120.2483],
+    '下營區': [23.2347, 120.2647],
+    '六甲區': [23.2314, 120.3472],
+    '官田區': [23.1944, 120.3139],
+    '佳里區': [23.1650, 120.1772],
+    '學甲區': [23.2328, 120.1803],
+    '西港區': [23.1222, 120.2028],
+    '七股區': [23.1450, 120.1267],
+    '將軍區': [23.1997, 120.1092],
+    '北門區': [23.2672, 120.1261],
+    '新市區': [23.0794, 120.2911],
+    '安定區': [23.1014, 120.2353],
+};
+
+// 獲取區域座標（支援帶「市」前綴的變體）
+const getDistrictCoords = (district: string): [number, number] | null => {
+    // 直接查找
+    if (DISTRICT_COORDS[district]) return DISTRICT_COORDS[district];
+    // 去掉「市」前綴
+    const cleanDistrict = district.replace(/^市/, '');
+    if (DISTRICT_COORDS[cleanDistrict]) return DISTRICT_COORDS[cleanDistrict];
+    // 部分匹配
+    for (const [name, coords] of Object.entries(DISTRICT_COORDS)) {
+        if (district.includes(name) || name.includes(district.replace(/^市/, ''))) {
+            return coords;
+        }
+    }
+    return null;
 };
 
 interface AccidentData {
@@ -128,7 +164,7 @@ export const AccidentViolationMap: React.FC<AccidentViolationMapProps> = ({
         // 繪製事故點位（紅色）
         if (showAccidents) {
             accidentData.forEach((accident) => {
-                const coords = DISTRICT_COORDS[accident.district];
+                const coords = getDistrictCoords(accident.district);
                 if (!coords) return;
 
                 const normalizedSize = (accident.severity_score || accident.total) / maxAccident;
@@ -164,7 +200,7 @@ export const AccidentViolationMap: React.FC<AccidentViolationMapProps> = ({
         // 繪製違規點位（藍色）- 稍微偏移避免重疊
         if (showViolations) {
             violationData.forEach((violation) => {
-                const baseCoords = DISTRICT_COORDS[violation.district];
+                const baseCoords = getDistrictCoords(violation.district);
                 if (!baseCoords) return;
 
                 // 稍微偏移避免與事故點重疊
@@ -304,9 +340,9 @@ export const TopAccidentLocations: React.FC<TopAccidentLocationsProps> = ({ data
                             <tr key={item.district} className={`border-b border-nook-cream/30 ${idx < 3 ? 'bg-red-50' : ''}`}>
                                 <td className="py-2 px-3">
                                     <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${idx === 0 ? 'bg-red-500 text-white' :
-                                            idx === 1 ? 'bg-orange-400 text-white' :
-                                                idx === 2 ? 'bg-yellow-400 text-white' :
-                                                    'bg-gray-200 text-gray-600'
+                                        idx === 1 ? 'bg-orange-400 text-white' :
+                                            idx === 2 ? 'bg-yellow-400 text-white' :
+                                                'bg-gray-200 text-gray-600'
                                         }`}>
                                         {idx + 1}
                                     </span>
