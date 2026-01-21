@@ -235,6 +235,166 @@ const SimpleTrendChart: React.FC<SimpleTrendChartProps> = ({ data, dataKey, colo
 // ============================================
 // 主頁面組件
 // ============================================
+
+// ============================================
+// 交叉分析趨勢圖組件 (雙軸折線圖)
+// ============================================
+const CrossAnalysisChart: React.FC<{ data: TrendDataPoint[] }> = ({ data }) => {
+    if (data.length === 0) return null;
+
+    const tickets = data.map(d => d.tickets);
+    const crashes = data.map(d => d.crashes);
+
+    // 計算兩個 Y 軸的範圍
+    const maxTickets = Math.max(...tickets, 1) * 1.1; // 留 10% 空間
+    const maxCrashes = Math.max(...crashes, 1) * 1.1;
+
+    // SVG 尺寸與邊距
+    const width = 1000;
+    const height = 300;
+    const padding = { top: 40, right: 60, bottom: 40, left: 60 };
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+
+    // 座標轉換函數
+    const getX = (index: number) => padding.left + (index / (data.length - 1)) * chartWidth;
+    const getY_Tickets = (val: number) => height - padding.bottom - (val / maxTickets) * chartHeight;
+    const getY_Crashes = (val: number) => height - padding.bottom - (val / maxCrashes) * chartHeight;
+
+    // 生成路徑數據
+    const ticketPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)},${getY_Tickets(d.tickets)}`).join(' ');
+    const crashPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)},${getY_Crashes(d.crashes)}`).join(' ');
+
+    return (
+        <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 nook-shadow mb-8">
+            <h3 className="text-lg font-bold text-nook-text mb-2 flex items-center gap-2">
+                <LineChart className="w-5 h-5 text-nook-leaf" />
+                違規 vs 事故 交叉趨勢分析
+            </h3>
+            <p className="text-sm text-nook-text/60 mb-6">觀察「違規取締力度」與「交通事故發生」之關聯性</p>
+
+            <div className="w-full overflow-x-auto">
+                <div className="min-w-[600px] relative">
+                    <svg viewBox={`0 0 ${width} ${height}`} className="w-full text-xs select-none">
+                        {/* 網格線 */}
+                        {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => {
+                            const y = height - padding.bottom - chartHeight * ratio;
+                            return (
+                                <line
+                                    key={i}
+                                    x1={padding.left}
+                                    y1={y}
+                                    x2={width - padding.right}
+                                    y2={y}
+                                    stroke="#e5e7eb"
+                                    strokeDasharray="4 4"
+                                />
+                            );
+                        })}
+
+                        {/* X 軸標籤 */}
+                        {data.map((d, i) => (
+                            <text
+                                key={i}
+                                x={getX(i)}
+                                y={height - 10}
+                                textAnchor="middle"
+                                fill="#6b7280"
+                                fontWeight="bold"
+                            >
+                                {d.month.split('/')[1]}月
+                            </text>
+                        ))}
+
+                        {/* 左 Y 軸 (違規) */}
+                        <text x={30} y={padding.top - 15} fill="#3b82f6" fontWeight="bold" fontSize="14" textAnchor="middle">違規數</text>
+                        {[0, 0.5, 1].map((ratio, i) => {
+                            const y = height - padding.bottom - chartHeight * ratio;
+                            const val = Math.round(maxTickets * ratio);
+                            return (
+                                <text key={i} x={padding.left - 10} y={y + 4} textAnchor="end" fill="#3b82f6" fontWeight="bold">
+                                    {val}
+                                </text>
+                            );
+                        })}
+
+                        {/* 右 Y 軸 (事故) */}
+                        <text x={width - 30} y={padding.top - 15} fill="#f97316" fontWeight="bold" fontSize="14" textAnchor="middle">事故數</text>
+                        {[0, 0.5, 1].map((ratio, i) => {
+                            const y = height - padding.bottom - chartHeight * ratio;
+                            const val = Math.round(maxCrashes * ratio);
+                            return (
+                                <text key={i} x={width - padding.right + 10} y={y + 4} textAnchor="start" fill="#f97316" fontWeight="bold">
+                                    {val}
+                                </text>
+                            );
+                        })}
+
+                        {/* 數據線 - 違規 (藍色) */}
+                        <path d={ticketPath} fill="none" stroke="#3b82f6" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-md" />
+
+                        {/* 數據線 - 事故 (橘色) */}
+                        <path d={crashPath} fill="none" stroke="#f97316" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-md" />
+
+                        {/* 數據點與 Tooltip 互動區 */}
+                        {data.map((d, i) => (
+                            <g key={i} className="group cursor-pointer">
+                                {/* 隱形觸發區 */}
+                                <rect
+                                    x={getX(i) - (chartWidth / (data.length - 1)) / 2}
+                                    y={padding.top}
+                                    width={chartWidth / (data.length - 1)}
+                                    height={chartHeight}
+                                    fill="transparent"
+                                />
+                                {/* 垂直指示線 (Hover 顯示) */}
+                                <line
+                                    x1={getX(i)} y1={padding.top} x2={getX(i)} y2={height - padding.bottom}
+                                    stroke="#9ca3af" strokeDasharray="4 4"
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                />
+
+                                {/* 違規點 */}
+                                <circle cx={getX(i)} cy={getY_Tickets(d.tickets)} r="6" fill="#eff6ff" stroke="#3b82f6" strokeWidth="3" className="group-hover:r-8 transition-all" />
+
+                                {/* 事故點 */}
+                                <circle cx={getX(i)} cy={getY_Crashes(d.crashes)} r="6" fill="#fff7ed" stroke="#f97316" strokeWidth="3" className="group-hover:r-8 transition-all" />
+
+                                {/* Tooltip */}
+                                <g className="opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none transform -translate-y-2">
+                                    {/* Tooltip Background */}
+                                    <rect x={getX(i) - 60} y={padding.top - 10} width="120" height="70" rx="8" fill="rgba(255, 255, 255, 0.95)" stroke="#e5e7eb" strokeWidth="1" className="shadow-xl" />
+
+                                    {/* Tooltip Content */}
+                                    <text x={getX(i)} y={padding.top + 10} textAnchor="middle" fill="#374151" fontWeight="bold" fontSize="14">{d.month}</text>
+
+                                    <circle cx={getX(i) - 30} cy={padding.top + 30} r="4" fill="#3b82f6" />
+                                    <text x={getX(i) - 20} y={padding.top + 34} textAnchor="start" fill="#3b82f6" fontSize="12" fontWeight="bold">違規: {d.tickets}</text>
+
+                                    <circle cx={getX(i) - 30} cy={padding.top + 50} r="4" fill="#f97316" />
+                                    <text x={getX(i) - 20} y={padding.top + 54} textAnchor="start" fill="#f97316" fontSize="12" fontWeight="bold">事故: {d.crashes}</text>
+                                </g>
+                            </g>
+                        ))}
+                    </svg>
+                </div>
+            </div>
+
+            {/* 圖例 */}
+            <div className="flex justify-center gap-8 mt-4">
+                <div className="flex items-center gap-2">
+                    <span className="w-8 h-1 bg-blue-500 rounded-full h-1.5"></span>
+                    <span className="text-sm font-bold text-nook-text">違規案件數 (左軸)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="w-8 h-1 bg-orange-500 rounded-full h-1.5"></span>
+                    <span className="text-sm font-bold text-nook-text">交通事故數 (右軸)</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const PerformanceComparisonPage: React.FC = () => {
     const now = new Date();
     const [year, setYear] = useState(now.getFullYear());
@@ -591,6 +751,11 @@ const PerformanceComparisonPage: React.FC = () => {
                         <SimpleTrendChart data={trendData} dataKey="crashes" color="bg-nook-orange" title="交通事故趨勢" />
                     </div>
                 </div>
+            )}
+
+            {/* 交叉分析趨勢圖 */}
+            {trendData.length > 0 && (
+                <CrossAnalysisChart data={trendData} />
             )}
 
             {/* 成效摘要 */}
