@@ -157,30 +157,64 @@ interface SimpleTrendChartProps {
 }
 
 const SimpleTrendChart: React.FC<SimpleTrendChartProps> = ({ data, dataKey, color, title }) => {
-    if (data.length === 0) return null;
+    if (data.length === 0) {
+        return (
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 nook-shadow">
+                <h4 className="text-sm font-medium text-nook-text/60 mb-3">{title}</h4>
+                <div className="h-24 flex items-center justify-center text-nook-text/40 text-sm">
+                    暫無趨勢資料
+                </div>
+            </div>
+        );
+    }
 
     const values = data.map(d => d[dataKey] as number);
-    const max = Math.max(...values);
-    const min = Math.min(...values);
-    const range = max - min || 1;
+    const max = Math.max(...values, 1); // At least 1 to avoid division issues
+    const sum = values.reduce((a, b) => a + b, 0);
+
+    // If all values are 0, show empty state
+    if (sum === 0) {
+        return (
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 nook-shadow">
+                <h4 className="text-sm font-medium text-nook-text/60 mb-3">{title}</h4>
+                <div className="flex items-end gap-1 h-24">
+                    {data.map((d, i) => (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                            <div className={`w-full ${color} rounded-t opacity-20`} style={{ height: '10%' }} />
+                            <span className="text-[10px] text-nook-text/40">{d.month.slice(-2)}</span>
+                        </div>
+                    ))}
+                </div>
+                <p className="text-center text-xs text-nook-text/40 mt-2">此期間無資料</p>
+            </div>
+        );
+    }
 
     return (
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 nook-shadow">
             <h4 className="text-sm font-medium text-nook-text/60 mb-3">{title}</h4>
             <div className="flex items-end gap-1 h-24">
                 {data.map((d, i) => {
-                    const height = ((d[dataKey] as number) - min) / range * 80 + 20;
+                    const value = d[dataKey] as number;
+                    const height = Math.max((value / max) * 100, 5); // At least 5% height
                     return (
-                        <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                        <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
                             <div
-                                className={`w-full ${color} rounded-t transition-all duration-300`}
+                                className={`w-full ${color} rounded-t transition-all duration-300 hover:opacity-80`}
                                 style={{ height: `${height}%` }}
-                                title={`${d.month}: ${d[dataKey]}`}
                             />
+                            {/* Value tooltip on hover */}
+                            <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                {value}
+                            </div>
                             <span className="text-[10px] text-nook-text/40">{d.month.slice(-2)}</span>
                         </div>
                     );
                 })}
+            </div>
+            <div className="flex justify-between text-[10px] text-nook-text/40 mt-2">
+                <span>最小: {Math.min(...values)}</span>
+                <span>最大: {Math.max(...values)}</span>
             </div>
         </div>
     );
@@ -218,7 +252,7 @@ const PerformanceComparisonPage: React.FC = () => {
     // 載入趨勢數據（過去6個月）
     useEffect(() => {
         const fetchTrend = async () => {
-            const points: TrendDataPoint[] = [];
+            const promises = [];
             for (let i = 5; i >= 0; i--) {
                 let m = month - i;
                 let y = year;
@@ -226,21 +260,34 @@ const PerformanceComparisonPage: React.FC = () => {
                     m += 12;
                     y -= 1;
                 }
-                try {
-                    const result = await apiClient.getMonthlyStats(y, m);
-                    points.push({
-                        month: `${y}/${m.toString().padStart(2, '0')}`,
-                        tickets: result.current.tickets,
-                        crashes: result.current.crashes,
-                        dui: result.current.topics.dui,
-                        red_light: result.current.topics.red_light,
-                        dangerous: result.current.topics.dangerous_driving,
-                    });
-                } catch {
-                    // Skip failed months
-                }
+                const monthStr = `${y}/${m.toString().padStart(2, '0')}`;
+
+                promises.push(
+                    apiClient.getMonthlyStats(y, m)
+                        .then(result => ({
+                            month: monthStr,
+                            tickets: result.current.tickets,
+                            crashes: result.current.crashes,
+                            dui: result.current.topics.dui,
+                            red_light: result.current.topics.red_light,
+                            dangerous: result.current.topics.dangerous_driving,
+                        }))
+                        .catch(err => {
+                            console.warn(`Failed to fetch stats for ${monthStr}, using 0`, err);
+                            return {
+                                month: monthStr,
+                                tickets: 0,
+                                crashes: 0,
+                                dui: 0,
+                                red_light: 0,
+                                dangerous: 0,
+                            };
+                        })
+                );
             }
-            setTrendData(points);
+
+            const results = await Promise.all(promises);
+            setTrendData(results);
         };
         fetchTrend();
     }, [year, month]);
@@ -388,7 +435,7 @@ const PerformanceComparisonPage: React.FC = () => {
                             </div>
                             <div className="mt-3 pt-3 border-t border-red-200">
                                 <div className={`text-sm font-medium ${data.current.severity.a1 < (data.last_year.severity?.a1 || 0) ? 'text-nook-leaf' :
-                                        data.current.severity.a1 > (data.last_year.severity?.a1 || 0) ? 'text-nook-red' : 'text-nook-text/60'
+                                    data.current.severity.a1 > (data.last_year.severity?.a1 || 0) ? 'text-nook-red' : 'text-nook-text/60'
                                     }`}>
                                     {data.current.severity.a1 < (data.last_year.severity?.a1 || 0) ? '✓ 減少 ' :
                                         data.current.severity.a1 > (data.last_year.severity?.a1 || 0) ? '↑ 增加 ' : '持平 '}
@@ -418,7 +465,7 @@ const PerformanceComparisonPage: React.FC = () => {
                             </div>
                             <div className="mt-3 pt-3 border-t border-orange-200">
                                 <div className={`text-sm font-medium ${data.current.severity.a2 < (data.last_year.severity?.a2 || 0) ? 'text-nook-leaf' :
-                                        data.current.severity.a2 > (data.last_year.severity?.a2 || 0) ? 'text-nook-red' : 'text-nook-text/60'
+                                    data.current.severity.a2 > (data.last_year.severity?.a2 || 0) ? 'text-nook-red' : 'text-nook-text/60'
                                     }`}>
                                     {data.current.severity.a2 < (data.last_year.severity?.a2 || 0) ? '✓ 減少 ' :
                                         data.current.severity.a2 > (data.last_year.severity?.a2 || 0) ? '↑ 增加 ' : '持平 '}
