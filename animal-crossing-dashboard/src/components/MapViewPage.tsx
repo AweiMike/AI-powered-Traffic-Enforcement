@@ -567,6 +567,14 @@ const MapViewPage: React.FC = () => {
                                         <span className="w-3 h-3 rounded-full bg-blue-500"></span>
                                         <span>闘紅燈違規</span>
                                     </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="w-3 h-3 rounded-full bg-cyan-500"></span>
+                                        <span>危險駕駛違規</span>
+                                    </div>
+                                    <div className="mt-2 pt-2 border-t border-nook-cream/50 text-[10px] text-nook-text/50">
+                                        <p className="font-medium text-nook-text/60 mb-1">危險駕駛涵蓋：</p>
+                                        <p>超速、逼車、競速、蛇行、甩尾、任意變換車道、未保持安全距離、肇事逃逸等</p>
+                                    </div>
                                 </>
                             )}
                         </div>
