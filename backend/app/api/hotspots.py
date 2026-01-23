@@ -144,7 +144,31 @@ async def get_accident_hotspots(
             key = f"{row.district}|{row.location_desc}"
             baseline_data[key] = row.total
     
-    # 組裝結果 - 組合區域+地點顯示完整位置
+    def clean_district(district: str) -> str:
+        """清理區域名稱，移除「市」前綴"""
+        if district and district.startswith('市'):
+            return district[1:]  # 移除開頭的「市」
+        return district or "未知區"
+    
+    def clean_location(location: str, district: str) -> str:
+        """清理地點名稱，移除與區域重複的前綴"""
+        if not location:
+            return "未知地點"
+        # 如果地點開頭與區域名稱的首字相同，可能是重複的簡寫
+        # 例如：district=新化區, location=新中山路 → 中山路
+        cleaned_district = clean_district(district)
+        if cleaned_district and len(cleaned_district) >= 2:
+            district_prefix = cleaned_district[0]  # 例如「新」
+            if location.startswith(district_prefix) and len(location) > 1:
+                # 確保不是完整路名開頭（如「新生路」應保留「新」）
+                # 檢查是否是「新X路」格式而非正常路名
+                # 簡單檢查：如果第二個字是常見路名用字，則視為重複前綴
+                common_road_chars = ['中', '大', '正', '民', '建', '信', '光', '和', '竹', '北', '南', '東', '西']
+                if len(location) > 1 and location[1] in common_road_chars:
+                    return location[1:]  # 移除重複的區域前綴
+        return location
+    
+    # 組裝結果
     hotspots = []
     for i, row in enumerate(results, 1):
         key = f"{row.district}|{row.location_desc}"
@@ -154,15 +178,10 @@ async def get_accident_hotspots(
         if compare_baseline and baseline_count > 0:
             trend_pct = round((row.total - baseline_count) / baseline_count * 100, 1)
         
-        # 組合完整地點名稱：區域 + 路段
-        full_location = row.location_desc or "未知地點"
-        if row.district and row.location_desc and row.district not in row.location_desc:
-            full_location = f"{row.district} {row.location_desc}"
-        
         hotspots.append(HotspotItem(
             rank=i,
-            location=full_location,
-            district=row.district or "未知區",
+            location=clean_location(row.location_desc, row.district),
+            district=clean_district(row.district),
             a1_count=row.a1_count or 0,
             a2_count=row.a2_count or 0,
             a3_count=row.a3_count or 0,
@@ -261,17 +280,31 @@ async def get_ticket_hotspots(
         desc('count')
     ).limit(top_n).all()
     
+    def clean_district(district: str) -> str:
+        """清理區域名稱，移除「市」前綴"""
+        if district and district.startswith('市'):
+            return district[1:]
+        return district or "未知區"
+    
+    def clean_location(location: str, district: str) -> str:
+        """清理地點名稱，移除與區域重複的前綴"""
+        if not location:
+            return "未知地點"
+        cleaned_district = clean_district(district)
+        if cleaned_district and len(cleaned_district) >= 2:
+            district_prefix = cleaned_district[0]
+            if location.startswith(district_prefix) and len(location) > 1:
+                common_road_chars = ['中', '大', '正', '民', '建', '信', '光', '和', '竹', '北', '南', '東', '西']
+                if len(location) > 1 and location[1] in common_road_chars:
+                    return location[1:]
+        return location
+    
     hotspots = []
     for i, row in enumerate(results, 1):
-        # 組合完整地點名稱
-        full_location = row.location_desc or "未知地點"
-        if row.district and row.location_desc and row.district not in row.location_desc:
-            full_location = f"{row.district} {row.location_desc}"
-            
         hotspots.append(TicketHotspotItem(
             rank=i,
-            location=full_location,
-            district=row.district or "未知區",
+            location=clean_location(row.location_desc, row.district),
+            district=clean_district(row.district),
             count=row.count,
             topic=topic_label,
             latitude=row.avg_lat,
