@@ -4,6 +4,7 @@ FastAPI 主應用程式
 """
 
 from fastapi import FastAPI
+# Trigger reload
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 

@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     GOOGLE_MAPS_API_KEY: str = ""
     MOI_ADDRESS_API_KEY: str = ""
 
+    # LLM 模型設定
+    OPENAI_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
+    CLAUDE_API_KEY: str = ""
+    PRIMARY_LLM_PROVIDER: str = "openai" # openai, gemini, anthropic
+    LLM_MODEL_NAME: str = "gpt-4-turbo" # or gemini-pro, claude-3-opus
+
     class Config:
         env_file = ".env"
         case_sensitive = True
