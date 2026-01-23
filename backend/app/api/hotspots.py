@@ -4,7 +4,7 @@
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, desc
+from sqlalchemy import func, and_, desc, case
 from typing import List, Optional
 from datetime import datetime, timedelta
 from pydantic import BaseModel
@@ -76,13 +76,13 @@ async def get_accident_hotspots(
     end_date = datetime.now().date()
     start_date = end_date - timedelta(days=days)
     
-    # 基礎查詢
+    # 基礎查詢 - 使用正確的 case() 語法
     query = db.query(
         Crash.district,
         Crash.location_desc,
-        func.sum(func.case((Crash.severity == 'A1', 1), else_=0)).label('a1_count'),
-        func.sum(func.case((Crash.severity == 'A2', 1), else_=0)).label('a2_count'),
-        func.sum(func.case((Crash.severity == 'A3', 1), else_=0)).label('a3_count'),
+        func.sum(case((Crash.severity == 'A1', 1), else_=0)).label('a1_count'),
+        func.sum(case((Crash.severity == 'A2', 1), else_=0)).label('a2_count'),
+        func.sum(case((Crash.severity == 'A3', 1), else_=0)).label('a3_count'),
         func.count(Crash.id).label('total'),
         func.avg(Crash.latitude).label('avg_lat'),
         func.avg(Crash.longitude).label('avg_lng')
