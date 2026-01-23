@@ -10,6 +10,7 @@ import {
     CheckCircle, ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
 import { apiClient, MonthlyStats } from '../api/client';
+import HotspotRankingCard from './HotspotRankingCard';
 
 // ============================================
 // 類型定義
@@ -757,6 +758,24 @@ const PerformanceComparisonPage: React.FC = () => {
             {trendData.length > 0 && (
                 <CrossAnalysisChart data={trendData} />
             )}
+
+            {/* 熱點排名區 */}
+            <div className="grid grid-cols-2 gap-6 mb-8 print:hidden">
+                <HotspotRankingCard
+                    type="accident"
+                    days={30}
+                    topN={5}
+                    severity="A1+A2"
+                    title="🚨 A1/A2 事故熱點 Top 5"
+                />
+                <HotspotRankingCard
+                    type="ticket"
+                    days={30}
+                    topN={5}
+                    topic="DUI"
+                    title="🍺 酒駕違規熱點 Top 5"
+                />
+            </div>
 
             {/* 成效摘要 */}
             <div className="bg-nook-leaf/10 rounded-3xl p-6">

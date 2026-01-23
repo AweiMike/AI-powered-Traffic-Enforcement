@@ -598,6 +598,45 @@ class APIClient {
   }
 
   // ============================================
+  // Hotspot Analysis API
+  // ============================================
+
+  async getAccidentHotspotsRanking(
+    days: number = 30,
+    topN: number = 10,
+    severity?: string,
+    compareBaseline: boolean = true
+  ): Promise<any> {
+    const params = new URLSearchParams({
+      days: days.toString(),
+      top_n: topN.toString(),
+      compare_baseline: compareBaseline.toString()
+    });
+    if (severity) params.append('severity', severity);
+    return this.request(`/hotspots/accident-hotspots?${params}`);
+  }
+
+  async getTicketHotspots(
+    days: number = 30,
+    topN: number = 10,
+    topic?: string
+  ): Promise<any> {
+    const params = new URLSearchParams({
+      days: days.toString(),
+      top_n: topN.toString()
+    });
+    if (topic) params.append('topic', topic);
+    return this.request(`/hotspots/ticket-hotspots?${params}`);
+  }
+
+  async getHotspotOverlap(
+    days: number = 30,
+    topN: number = 10
+  ): Promise<any> {
+    return this.request(`/hotspots/hotspot-overlap?days=${days}&top_n=${topN}`);
+  }
+
+  // ============================================
   // System API (root-level, no /api/v1 prefix)
   // ============================================
 
