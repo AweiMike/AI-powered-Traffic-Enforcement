@@ -602,16 +602,29 @@ class APIClient {
   // ============================================
 
   async getAccidentHotspotsRanking(
-    days: number = 30,
-    topN: number = 10,
-    severity?: string,
-    compareBaseline: boolean = true
+    options: {
+      days?: number;
+      year?: number;
+      month?: number;
+      topN?: number;
+      severity?: string;
+      compareBaseline?: boolean;
+    } = {}
   ): Promise<any> {
+    const { days = 30, year, month, topN = 10, severity, compareBaseline = true } = options;
     const params = new URLSearchParams({
-      days: days.toString(),
       top_n: topN.toString(),
       compare_baseline: compareBaseline.toString()
     });
+
+    // 若有年月則使用年月，否則使用 days
+    if (year && month) {
+      params.append('year', year.toString());
+      params.append('month', month.toString());
+    } else {
+      params.append('days', days.toString());
+    }
+
     if (severity) params.append('severity', severity);
     return this.request(`/hotspots/accident-hotspots?${params}`);
   }
@@ -619,12 +632,22 @@ class APIClient {
   async getTicketHotspots(
     days: number = 30,
     topN: number = 10,
-    topic?: string
+    topic?: string,
+    year?: number,
+    month?: number
   ): Promise<any> {
     const params = new URLSearchParams({
-      days: days.toString(),
       top_n: topN.toString()
     });
+
+    // 若有年月則使用年月，否則使用 days
+    if (year && month) {
+      params.append('year', year.toString());
+      params.append('month', month.toString());
+    } else {
+      params.append('days', days.toString());
+    }
+
     if (topic) params.append('topic', topic);
     return this.request(`/hotspots/ticket-hotspots?${params}`);
   }

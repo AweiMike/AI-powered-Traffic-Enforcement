@@ -24,6 +24,8 @@ interface HotspotItem {
 interface HotspotRankingCardProps {
     type: 'accident' | 'ticket';
     days?: number;
+    year?: number;
+    month?: number;
     topN?: number;
     severity?: string;
     topic?: string;
@@ -34,6 +36,8 @@ interface HotspotRankingCardProps {
 const HotspotRankingCard: React.FC<HotspotRankingCardProps> = ({
     type,
     days = 30,
+    year,
+    month,
     topN = 5,
     severity,
     topic,
@@ -51,11 +55,17 @@ const HotspotRankingCard: React.FC<HotspotRankingCardProps> = ({
             setError(null);
             try {
                 if (type === 'accident') {
-                    const result = await apiClient.getAccidentHotspotsRanking(days, topN, severity);
+                    const result = await apiClient.getAccidentHotspotsRanking({
+                        days,
+                        year,
+                        month,
+                        topN,
+                        severity
+                    });
                     setHotspots(result.hotspots || []);
                     setTotalInPeriod(result.total_in_period || 0);
                 } else {
-                    const result = await apiClient.getTicketHotspots(days, topN, topic);
+                    const result = await apiClient.getTicketHotspots(days, topN, topic, year, month);
                     setHotspots(result.hotspots || []);
                 }
             } catch (err) {
@@ -66,7 +76,7 @@ const HotspotRankingCard: React.FC<HotspotRankingCardProps> = ({
             }
         };
         fetchData();
-    }, [type, days, topN, severity, topic]);
+    }, [type, days, year, month, topN, severity, topic]);
 
     const getRankBadge = (rank: number) => {
         if (rank === 1) return <span className="w-6 h-6 flex items-center justify-center bg-yellow-400 text-white rounded-full text-xs font-bold">🥇</span>;
@@ -143,8 +153,8 @@ const HotspotRankingCard: React.FC<HotspotRankingCardProps> = ({
                         <div
                             key={item.rank}
                             className={`flex items-center gap-3 p-3 rounded-xl transition-all ${onHotspotClick
-                                    ? 'hover:bg-nook-leaf/10 cursor-pointer'
-                                    : 'bg-nook-cream/30'
+                                ? 'hover:bg-nook-leaf/10 cursor-pointer'
+                                : 'bg-nook-cream/30'
                                 }`}
                             onClick={() => onHotspotClick?.(item)}
                         >

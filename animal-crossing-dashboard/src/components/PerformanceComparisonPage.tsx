@@ -763,17 +763,19 @@ const PerformanceComparisonPage: React.FC = () => {
             <div className="grid grid-cols-2 gap-6 mb-8 print:hidden">
                 <HotspotRankingCard
                     type="accident"
-                    days={30}
+                    year={year}
+                    month={month}
                     topN={5}
                     severity="A1+A2"
-                    title="🚨 A1/A2 事故熱點 Top 5"
+                    title={`🚨 ${year}年${month}月 A1/A2 事故熱點 Top 5`}
                 />
                 <HotspotRankingCard
                     type="ticket"
-                    days={30}
+                    year={year}
+                    month={month}
                     topN={5}
                     topic="DUI"
-                    title="🍺 酒駕違規熱點 Top 5"
+                    title={`🍺 ${year}年${month}月 酒駕違規熱點 Top 5`}
                 />
             </div>
 

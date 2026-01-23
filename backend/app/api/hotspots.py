@@ -60,7 +60,9 @@ class TicketHotspotItem(BaseModel):
 
 @router.get("/accident-hotspots", response_model=HotspotResponse)
 async def get_accident_hotspots(
-    days: int = Query(default=30, description="分析期間天數"),
+    year: Optional[int] = Query(default=None, description="年份 (若指定則忽略 days)"),
+    month: Optional[int] = Query(default=None, ge=1, le=12, description="月份 (需配合 year)"),
+    days: int = Query(default=30, description="分析期間天數 (若未指定 year/month)"),
     top_n: int = Query(default=10, ge=1, le=50, description="返回前 N 名"),
     severity: Optional[str] = Query(default=None, description="嚴重度篩選: A1, A2, A1+A2"),
     compare_baseline: bool = Query(default=True, description="是否比較去年同期"),
@@ -72,9 +74,19 @@ async def get_accident_hotspots(
     - 依地點聚合事故數量
     - 支援嚴重度篩選
     - 可比較去年同期趨勢
+    - 支援年月篩選
     """
-    end_date = datetime.now().date()
-    start_date = end_date - timedelta(days=days)
+    # 決定日期範圍
+    if year and month:
+        # 使用指定年月
+        import calendar
+        _, last_day = calendar.monthrange(year, month)
+        start_date = datetime(year, month, 1).date()
+        end_date = datetime(year, month, last_day).date()
+    else:
+        # 使用 days 參數
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=days)
     
     # 基礎查詢 - 使用正確的 case() 語法
     query = db.query(
@@ -132,7 +144,7 @@ async def get_accident_hotspots(
             key = f"{row.district}|{row.location_desc}"
             baseline_data[key] = row.total
     
-    # 組裝結果
+    # 組裝結果 - 組合區域+地點顯示完整位置
     hotspots = []
     for i, row in enumerate(results, 1):
         key = f"{row.district}|{row.location_desc}"
@@ -142,9 +154,14 @@ async def get_accident_hotspots(
         if compare_baseline and baseline_count > 0:
             trend_pct = round((row.total - baseline_count) / baseline_count * 100, 1)
         
+        # 組合完整地點名稱：區域 + 路段
+        full_location = row.location_desc or "未知地點"
+        if row.district and row.location_desc and row.district not in row.location_desc:
+            full_location = f"{row.district} {row.location_desc}"
+        
         hotspots.append(HotspotItem(
             rank=i,
-            location=row.location_desc or "未知地點",
+            location=full_location,
             district=row.district or "未知區",
             a1_count=row.a1_count or 0,
             a2_count=row.a2_count or 0,
@@ -167,7 +184,9 @@ async def get_accident_hotspots(
         period={
             "start": start_date.isoformat(),
             "end": end_date.isoformat(),
-            "days": days
+            "days": days if not (year and month) else None,
+            "year": year,
+            "month": month
         },
         baseline={
             "start": (start_date.replace(year=start_date.year - 1)).isoformat(),
@@ -185,7 +204,9 @@ async def get_accident_hotspots(
 
 @router.get("/ticket-hotspots")
 async def get_ticket_hotspots(
-    days: int = Query(default=30, description="分析期間天數"),
+    year: Optional[int] = Query(default=None, description="年份 (若指定則忽略 days)"),
+    month: Optional[int] = Query(default=None, ge=1, le=12, description="月份 (需配合 year)"),
+    days: int = Query(default=30, description="分析期間天數 (若未指定 year/month)"),
     top_n: int = Query(default=10, ge=1, le=50, description="返回前 N 名"),
     topic: Optional[str] = Query(default=None, description="主題篩選: DUI, RED_LIGHT, DANGEROUS"),
     db: Session = Depends(get_db)
@@ -195,9 +216,17 @@ async def get_ticket_hotspots(
     
     - 依地點聚合違規數量
     - 支援主題篩選（酒駕/闘紅燈/危駕）
+    - 支援年月篩選
     """
-    end_date = datetime.now().date()
-    start_date = end_date - timedelta(days=days)
+    # 決定日期範圍
+    if year and month:
+        import calendar
+        _, last_day = calendar.monthrange(year, month)
+        start_date = datetime(year, month, 1).date()
+        end_date = datetime(year, month, last_day).date()
+    else:
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=days)
     
     query = db.query(
         Ticket.district,
@@ -234,9 +263,14 @@ async def get_ticket_hotspots(
     
     hotspots = []
     for i, row in enumerate(results, 1):
+        # 組合完整地點名稱
+        full_location = row.location_desc or "未知地點"
+        if row.district and row.location_desc and row.district not in row.location_desc:
+            full_location = f"{row.district} {row.location_desc}"
+            
         hotspots.append(TicketHotspotItem(
             rank=i,
-            location=row.location_desc or "未知地點",
+            location=full_location,
             district=row.district or "未知區",
             count=row.count,
             topic=topic_label,
