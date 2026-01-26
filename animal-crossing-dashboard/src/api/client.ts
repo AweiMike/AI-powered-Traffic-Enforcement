@@ -676,6 +676,40 @@ class APIClient {
     if (!response.ok) throw new Error(`API Error: ${response.status}`);
     return response.json();
   }
+
+  // ============================================
+  // AI Report API
+  // ============================================
+
+  async generateAIReport(year: number, month: number, apiKey?: string, provider: string = 'openai', model?: string): Promise<ReportResponse> {
+    const headers: Record<string, string> = {};
+    if (apiKey) {
+      headers['X-LLM-API-KEY'] = apiKey;
+      headers['X-LLM-PROVIDER'] = provider;
+      if (model) {
+        headers['X-LLM-MODEL'] = model;
+      }
+    }
+
+    return this.request(`/report/generate?year=${year}&month=${month}`, {
+      method: 'POST',
+      headers
+    });
+  }
+}
+
+// 報告相關介面定義
+export interface ReportResponse {
+  period: {
+    year: number;
+    month: number;
+  };
+  raw_data: any; // 原始統計數據
+  ai_analysis: {
+    provider: string;
+    model: string;
+    content: string; // Markdown 格式報告
+  };
 }
 
 // Export singleton instance

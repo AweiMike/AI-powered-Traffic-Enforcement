@@ -10,7 +10,7 @@ class ReportGeneratorService:
         self.analytics = AnalyticsEngine(db)
         self.llm = LLMService()
 
-    async def generate_full_report(self, year: int, month: int) -> dict:
+    async def generate_full_report(self, year: int, month: int, api_key: str = None, provider: str = None, model_name: str = None) -> dict:
         """
         生成完整的 AI 分析報告
         """
@@ -23,7 +23,13 @@ class ReportGeneratorService:
         
         # 3. 呼叫 LLM
         # 這裡我們預期 LLM 返回 Markdown 格式的報告
-        report_content = await self.llm.generate_text(system_prompt, user_prompt)
+        report_content = await self.llm.generate_text(
+            system_prompt, 
+            user_prompt,
+            api_key=api_key,
+            provider=provider,
+            model_name=model_name
+        )
         
         # 4. 回傳結果
         # 我們回傳結構化數據，將原始數據與 AI 報告分開，方便前端展示
