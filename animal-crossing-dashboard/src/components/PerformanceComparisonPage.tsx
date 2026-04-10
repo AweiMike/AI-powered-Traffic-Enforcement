@@ -498,6 +498,22 @@ const PerformanceComparisonPage: React.FC = () => {
             data.current.topics.dangerous_driving - data.last_year.topics.dangerous_driving]);
         rows.push([]);
 
+        // === 舉發子類型 ===
+        if (data.current.enforcement) {
+            rows.push(['【舉發子類型】']);
+            rows.push(['子類型', '本期', '去年同期', '增減', '變化率']);
+            for (const key of Object.keys(data.current.enforcement)) {
+                const cur = data.current.enforcement[key] || 0;
+                const last = data.last_year.enforcement?.[key] || 0;
+                const diff = cur - last;
+                const pct = last > 0 ? Math.round((diff / last) * 1000) / 10 : 0;
+                if (cur + last > 0) {
+                    rows.push([key, cur, last, diff, `${pct}%`]);
+                }
+            }
+            rows.push([]);
+        }
+
         // === A1 死亡事故清單 ===
         if (a1List.length > 0) {
             rows.push(['【A1 死亡事故清單】', `共 ${a1List.length} 件`]);
