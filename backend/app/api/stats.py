@@ -149,58 +149,73 @@ async def get_overview(days: int = 30, db: Session = Depends(get_db)):
 
 @router.get("/monthly")
 async def get_monthly_stats(
-    year: int = Query(..., description="年份"),
-    month: int = Query(..., ge=1, le=12, description="月份 (1-12)"),
+    year: Optional[int] = Query(default=None, description="年份 (若指定 start_date/end_date 則忽略)"),
+    month: Optional[int] = Query(default=None, ge=1, le=12, description="月份 (需配合 year)"),
+    start_date: Optional[str] = Query(default=None, description="起始日期 YYYY-MM-DD"),
+    end_date: Optional[str] = Query(default=None, description="結束日期 YYYY-MM-DD"),
     db: Session = Depends(get_db),
 ):
     """
-    月度統計（含去年同期比較）
+    月度/區間統計（含去年同期比較）
 
-    參數：
-    - year: 統計年份
-    - month: 統計月份 (1-12)
-
-    返回：
-    - 當月統計
-    - 去年同期統計
-    - 增減率
+    支援兩種模式：
+    1. year + month：傳統月度統計
+    2. start_date + end_date：自訂日期區間統計（自動計算去年同期）
     """
-    # 驗證日期
-    try:
-        datetime(year, month, 1)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="無效的年月")
+    import calendar
 
-    # 當年統計
-    current_tickets = (
-        db.query(func.count(Ticket.id))
-        .filter(and_(Ticket.year == year, Ticket.month == month))
-        .scalar()
-        or 0
-    )
+    use_date_range = start_date and end_date
 
-    current_crashes = (
-        db.query(func.count(Crash.id))
-        .filter(and_(Crash.year == year, Crash.month == month))
-        .scalar()
-        or 0
-    )
+    if use_date_range:
+        try:
+            sd = datetime.strptime(start_date, "%Y-%m-%d").date()
+            ed = datetime.strptime(end_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="日期格式錯誤，請使用 YYYY-MM-DD")
+        # 去年同期
+        prev_sd = sd.replace(year=sd.year - 1)
+        prev_ed = ed.replace(year=ed.year - 1)
+    else:
+        if not year or not month:
+            raise HTTPException(status_code=400, detail="需提供 year+month 或 start_date+end_date")
+        try:
+            datetime(year, month, 1)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="無效的年月")
+        _, last_day = calendar.monthrange(year, month)
+        sd = datetime(year, month, 1).date()
+        ed = datetime(year, month, last_day).date()
+        prev_sd = sd.replace(year=sd.year - 1)
+        prev_ed = ed.replace(year=ed.year - 1)
+
+    # --- 共用查詢函數 ---
+    def count_tickets(s, e):
+        return db.query(func.count(Ticket.id)).filter(
+            and_(Ticket.violation_date >= s, Ticket.violation_date <= e)
+        ).scalar() or 0
+
+    def count_crashes(s, e):
+        return db.query(func.count(Crash.id)).filter(
+            and_(Crash.occurred_date >= s, Crash.occurred_date <= e)
+        ).scalar() or 0
+
+    def count_tickets_topic(s, e, col):
+        return db.query(func.count(Ticket.id)).filter(
+            and_(Ticket.violation_date >= s, Ticket.violation_date <= e, col == True)
+        ).scalar() or 0
+
+    def count_crashes_severity(s, e, sev):
+        return db.query(func.count(Crash.id)).filter(
+            and_(Crash.occurred_date >= s, Crash.occurred_date <= e, Crash.severity == sev)
+        ).scalar() or 0
+
+    # 當期統計
+    current_tickets = count_tickets(sd, ed)
+    current_crashes = count_crashes(sd, ed)
 
     # 去年同期統計
-    last_year = year - 1
-    last_year_tickets = (
-        db.query(func.count(Ticket.id))
-        .filter(and_(Ticket.year == last_year, Ticket.month == month))
-        .scalar()
-        or 0
-    )
-
-    last_year_crashes = (
-        db.query(func.count(Crash.id))
-        .filter(and_(Crash.year == last_year, Crash.month == month))
-        .scalar()
-        or 0
-    )
+    last_year_tickets = count_tickets(prev_sd, prev_ed)
+    last_year_crashes = count_crashes(prev_sd, prev_ed)
 
     # 計算變化率
     tickets_change = 0
@@ -208,7 +223,6 @@ async def get_monthly_stats(
         tickets_change = round(
             (current_tickets - last_year_tickets) / last_year_tickets * 100, 1
         )
-
     crashes_change = 0
     if last_year_crashes > 0:
         crashes_change = round(
@@ -217,95 +231,34 @@ async def get_monthly_stats(
 
     # 主題統計
     current_topics = {
-        "dui": db.query(func.count(Ticket.id))
-        .filter(
-            and_(Ticket.year == year, Ticket.month == month, Ticket.topic_dui == True)
-        )
-        .scalar()
-        or 0,
-        "red_light": db.query(func.count(Ticket.id))
-        .filter(
-            and_(
-                Ticket.year == year,
-                Ticket.month == month,
-                Ticket.topic_red_light == True,
-            )
-        )
-        .scalar()
-        or 0,
-        "dangerous_driving": db.query(func.count(Ticket.id))
-        .filter(
-            and_(
-                Ticket.year == year,
-                Ticket.month == month,
-                Ticket.topic_dangerous == True,
-            )
-        )
-        .scalar()
-        or 0,
+        "dui": count_tickets_topic(sd, ed, Ticket.topic_dui),
+        "red_light": count_tickets_topic(sd, ed, Ticket.topic_red_light),
+        "dangerous_driving": count_tickets_topic(sd, ed, Ticket.topic_dangerous),
     }
-
     last_year_topics = {
-        "dui": db.query(func.count(Ticket.id))
-        .filter(
-            and_(
-                Ticket.year == last_year,
-                Ticket.month == month,
-                Ticket.topic_dui == True,
-            )
-        )
-        .scalar()
-        or 0,
-        "red_light": db.query(func.count(Ticket.id))
-        .filter(
-            and_(
-                Ticket.year == last_year,
-                Ticket.month == month,
-                Ticket.topic_red_light == True,
-            )
-        )
-        .scalar()
-        or 0,
-        "dangerous_driving": db.query(func.count(Ticket.id))
-        .filter(
-            and_(
-                Ticket.year == last_year,
-                Ticket.month == month,
-                Ticket.topic_dangerous == True,
-            )
-        )
-        .scalar()
-        or 0,
+        "dui": count_tickets_topic(prev_sd, prev_ed, Ticket.topic_dui),
+        "red_light": count_tickets_topic(prev_sd, prev_ed, Ticket.topic_red_light),
+        "dangerous_driving": count_tickets_topic(prev_sd, prev_ed, Ticket.topic_dangerous),
     }
 
-    # 事故嚴重度統計 - 當年
+    # 事故嚴重度統計
     current_severity = {
-        "a1": db.query(func.count(Crash.id))
-        .filter(and_(Crash.year == year, Crash.month == month, Crash.severity == "A1"))
-        .scalar() or 0,
-        "a2": db.query(func.count(Crash.id))
-        .filter(and_(Crash.year == year, Crash.month == month, Crash.severity == "A2"))
-        .scalar() or 0,
-        "a3": db.query(func.count(Crash.id))
-        .filter(and_(Crash.year == year, Crash.month == month, Crash.severity == "A3"))
-        .scalar() or 0,
+        "a1": count_crashes_severity(sd, ed, "A1"),
+        "a2": count_crashes_severity(sd, ed, "A2"),
+        "a3": count_crashes_severity(sd, ed, "A3"),
+    }
+    last_year_severity = {
+        "a1": count_crashes_severity(prev_sd, prev_ed, "A1"),
+        "a2": count_crashes_severity(prev_sd, prev_ed, "A2"),
+        "a3": count_crashes_severity(prev_sd, prev_ed, "A3"),
     }
 
-    # 事故嚴重度統計 - 去年同期
-    last_year_severity = {
-        "a1": db.query(func.count(Crash.id))
-        .filter(and_(Crash.year == last_year, Crash.month == month, Crash.severity == "A1"))
-        .scalar() or 0,
-        "a2": db.query(func.count(Crash.id))
-        .filter(and_(Crash.year == last_year, Crash.month == month, Crash.severity == "A2"))
-        .scalar() or 0,
-        "a3": db.query(func.count(Crash.id))
-        .filter(and_(Crash.year == last_year, Crash.month == month, Crash.severity == "A3"))
-        .scalar() or 0,
-    }
+    period_info = {"year": year, "month": month}
+    if use_date_range:
+        period_info = {"start_date": str(sd), "end_date": str(ed)}
 
     return {
-        "period": {"year": year, "month": month},
+        "period": period_info,
         "current": {
             "tickets": current_tickets,
             "crashes": current_crashes,
@@ -313,7 +266,7 @@ async def get_monthly_stats(
             "severity": current_severity,
         },
         "last_year": {
-            "year": last_year,
+            "year": prev_sd.year,
             "tickets": last_year_tickets,
             "crashes": last_year_crashes,
             "topics": last_year_topics,
@@ -733,4 +686,44 @@ async def get_violation_stats(days: int = 30, db: Session = Depends(get_db)):
             "dangerous_driving": dangerous_count,
             "others": total_tickets - (dui_count + red_light_count + dangerous_count),
         },
+    }
+
+
+@router.get("/data-info")
+async def get_data_info(db: Session = Depends(get_db)):
+    """
+    取得資料庫中事故與違規的資料起訖日期及最後上傳時間
+    """
+    # 事故資料日期範圍
+    crash_min = db.query(func.min(Crash.occurred_date)).scalar()
+    crash_max = db.query(func.max(Crash.occurred_date)).scalar()
+    crash_count = db.query(func.count(Crash.id)).scalar() or 0
+
+    # 違規資料日期範圍
+    ticket_min = db.query(func.min(Ticket.violation_date)).scalar()
+    ticket_max = db.query(func.max(Ticket.violation_date)).scalar()
+    ticket_count = db.query(func.count(Ticket.id)).scalar() or 0
+
+    # 最後上傳時間（用 created_at 推斷）
+    last_crash_upload = db.query(func.max(Crash.created_at)).scalar()
+    last_ticket_upload = db.query(func.max(Ticket.created_at)).scalar()
+
+    # 取最新的上傳時間
+    upload_times = [t for t in [last_crash_upload, last_ticket_upload] if t]
+    last_upload = max(upload_times) if upload_times else None
+
+    return {
+        "crash": {
+            "earliest": str(crash_min) if crash_min else None,
+            "latest": str(crash_max) if crash_max else None,
+            "count": crash_count,
+            "last_upload": last_crash_upload.isoformat() if last_crash_upload else None,
+        },
+        "ticket": {
+            "earliest": str(ticket_min) if ticket_min else None,
+            "latest": str(ticket_max) if ticket_max else None,
+            "count": ticket_count,
+            "last_upload": last_ticket_upload.isoformat() if last_ticket_upload else None,
+        },
+        "last_upload": last_upload.isoformat() if last_upload else None,
     }

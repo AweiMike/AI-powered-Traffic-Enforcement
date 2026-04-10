@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, Database, AlertCircle, Trash2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, Database, AlertCircle, Trash2, FolderOpen } from 'lucide-react';
 import { apiClient } from '../api/client';
 
 // API 基礎 URL
@@ -103,12 +103,12 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
     e.preventDefault();
     setIsDragging(false);
     const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile && (droppedFile.name.endsWith('.xlsx') || droppedFile.name.endsWith('.xls'))) {
+    if (droppedFile && (droppedFile.name.endsWith('.xlsx') || droppedFile.name.endsWith('.xls') || droppedFile.name.endsWith('.txt'))) {
       setFile(droppedFile);
       setResult(null);
       setError(null);
     } else {
-      setError('請上傳 Excel 檔案（.xlsx 或 .xls）');
+      setError('請上傳 Excel (.xlsx, .xls) 或 TXT (.txt) 檔案');
     }
   }, []);
 
@@ -195,7 +195,7 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".xlsx,.xls"
+          accept=".xlsx,.xls,.txt"
           onChange={handleFileSelect}
           className="hidden"
         />
@@ -217,7 +217,7 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
               拖放 Excel 檔案到此處
             </p>
             <p className="text-sm text-nook-text/60">
-              或點擊選擇檔案（.xlsx, .xls）
+              或點擊選擇檔案（.xlsx, .xls, .txt）
             </p>
           </>
         )}
@@ -457,6 +457,153 @@ const DatabaseStatusCard: React.FC<DatabaseStatusCardProps> = ({ refreshTrigger 
 };
 
 // ============================================
+// 批次匯入元件（事故 / 舉發共用）
+// ============================================
+interface BatchImportProps {
+  onComplete: () => void;
+  title: string;
+  description: string;
+  emoji: string;
+  endpoint: string;
+  confirmMessage: string;
+  color: string;
+}
+
+const BatchImportCard: React.FC<BatchImportProps> = ({
+  onComplete, title, description, emoji, endpoint, confirmMessage, color,
+}) => {
+  const [isImporting, setIsImporting] = useState(false);
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleBatchImport = async () => {
+    if (!confirm(confirmMessage)) return;
+
+    setIsImporting(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      const response = await fetch(endpoint, { method: 'POST' });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || '批次匯入失敗');
+      }
+
+      const data = await response.json();
+      setResult(data);
+      onComplete();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '批次匯入過程發生錯誤');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  return (
+    <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 nook-shadow">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`w-12 h-12 bg-${color}/20 rounded-2xl flex items-center justify-center text-2xl`}>
+            {emoji}
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-nook-text">{title}</h3>
+            <p className="text-sm text-nook-text/60">{description}</p>
+          </div>
+        </div>
+        <button
+          onClick={handleBatchImport}
+          disabled={isImporting}
+          className={`
+            flex items-center gap-2 px-6 py-3 rounded-2xl font-medium transition-all duration-200
+            ${isImporting
+              ? 'bg-nook-text/10 text-nook-text/40 cursor-not-allowed'
+              : `bg-${color} text-white hover:opacity-90 shadow-lg shadow-${color}/30`
+            }
+          `}
+        >
+          {isImporting ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              匯入中...
+            </>
+          ) : (
+            <>
+              <FolderOpen className="w-5 h-5" />
+              批次匯入
+            </>
+          )}
+        </button>
+      </div>
+
+      {error && (
+        <div className="mt-4 bg-nook-red/10 rounded-2xl p-4 flex items-start gap-3">
+          <XCircle className="w-5 h-5 text-nook-red flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-nook-red/80">{error}</p>
+        </div>
+      )}
+
+      {result && (
+        <div className={`mt-4 rounded-2xl p-4 ${result.success ? 'bg-nook-leaf/10' : 'bg-nook-red/10'}`}>
+          <div className="flex items-start gap-3">
+            {result.success ? (
+              <CheckCircle className="w-5 h-5 text-nook-leaf flex-shrink-0 mt-0.5" />
+            ) : (
+              <XCircle className="w-5 h-5 text-nook-red flex-shrink-0 mt-0.5" />
+            )}
+            <div className="flex-1">
+              <p className={`font-medium ${result.success ? 'text-nook-leaf' : 'text-nook-red'}`}>
+                {result.message}
+              </p>
+              <div className="mt-2 text-sm text-nook-text/80 space-y-1">
+                <p>新增：<strong>{result.stats.new}</strong> 筆</p>
+                <p>略過（重複）：<strong>{result.stats.skipped}</strong> 筆</p>
+                <p>錯誤：<strong>{result.stats.errors}</strong> 筆</p>
+                {(result as any).coordinates && (
+                  <p>GPS 定位：<strong>{(result as any).coordinates.with_gps}</strong> 筆 / 備援座標：<strong>{(result as any).coordinates.fallback}</strong> 筆</p>
+                )}
+                {(result as any).stats?.files_skipped > 0 && (
+                  <p className="text-nook-text/50">已匯入檔案跳過：<strong>{(result as any).stats.files_skipped}</strong> 個</p>
+                )}
+                {(result as any).skipped_files?.length > 0 && (
+                  <details className="mt-1 text-xs text-nook-text/50">
+                    <summary className="cursor-pointer">已跳過的檔案列表</summary>
+                    <ul className="mt-1 ml-4 space-y-0.5">
+                      {(result as any).skipped_files.map((f: string, i: number) => (
+                        <li key={i}>- {f}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+                {result.topics_imported && (
+                  <div className="flex gap-4 mt-1">
+                    <span>酒駕 {result.topics_imported.dui}</span>
+                    <span>闘紅燈 {result.topics_imported.red_light}</span>
+                    <span>危駕 {result.topics_imported.dangerous}</span>
+                  </div>
+                )}
+              </div>
+              {result.errors.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-nook-text/10">
+                  <p className="text-sm font-medium text-nook-text mb-2">錯誤詳情：</p>
+                  <ul className="text-xs text-nook-text/60 space-y-1">
+                    {result.errors.map((err, idx) => (
+                      <li key={idx}>• {err}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================
 // 主頁面元件
 // ============================================
 const DataImportPage: React.FC = () => {
@@ -517,7 +664,28 @@ const DataImportPage: React.FC = () => {
         <UploadCard type="ticket" onUploadComplete={handleUploadComplete} />
       </div>
 
-      {/* 資料庫狀態 */}
+      {/* 批次匯入區 */}
+      <div className="grid grid-cols-2 gap-6 mb-8">
+        <BatchImportCard
+          onComplete={handleUploadComplete}
+          title="批次匯入 EIS 事故資料"
+          description="一鍵匯入「事故調查表資料」資料夾中所有 TXT 檔案"
+          emoji="🚗"
+          endpoint={`${API_BASE}/import/crash/batch`}
+          confirmMessage="即將批次匯入「事故調查表資料」資料夾中所有 TXT 檔案，是否繼續？"
+          color="nook-orange"
+        />
+        <BatchImportCard
+          onComplete={handleUploadComplete}
+          title="批次匯入舉發案件"
+          description="一鍵匯入「舉發案件綜合查詢」資料夾中所有 Excel 檔案"
+          emoji="📋"
+          endpoint={`${API_BASE}/import/ticket/batch`}
+          confirmMessage="即將批次匯入「舉發案件綜合查詢」資料夾中所有 Excel 檔案，是否繼續？"
+          color="nook-sky"
+        />
+      </div>
+
       {/* 資料庫狀態 */}
       <DatabaseStatusCard refreshTrigger={refreshTrigger} />
 

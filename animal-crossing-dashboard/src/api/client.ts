@@ -261,6 +261,8 @@ export interface AccidentHotspot {
     a2_count: number;
     a3_count: number;
     severity_score: number;
+    death_count?: number;
+    injury_count?: number;
   };
   violations: {
     total: number;
@@ -289,6 +291,8 @@ export interface AccidentHotspotsResponse {
     a3_total: number;
     dui_crash_total?: number;
     total_dui_violations?: number;
+    death_total?: number;
+    injury_total?: number;
   };
   note: string;
 }
@@ -458,6 +462,42 @@ class APIClient {
     return this.request(`/stats/monthly?year=${year}&month=${month}`);
   }
 
+  async getMonthlyStatsByRange(startDate: string, endDate: string): Promise<MonthlyStats> {
+    return this.request(`/stats/monthly?start_date=${startDate}&end_date=${endDate}`);
+  }
+
+  async getDataInfo(): Promise<{
+    crash: { earliest: string | null; latest: string | null; count: number; last_upload: string | null };
+    ticket: { earliest: string | null; latest: string | null; count: number; last_upload: string | null };
+    last_upload: string | null;
+  }> {
+    return this.request('/stats/data-info');
+  }
+
+  async getA1AccidentList(startDate?: string, endDate?: string): Promise<{
+    period: { start: string; end: string };
+    total: number;
+    items: Array<{
+      date: string;
+      time: string | null;
+      district: string;
+      location: string;
+      cause: string;
+      party_type: string;
+      death_count: number;
+      injury_count: number;
+      is_elderly: boolean;
+      precinct: string;
+      latitude: number | null;
+      longitude: number | null;
+    }>;
+  }> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    return this.request(`/hotspots/a1-accident-list?${params}`);
+  }
+
   async getElderlyStats(days: number = 30): Promise<any> {
     return this.request(`/stats/elderly?days=${days}`);
   }
@@ -522,15 +562,19 @@ class APIClient {
   // Accident Analysis API (事故分析)
   // ============================================
 
-  async getAccidentHotspots(days: number = 30, isElderly: boolean = false): Promise<AccidentHotspotsResponse> {
+  async getAccidentHotspots(days: number = 30, isElderly: boolean = false, startDate?: string, endDate?: string): Promise<AccidentHotspotsResponse> {
     const params = new URLSearchParams({ days: days.toString() });
     if (isElderly) params.append('is_elderly', 'true');
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
     return this.request(`/recommendations/accidents/hotspots?${params}`);
   }
 
-  async getAccidentPeakTimes(district: string, days: number = 30, isElderly: boolean = false): Promise<PeakTimesResponse> {
+  async getAccidentPeakTimes(district: string, days: number = 30, isElderly: boolean = false, startDate?: string, endDate?: string): Promise<PeakTimesResponse> {
     const params = new URLSearchParams({ days: days.toString() });
     if (isElderly) params.append('is_elderly', 'true');
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
     return this.request(`/recommendations/accidents/peak-times/${encodeURIComponent(district)}?${params}`);
   }
 
@@ -540,9 +584,11 @@ class APIClient {
     return this.request(`/recommendations/heatmap/accidents?${params}`);
   }
 
-  async getCrossAnalysis(district?: string, days: number = 30): Promise<CrossAnalysisResponse> {
+  async getCrossAnalysis(district?: string, days: number = 30, startDate?: string, endDate?: string): Promise<CrossAnalysisResponse> {
     const params = new URLSearchParams({ days: days.toString() });
     if (district) params.append('district', district);
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
     return this.request(`/recommendations/cross-analysis?${params}`);
   }
 
@@ -560,8 +606,11 @@ class APIClient {
   // Advanced Analysis API (進階分析)
   // ============================================
 
-  async getElderlyVehicleAnalysis(days: number = 365): Promise<any> {
-    return this.request(`/recommendations/analysis/elderly-vehicle-types?days=${days}`);
+  async getElderlyVehicleAnalysis(days: number = 365, startDate?: string, endDate?: string): Promise<any> {
+    const params = new URLSearchParams({ days: days.toString() });
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    return this.request(`/recommendations/analysis/elderly-vehicle-types?${params}`);
   }
 
   async getDuiEnvironmentAnalysis(days: number = 365): Promise<any> {
@@ -572,10 +621,19 @@ class APIClient {
   // Map Data API (地圖資料)
   // ============================================
 
-  async getMapPoints(days: number = 90, pointType: string = 'all', severity?: string, topic?: string): Promise<any> {
+  async getMapPoints(
+    days: number = 90,
+    pointType: string = 'all',
+    severity?: string,
+    topic?: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<any> {
     const params = new URLSearchParams({ days: days.toString(), point_type: pointType });
     if (severity) params.append('severity', severity);
     if (topic) params.append('topic', topic);
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
     return this.request(`/recommendations/map/points?${params}`);
   }
 
@@ -585,6 +643,12 @@ class APIClient {
 
   async updateCrashCoordinates(crashId: number, lat: number, lng: number): Promise<any> {
     return this.request(`/recommendations/map/crash/${crashId}/coordinates?latitude=${lat}&longitude=${lng}`, {
+      method: 'PUT'
+    });
+  }
+
+  async updateTicketCoordinates(ticketId: number, lat: number, lng: number): Promise<any> {
+    return this.request(`/recommendations/map/ticket/${ticketId}/coordinates?latitude=${lat}&longitude=${lng}`, {
       method: 'PUT'
     });
   }
@@ -606,19 +670,24 @@ class APIClient {
       days?: number;
       year?: number;
       month?: number;
+      startDate?: string;
+      endDate?: string;
       topN?: number;
       severity?: string;
       compareBaseline?: boolean;
     } = {}
   ): Promise<any> {
-    const { days = 30, year, month, topN = 10, severity, compareBaseline = true } = options;
+    const { days = 30, year, month, startDate, endDate, topN = 10, severity, compareBaseline = true } = options;
     const params = new URLSearchParams({
       top_n: topN.toString(),
       compare_baseline: compareBaseline.toString()
     });
 
-    // 若有年月則使用年月，否則使用 days
-    if (year && month) {
+    // 優先 startDate/endDate > year/month > days
+    if (startDate && endDate) {
+      params.append('start_date', startDate);
+      params.append('end_date', endDate);
+    } else if (year && month) {
       params.append('year', year.toString());
       params.append('month', month.toString());
     } else {
@@ -634,14 +703,19 @@ class APIClient {
     topN: number = 10,
     topic?: string,
     year?: number,
-    month?: number
+    month?: number,
+    startDate?: string,
+    endDate?: string
   ): Promise<any> {
     const params = new URLSearchParams({
       top_n: topN.toString()
     });
 
-    // 若有年月則使用年月，否則使用 days
-    if (year && month) {
+    // 優先 startDate/endDate > year/month > days
+    if (startDate && endDate) {
+      params.append('start_date', startDate);
+      params.append('end_date', endDate);
+    } else if (year && month) {
       params.append('year', year.toString());
       params.append('month', month.toString());
     } else {
@@ -695,6 +769,18 @@ class APIClient {
       method: 'POST',
       headers
     });
+  }
+
+  // ============================================
+  // Enforcement Performance API (執法績效統計)
+  // ============================================
+
+  async getDuiPerformance(startDate: string, endDate: string): Promise<any> {
+    return this.request(`/enforcement/dui?start_date=${startDate}&end_date=${endDate}`);
+  }
+
+  async getHeavyVehiclePerformance(startDate: string, endDate: string): Promise<any> {
+    return this.request(`/enforcement/heavy-vehicle?start_date=${startDate}&end_date=${endDate}`);
   }
 }
 

@@ -231,7 +231,7 @@ def get_severity_weight(severity: str) -> int:
 def import_crashes(filepath: str, db: Session, batch_id: str) -> Dict:
     """匯入交通事故資料（支援去重）"""
     print(f"\n{'=' * 60}")
-    print(f"📥 匯入事故資料: {os.path.basename(filepath)}")
+    print(f"[IMPORT] 匯入事故資料: {os.path.basename(filepath)}")
     print(f"{'=' * 60}")
 
     df = pd.read_excel(filepath)
@@ -291,7 +291,7 @@ def import_crashes(filepath: str, db: Session, batch_id: str) -> Dict:
         except Exception as e:
             stats["errors"] += 1
             if stats["errors"] <= 5:
-                print(f"   ⚠️ 第 {idx + 1} 筆錯誤: {e}")
+                print(f"   [WARN] 第 {idx + 1} 筆錯誤: {e}")
 
     db.commit()
     print(
@@ -304,7 +304,7 @@ def import_crashes(filepath: str, db: Session, batch_id: str) -> Dict:
 def import_tickets(filepath: str, db: Session, batch_id: str) -> Dict:
     """匯入舉發案件資料（支援去重）"""
     print(f"\n{'=' * 60}")
-    print(f"📥 匯入舉發資料: {os.path.basename(filepath)}")
+    print(f"[IMPORT] 匯入舉發資料: {os.path.basename(filepath)}")
     print(f"{'=' * 60}")
 
     df = pd.read_excel(filepath)
@@ -406,7 +406,7 @@ def import_tickets(filepath: str, db: Session, batch_id: str) -> Dict:
         except Exception as e:
             stats["errors"] += 1
             if stats["errors"] <= 5:
-                print(f"   ⚠️ 第 {idx + 1} 筆錯誤: {e}")
+                print(f"   [WARN] 第 {idx + 1} 筆錯誤: {e}")
 
     db.commit()
     print(
@@ -454,7 +454,7 @@ def init_topics(db: Session):
             db.add(topic)
 
     db.commit()
-    print("✅ 主題定義初始化完成")
+    print("[OK] 主題定義初始化完成")
 
 
 # ============================================
@@ -471,7 +471,7 @@ def main():
     args = parser.parse_args()
 
     print("\n" + "=" * 60)
-    print("🌿 精準執法系統 - 資料匯入工具 v2.0")
+    print("精準執法系統 - 資料匯入工具 v2.0")
     print("=" * 60)
 
     # 確保資料目錄存在
@@ -482,9 +482,9 @@ def main():
 
     # 創建表格
     if args.init or args.crash or args.ticket:
-        print("🔧 檢查資料庫結構...")
+        print("[CHECK] 檢查資料庫結構...")
         Base.metadata.create_all(bind=engine)
-        print("✅ 資料表就緒")
+        print("[OK] 資料表就緒")
 
     db = SessionLocal()
 
@@ -492,23 +492,23 @@ def main():
         init_topics(db)
 
         batch_id = f"IMPORT_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        print(f"\n📋 匯入批次: {batch_id}")
+        print(f"\n[BATCH] 匯入批次: {batch_id}")
 
         if args.crash:
             if os.path.exists(args.crash):
                 import_crashes(args.crash, db, batch_id)
             else:
-                print(f"❌ 找不到檔案: {args.crash}")
+                print(f"[ERROR] 找不到檔案: {args.crash}")
 
         if args.ticket:
             if os.path.exists(args.ticket):
                 import_tickets(args.ticket, db, batch_id)
             else:
-                print(f"❌ 找不到檔案: {args.ticket}")
+                print(f"[ERROR] 找不到檔案: {args.ticket}")
 
         # 顯示統計
         print("\n" + "=" * 60)
-        print("📊 資料庫統計")
+        print("[STATS] 資料庫統計")
         print("=" * 60)
 
         crash_count = db.query(Crash).count()
@@ -520,10 +520,10 @@ def main():
 
         print(f"   事故總數: {crash_count}")
         print(f"   舉發總數: {ticket_count}")
-        print(f"     - 🍺 酒駕: {dui_count}")
-        print(f"     - 🚦 闘紅燈: {red_count}")
-        print(f"     - ⚡ 危險駕駛: {danger_count}")
-        print(f"     - 👴 高齡者: {elderly_count}")
+        print(f"     - 酒駕: {dui_count}")
+        print(f"     - 闘紅燈: {red_count}")
+        print(f"     - 危險駕駛: {danger_count}")
+        print(f"     - 高齡者: {elderly_count}")
 
         # 年份範圍
         if ticket_count > 0:
@@ -534,7 +534,7 @@ def main():
     finally:
         db.close()
 
-    print("\n✅ 完成！")
+    print("\n[OK] 完成！")
 
 
 if __name__ == "__main__":

@@ -22,6 +22,12 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
         "http://localhost:5174",
         "http://127.0.0.1:5174",
+        "http://localhost",
+        "http://localhost:80",
+        "http://10.128.44.65",
+        "http://10.128.44.65:80",
+        "http://10.128.44.65:5173",
+        "http://10.128.44.65:8080",
     ]
 
     # 安全

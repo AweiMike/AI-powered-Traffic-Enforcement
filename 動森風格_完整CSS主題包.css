@@ -1,0 +1,897 @@
+/**
+ * 精準執法儀表板系統 - 動森風格完整 CSS 主題包
+ * Animal Crossing Theme - Complete CSS Package
+ *
+ * 設計理念：柔和、療癒、清晰
+ * 版本：v1.0
+ * 更新日期：2026-01-13
+ */
+
+/* ========================================
+   1. CSS Variables - 核心設計變數
+   ======================================== */
+
+:root {
+  /* === 主色調 - Animal Crossing 草綠系 === */
+  --ac-primary: #9ECE9A;              /* 主色：草綠色 */
+  --ac-primary-light: #B8E0B5;        /* 淺綠 */
+  --ac-primary-dark: #7DAC7A;         /* 深綠 */
+  --ac-primary-pale: #E8F5E7;         /* 極淺綠 */
+
+  /* === 背景色系 === */
+  --ac-bg-main: #F9F6F0;              /* 主背景：米白色 */
+  --ac-bg-card: #FFFFFF;              /* 卡片背景：純白 */
+  --ac-bg-hover: #F0EDE5;             /* 懸停背景 */
+  --ac-bg-active: #E8E4D8;            /* 激活背景 */
+
+  /* === 文字色系 === */
+  --ac-text-primary: #4A4035;         /* 主文字：深棕色 */
+  --ac-text-secondary: #8B7E74;       /* 次要文字：灰棕色 */
+  --ac-text-tertiary: #AFA49A;        /* 三級文字：淺灰棕 */
+  --ac-text-white: #FFFFFF;           /* 白色文字 */
+
+  /* === 主題專屬配色 === */
+  --topic-dui: #E89A9A;               /* 🍺 酒駕：柔和粉紅 */
+  --topic-dui-light: #F5D6D6;         /* 酒駕淺色背景 */
+  --topic-dui-dark: #D67676;          /* 酒駕深色 */
+
+  --topic-red-light: #F4B860;         /* 🚦 闖紅燈：溫暖橘黃 */
+  --topic-red-light-bg: #FFD89C;      /* 闖紅燈淺色背景 */
+  --topic-red-light-dark: #E0A040;    /* 闖紅燈深色 */
+
+  --topic-danger: #8DCEDC;            /* ⚡ 危險駕駛：柔和天藍 */
+  --topic-danger-light: #D1EDF4;      /* 危險駕駛淺色背景 */
+  --topic-danger-dark: #60B8CC;       /* 危險駕駛深色 */
+
+  /* === 12班別配色 (時段對應色彩) === */
+  /* 深夜班別 (00-04) */
+  --shift-01: #7B9FCC;                /* 班別01: 深夜藍 */
+  --shift-02: #6A8EBB;                /* 班別02: 深藍 */
+
+  /* 清晨班別 (04-08) */
+  --shift-03: #B58AAA;                /* 班別03: 破曉紫 */
+  --shift-04: #E8A87C;                /* 班別04: 朝陽橘 */
+
+  /* 上午班別 (08-12) */
+  --shift-05: #F4D35E;                /* 班別05: 晨光金 */
+  --shift-06: #F7E76C;                /* 班別06: 陽光黃 */
+
+  /* 中午班別 (12-14) */
+  --shift-07: #A8DADC;                /* 班別07: 正午青 */
+
+  /* 下午班別 (14-18) */
+  --shift-08: #9ECE9A;                /* 班別08: 午後綠 */
+  --shift-09: #F4A261;                /* 班別09: 黃昏橙 */
+
+  /* 傍晚班別 (18-20) */
+  --shift-10: #E76F51;                /* 班別10: 夕陽橘 */
+
+  /* 夜間班別 (20-24) */
+  --shift-11: #9A8ABF;                /* 班別11: 暮色紫 */
+  --shift-12: #6D5F9C;                /* 班別12: 夜幕紫藍 */
+
+  /* === 功能色彩 === */
+  --ac-success: #9ECE9A;              /* 成功：綠色 */
+  --ac-warning: #F4B860;              /* 警告：橙黃 */
+  --ac-danger: #E89A9A;               /* 危險：粉紅 */
+  --ac-info: #8DCEDC;                 /* 資訊：天藍 */
+
+  /* === 邊框與陰影 === */
+  --ac-border: #D8D3CB;               /* 邊框色 */
+  --ac-border-light: #E8E4DC;         /* 淺邊框 */
+  --ac-border-dark: #AFA49A;          /* 深邊框 */
+
+  --shadow-sm: 0 2px 6px rgba(139, 126, 116, 0.06);
+  --shadow-md: 0 4px 12px rgba(139, 126, 116, 0.08);
+  --shadow-lg: 0 8px 20px rgba(139, 126, 116, 0.12);
+  --shadow-xl: 0 12px 32px rgba(139, 126, 116, 0.16);
+
+  /* === 圓角半徑 === */
+  --radius-sm: 8px;                   /* 小圓角：按鈕、標籤 */
+  --radius-md: 12px;                  /* 中圓角：輸入框 */
+  --radius-lg: 20px;                  /* 大圓角：卡片 */
+  --radius-xl: 28px;                  /* 特大圓角：主題切換器 */
+  --radius-full: 9999px;              /* 完全圓形：頭像、徽章 */
+
+  /* === 間距系統 === */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+
+  /* === 字體設定 === */
+  --font-family-base: 'Quicksand', 'Noto Sans TC', sans-serif;
+  --font-family-display: 'Quicksand', 'Noto Sans TC', sans-serif;
+
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 24px;
+  --font-size-2xl: 32px;
+  --font-size-3xl: 40px;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* === 動畫時間 === */
+  --transition-fast: 0.15s;
+  --transition-base: 0.3s;
+  --transition-slow: 0.5s;
+
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  /* === Z-index 層級 === */
+  --z-dropdown: 1000;
+  --z-modal: 1050;
+  --z-tooltip: 1100;
+  --z-toast: 1150;
+}
+
+
+/* ========================================
+   2. 全局樣式
+   ======================================== */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-normal);
+  color: var(--ac-text-primary);
+  background-color: var(--ac-bg-main);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-family-display);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.3;
+  color: var(--ac-text-primary);
+}
+
+h1 { font-size: var(--font-size-3xl); }
+h2 { font-size: var(--font-size-2xl); }
+h3 { font-size: var(--font-size-xl); }
+h4 { font-size: var(--font-size-lg); }
+
+
+/* ========================================
+   3. 卡片組件 - Card Component
+   ======================================== */
+
+.ac-card {
+  background-color: var(--ac-bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--spacing-lg);
+  transition: all var(--transition-base) var(--ease-in-out);
+}
+
+.ac-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.ac-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 2px solid var(--ac-border-light);
+}
+
+.ac-card-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--ac-text-primary);
+}
+
+.ac-card-body {
+  margin-bottom: var(--spacing-md);
+}
+
+.ac-card-footer {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--ac-border-light);
+}
+
+
+/* ========================================
+   4. 按鈕組件 - Button Component
+   ======================================== */
+
+.ac-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-base) var(--ease-in-out);
+  text-decoration: none;
+}
+
+.ac-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.ac-btn:active {
+  transform: translateY(0);
+}
+
+/* 按鈕變體 */
+.ac-btn-primary {
+  background-color: var(--ac-primary);
+  color: var(--ac-text-white);
+}
+
+.ac-btn-primary:hover {
+  background-color: var(--ac-primary-dark);
+}
+
+.ac-btn-secondary {
+  background-color: var(--ac-bg-hover);
+  color: var(--ac-text-primary);
+  border: 1px solid var(--ac-border);
+}
+
+.ac-btn-danger {
+  background-color: var(--topic-dui);
+  color: var(--ac-text-white);
+}
+
+.ac-btn-warning {
+  background-color: var(--topic-red-light);
+  color: var(--ac-text-white);
+}
+
+.ac-btn-info {
+  background-color: var(--topic-danger);
+  color: var(--ac-text-white);
+}
+
+/* 按鈕尺寸 */
+.ac-btn-sm {
+  padding: 6px 16px;
+  font-size: var(--font-size-sm);
+}
+
+.ac-btn-lg {
+  padding: 14px 32px;
+  font-size: var(--font-size-lg);
+}
+
+
+/* ========================================
+   5. 主題切換器 - Topic Selector
+   ======================================== */
+
+.ac-topic-selector {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-lg);
+  margin: var(--spacing-2xl) 0;
+}
+
+.ac-topic-card {
+  background-color: var(--ac-bg-card);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-xl);
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--transition-base) var(--ease-in-out);
+  border: 3px solid transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+.ac-topic-card:hover {
+  transform: translateY(-8px);
+  box-shadow: var(--shadow-xl);
+}
+
+.ac-topic-card.active {
+  border-color: var(--ac-primary);
+  box-shadow: var(--shadow-lg);
+}
+
+/* 主題特定樣式 */
+.ac-topic-card.topic-dui.active {
+  border-color: var(--topic-dui);
+  background-color: var(--topic-dui-light);
+}
+
+.ac-topic-card.topic-red-light.active {
+  border-color: var(--topic-red-light);
+  background-color: var(--topic-red-light-bg);
+}
+
+.ac-topic-card.topic-danger.active {
+  border-color: var(--topic-danger);
+  background-color: var(--topic-danger-light);
+}
+
+.ac-topic-icon {
+  font-size: 48px;
+  margin-bottom: var(--spacing-md);
+  display: block;
+}
+
+.ac-topic-name {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--spacing-sm);
+}
+
+.ac-topic-count {
+  font-size: var(--font-size-sm);
+  color: var(--ac-text-secondary);
+}
+
+.ac-topic-priority {
+  margin-top: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  color: var(--topic-red-light);
+}
+
+
+/* ========================================
+   6. Top 5 推薦卡 - Recommendation Card
+   ======================================== */
+
+.ac-recommendation-card {
+  background-color: var(--ac-bg-card);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+  box-shadow: var(--shadow-md);
+  border-left: 6px solid var(--ac-primary);
+  transition: all var(--transition-base) var(--ease-in-out);
+}
+
+.ac-recommendation-card:hover {
+  transform: translateX(4px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* 主題特定左側彩條 */
+.ac-recommendation-card.topic-dui {
+  border-left-color: var(--topic-dui);
+}
+
+.ac-recommendation-card.topic-red-light {
+  border-left-color: var(--topic-red-light);
+}
+
+.ac-recommendation-card.topic-danger {
+  border-left-color: var(--topic-danger);
+}
+
+.ac-rec-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.ac-rec-rank {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+}
+
+.ac-rec-rank-number {
+  background-color: var(--ac-primary);
+  color: var(--ac-text-white);
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-lg);
+}
+
+.ac-rec-location {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--ac-text-primary);
+  margin-bottom: var(--spacing-md);
+}
+
+.ac-rec-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: var(--spacing-md);
+  margin: var(--spacing-lg) 0;
+}
+
+.ac-metric-item {
+  text-align: center;
+  padding: var(--spacing-md);
+  background-color: var(--ac-bg-main);
+  border-radius: var(--radius-md);
+}
+
+.ac-metric-label {
+  font-size: var(--font-size-sm);
+  color: var(--ac-text-secondary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.ac-metric-value {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--ac-text-primary);
+}
+
+.ac-metric-trend {
+  font-size: var(--font-size-sm);
+  margin-top: var(--spacing-xs);
+}
+
+.ac-metric-trend.up {
+  color: var(--ac-danger);
+}
+
+.ac-metric-trend.down {
+  color: var(--ac-success);
+}
+
+.ac-rec-suggestion {
+  background-color: var(--ac-primary-pale);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--ac-primary);
+  margin-top: var(--spacing-md);
+}
+
+.ac-rec-suggestion-title {
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--spacing-sm);
+  color: var(--ac-text-primary);
+}
+
+
+/* ========================================
+   7. 12班別選擇器 - Shift Selector
+   ======================================== */
+
+.ac-shift-selector {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--spacing-md);
+  margin: var(--spacing-xl) 0;
+}
+
+.ac-shift-item {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--ac-bg-card);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-base) var(--ease-in-out);
+  border: 2px solid transparent;
+  padding: var(--spacing-sm);
+}
+
+.ac-shift-item:hover {
+  transform: scale(1.1);
+  box-shadow: var(--shadow-md);
+}
+
+.ac-shift-item.active {
+  border-color: var(--ac-primary);
+  background-color: var(--ac-primary-pale);
+}
+
+.ac-shift-icon {
+  font-size: 32px;
+  margin-bottom: var(--spacing-xs);
+}
+
+.ac-shift-number {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--ac-text-primary);
+}
+
+.ac-shift-time {
+  font-size: var(--font-size-xs);
+  color: var(--ac-text-secondary);
+}
+
+/* 班別特定色彩 */
+.ac-shift-item[data-shift="01"] { background-color: rgba(123, 159, 204, 0.1); }
+.ac-shift-item[data-shift="02"] { background-color: rgba(106, 142, 187, 0.1); }
+.ac-shift-item[data-shift="03"] { background-color: rgba(181, 138, 170, 0.1); }
+.ac-shift-item[data-shift="04"] { background-color: rgba(232, 168, 124, 0.1); }
+.ac-shift-item[data-shift="05"] { background-color: rgba(244, 211, 94, 0.1); }
+.ac-shift-item[data-shift="06"] { background-color: rgba(247, 231, 108, 0.1); }
+.ac-shift-item[data-shift="07"] { background-color: rgba(168, 218, 220, 0.1); }
+.ac-shift-item[data-shift="08"] { background-color: rgba(158, 206, 154, 0.1); }
+.ac-shift-item[data-shift="09"] { background-color: rgba(244, 162, 97, 0.1); }
+.ac-shift-item[data-shift="10"] { background-color: rgba(231, 111, 81, 0.1); }
+.ac-shift-item[data-shift="11"] { background-color: rgba(154, 138, 191, 0.1); }
+.ac-shift-item[data-shift="12"] { background-color: rgba(109, 95, 156, 0.1); }
+
+
+/* ========================================
+   8. 地圖標記樣式 - Map Markers
+   ======================================== */
+
+.ac-map-marker {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition: all var(--transition-base) var(--ease-in-out);
+}
+
+.ac-map-marker:hover {
+  transform: scale(1.2);
+  box-shadow: var(--shadow-lg);
+}
+
+/* 主題標記 */
+.ac-marker-dui {
+  background-color: var(--topic-dui);
+  border: 2px solid var(--topic-dui-dark);
+}
+
+.ac-marker-red-light {
+  background-color: var(--topic-red-light);
+  border: 2px solid var(--topic-red-light-dark);
+}
+
+.ac-marker-danger {
+  background-color: var(--topic-danger);
+  border: 2px solid var(--topic-danger-dark);
+}
+
+/* 事故標記 */
+.ac-marker-crash {
+  background-color: var(--ac-danger);
+  border: 3px solid #B86B6B;
+  animation: pulse 2s infinite;
+}
+
+/* 推薦點位標記 */
+.ac-marker-recommended {
+  background-color: var(--ac-primary);
+  border: 3px solid var(--ac-primary-dark);
+  width: 40px;
+  height: 40px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+
+/* ========================================
+   9. 載入動畫 - Loading Animation
+   ======================================== */
+
+.ac-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-2xl);
+}
+
+.ac-loading-leaf {
+  width: 60px;
+  height: 60px;
+  font-size: 48px;
+  animation: rotate-leaf 2s infinite ease-in-out;
+}
+
+@keyframes rotate-leaf {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.2);
+  }
+}
+
+.ac-loading-text {
+  font-size: var(--font-size-lg);
+  color: var(--ac-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+
+/* ========================================
+   10. 徽章與標籤 - Badges & Tags
+   ======================================== */
+
+.ac-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+}
+
+.ac-badge-primary {
+  background-color: var(--ac-primary);
+  color: var(--ac-text-white);
+}
+
+.ac-badge-danger {
+  background-color: var(--topic-dui);
+  color: var(--ac-text-white);
+}
+
+.ac-badge-warning {
+  background-color: var(--topic-red-light);
+  color: var(--ac-text-white);
+}
+
+.ac-badge-info {
+  background-color: var(--topic-danger);
+  color: var(--ac-text-white);
+}
+
+.ac-badge-outline {
+  background-color: transparent;
+  border: 1.5px solid currentColor;
+}
+
+
+/* ========================================
+   11. 表單元素 - Form Elements
+   ======================================== */
+
+.ac-input,
+.ac-select,
+.ac-textarea {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-md);
+  color: var(--ac-text-primary);
+  background-color: var(--ac-bg-card);
+  border: 2px solid var(--ac-border);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base) var(--ease-in-out);
+}
+
+.ac-input:focus,
+.ac-select:focus,
+.ac-textarea:focus {
+  outline: none;
+  border-color: var(--ac-primary);
+  box-shadow: 0 0 0 3px var(--ac-primary-pale);
+}
+
+.ac-checkbox,
+.ac-radio {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--ac-primary);
+  cursor: pointer;
+}
+
+
+/* ========================================
+   12. 工具提示 - Tooltip
+   ======================================== */
+
+.ac-tooltip {
+  position: relative;
+  display: inline-block;
+}
+
+.ac-tooltip-text {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--ac-text-primary);
+  color: var(--ac-text-white);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  z-index: var(--z-tooltip);
+  transition: all var(--transition-fast) var(--ease-in-out);
+}
+
+.ac-tooltip:hover .ac-tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+
+/* ========================================
+   13. 響應式設計 - Responsive Design
+   ======================================== */
+
+/* 平板 */
+@media (max-width: 1024px) {
+  .ac-topic-selector {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .ac-shift-selector {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .ac-rec-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 手機 */
+@media (max-width: 640px) {
+  :root {
+    --font-size-md: 14px;
+    --font-size-lg: 16px;
+    --font-size-xl: 20px;
+    --spacing-lg: 16px;
+    --spacing-xl: 24px;
+  }
+
+  .ac-topic-selector {
+    grid-template-columns: 1fr;
+  }
+
+  .ac-shift-selector {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .ac-rec-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .ac-card {
+    padding: var(--spacing-md);
+  }
+}
+
+
+/* ========================================
+   14. 列印樣式 - Print Styles
+   ======================================== */
+
+@media print {
+  body {
+    background-color: white;
+  }
+
+  .ac-card {
+    box-shadow: none;
+    border: 1px solid var(--ac-border);
+    page-break-inside: avoid;
+  }
+
+  .ac-btn,
+  .ac-loading,
+  .ac-shift-selector {
+    display: none;
+  }
+}
+
+
+/* ========================================
+   15. 深色模式支援 (可選)
+   ======================================== */
+
+@media (prefers-color-scheme: dark) {
+  /* 未來可擴展深色模式 */
+  /* 目前專注於療癒明亮風格 */
+}
+
+
+/* ========================================
+   16. 工具類 - Utility Classes
+   ======================================== */
+
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+
+.mt-sm { margin-top: var(--spacing-sm); }
+.mt-md { margin-top: var(--spacing-md); }
+.mt-lg { margin-top: var(--spacing-lg); }
+
+.mb-sm { margin-bottom: var(--spacing-sm); }
+.mb-md { margin-bottom: var(--spacing-md); }
+.mb-lg { margin-bottom: var(--spacing-lg); }
+
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-sm { gap: var(--spacing-sm); }
+.gap-md { gap: var(--spacing-md); }
+
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+
+.hidden { display: none; }
+
+
+/* ========================================
+   END OF STYLESHEET
+   ======================================== */
+
+/**
+ * 使用說明：
+ *
+ * 1. 引入字體：
+ *    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+ *
+ * 2. 引入此 CSS：
+ *    <link rel="stylesheet" href="動森風格_完整CSS主題包.css">
+ *
+ * 3. HTML 範例：
+ *    <div class="ac-card">
+ *      <div class="ac-card-header">
+ *        <h3 class="ac-card-title">卡片標題</h3>
+ *      </div>
+ *      <div class="ac-card-body">
+ *        卡片內容
+ *      </div>
+ *    </div>
+ *
+ * 4. 主題切換範例：
+ *    <div class="ac-topic-selector">
+ *      <div class="ac-topic-card topic-dui active">
+ *        <span class="ac-topic-icon">🍺</span>
+ *        <div class="ac-topic-name">酒駕取締</div>
+ *        <div class="ac-topic-count">26 筆</div>
+ *        <div class="ac-topic-priority">⭐⭐⭐</div>
+ *      </div>
+ *    </div>
+ */

@@ -192,7 +192,7 @@ def init_shift_data(db):
     # 檢查是否已有資料
     existing_count = db.query(Shift).count()
     if existing_count > 0:
-        print(f"⚠️  班別資料已存在 ({existing_count} 筆)，跳過初始化")
+        print(f"[WARN]  班別資料已存在 ({existing_count} 筆)，跳過初始化")
         return
 
     # 批次新增
@@ -201,4 +201,4 @@ def init_shift_data(db):
         db.add(shift)
 
     db.commit()
-    print(f"✅ 班別資料初始化完成 (12 筆)")
+    print(f"[OK] 班別資料初始化完成 (12 筆)")

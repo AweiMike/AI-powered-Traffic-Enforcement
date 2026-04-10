@@ -218,10 +218,10 @@ export function useHealthCheck(): UseAPIState<any> {
 /**
  * 取得事故熱點分析
  */
-export function useAccidentHotspots(days: number = 30, isElderly: boolean = false): UseAPIState<AccidentHotspotsResponse> {
+export function useAccidentHotspots(days: number = 30, isElderly: boolean = false, startDate?: string, endDate?: string): UseAPIState<AccidentHotspotsResponse> {
   return useAPI(
-    () => apiClient.getAccidentHotspots(days, isElderly),
-    [days, isElderly]
+    () => apiClient.getAccidentHotspots(days, isElderly, startDate, endDate),
+    [days, isElderly, startDate, endDate]
   );
 }
 
@@ -231,11 +231,13 @@ export function useAccidentHotspots(days: number = 30, isElderly: boolean = fals
 export function useAccidentPeakTimes(
   district: string,
   days: number = 30,
-  isElderly: boolean = false
+  isElderly: boolean = false,
+  startDate?: string,
+  endDate?: string,
 ): UseAPIState<PeakTimesResponse> {
   return useAPI(
-    () => apiClient.getAccidentPeakTimes(district, days, isElderly),
-    [district, days, isElderly]
+    () => apiClient.getAccidentPeakTimes(district, days, isElderly, startDate, endDate),
+    [district, days, isElderly, startDate, endDate]
   );
 }
 
@@ -257,11 +259,13 @@ export function useAccidentHeatmap(
  */
 export function useCrossAnalysis(
   district?: string,
-  days: number = 30
+  days: number = 30,
+  startDate?: string,
+  endDate?: string,
 ): UseAPIState<CrossAnalysisResponse> {
   return useAPI(
-    () => apiClient.getCrossAnalysis(district, days),
-    [district, days]
+    () => apiClient.getCrossAnalysis(district, days, startDate, endDate),
+    [district, days, startDate, endDate]
   );
 }
 

@@ -11,8 +11,8 @@ if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
 if __name__ == "__main__":
-    print("🌿 正在啟動精準執法後端伺服器 (Port 8080)...")
-    print(f"📍 工作目錄: {current_dir}")
+    print("[START] 正在啟動精準執法後端伺服器 (Port 8080)...")
+    print(f"  工作目錄: {current_dir}")
 
     # 啟動 FastAPI，指定 Port 8080
     uvicorn.run(

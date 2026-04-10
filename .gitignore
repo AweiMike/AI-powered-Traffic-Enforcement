@@ -4,6 +4,7 @@
 ## Dependencies
 node_modules/
 venv/
+.venv/
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -12,15 +13,38 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+backend/static/
 
-## Database
+## Database (含真實執法資料，禁止上傳)
 *.db
 *.sqlite
 *.sqlite3
+backend/data/
+
+## 敏感資料 — 交通事故/舉發案件原始資料 (含個資)
+*.xls
+*.xlsx
+*.csv
+事故調查表資料/
+舉發案件綜合查詢/
+excel_analysis.json
+violations_analysis.json
+
+## 內部文件 / 截圖
+*.pdf
+pdf_pages/
+螢幕擷取畫面*
 
 ## Environment
 .env
 .env.local
+.env.*
+
+## AI agent 工具本地設定
+.agent/
+.claude/
+.gemini/
+.shared/
 
 ## IDE
 .idea/
@@ -31,6 +55,7 @@ build/
 ## OS
 .DS_Store
 Thumbs.db
+nul
 
 ## Logs
 *.log
@@ -39,3 +64,12 @@ logs/
 ## Temporary
 *.tmp
 temp/
+
+## PyInstaller
+*.spec
+
+## Test scripts with data references
+backend/test_*.py
+
+## Node/package lock (optional, can regenerate)
+# package-lock.json

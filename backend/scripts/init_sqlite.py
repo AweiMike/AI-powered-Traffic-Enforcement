@@ -47,7 +47,7 @@ def init_topics(db):
     # 檢查是否已有資料
     existing_count = db.query(Topic).count()
     if existing_count > 0:
-        print(f"⚠️  主題資料已存在 ({existing_count} 筆)，跳過初始化")
+        print(f"[WARN]  主題資料已存在 ({existing_count} 筆)，跳過初始化")
         return
 
     # 批次新增
@@ -56,7 +56,7 @@ def init_topics(db):
         db.add(topic)
 
     db.commit()
-    print(f"✅ 主題資料初始化完成 (3 筆)")
+    print(f"[OK] 主題資料初始化完成 (3 筆)")
 
 
 def init_violation_type_map(db):
@@ -112,7 +112,7 @@ def init_violation_type_map(db):
     # 檢查是否已有資料
     existing_count = db.query(ViolationTypeMap).count()
     if existing_count > 0:
-        print(f"⚠️  違規條款對照資料已存在 ({existing_count} 筆)，跳過初始化")
+        print(f"[WARN]  違規條款對照資料已存在 ({existing_count} 筆)，跳過初始化")
         return
 
     # 批次新增
@@ -121,7 +121,7 @@ def init_violation_type_map(db):
         db.add(vm)
 
     db.commit()
-    print(f"✅ 違規條款對照資料初始化完成 ({len(violation_maps)} 筆)")
+    print(f"[OK] 違規條款對照資料初始化完成 ({len(violation_maps)} 筆)")
 
 
 def main():
@@ -134,7 +134,7 @@ def main():
     # 1. 創建資料目錄
     data_dir = project_root / "data"
     data_dir.mkdir(exist_ok=True)
-    print(f"✅ 資料目錄已創建：{data_dir}")
+    print(f"[OK] 資料目錄已創建：{data_dir}")
 
     # 2. 創建所有表格
     print("\n正在創建資料庫表格...")
@@ -154,24 +154,24 @@ def main():
         init_violation_type_map(db)
 
         print("\n" + "=" * 60)
-        print("✅ 資料庫初始化完成！")
+        print("[OK] 資料庫初始化完成！")
         print("=" * 60)
         print()
-        print("📌 資料庫位置：")
+        print("[INFO] 資料庫位置：")
         db_path = data_dir / "traffic_enforcement.db"
         print(f"   {db_path}")
         print()
-        print("📌 下一步：")
+        print("[INFO] 下一步：")
         print("   1. 使用匯入腳本將您的資料匯入資料庫")
         print("   2. 或者先啟動系統測試介面（會顯示空資料）")
         print()
-        print("🚀 啟動系統：")
+        print("[START] 啟動系統：")
         print("   執行 啟動系統.bat 或")
         print("   cd backend && python app/main.py")
         print()
 
     except Exception as e:
-        print(f"\n❌ 初始化失敗：{e}")
+        print(f"\n[ERROR] 初始化失敗：{e}")
         db.rollback()
         raise
     finally:

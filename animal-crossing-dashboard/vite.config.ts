@@ -9,6 +9,7 @@ export default defineConfig({
     },
   },
   server: {
+    host: '0.0.0.0',  // 允許內網其他電腦連線
     port: 5173,
     open: true,
     proxy: {

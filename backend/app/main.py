@@ -3,14 +3,20 @@ FastAPI 主應用程式
 精準執法儀表板系統 - 個資保護版本
 """
 
-from fastapi import FastAPI
-# Trigger reload
+import os
+from pathlib import Path
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 
 from app.config import settings
 from app.database import init_db
-from app.api import topics, stats, recommendations, imports, admin, hotspots, report
+from app.api import topics, stats, recommendations, imports, admin, hotspots, report, evehicle, enforcement
+
+# 前端靜態檔案目錄
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 
 # ============================================
@@ -20,21 +26,21 @@ from app.api import topics, stats, recommendations, imports, admin, hotspots, re
 async def lifespan(app: FastAPI):
     """應用程式啟動/關閉事件"""
     # 啟動時
-    print(f"\n🌿 {settings.PROJECT_NAME} 啟動中...")
-    print(f"📍 API 端點：http://localhost:8000{settings.API_V1_PREFIX}")
-    print(f"📚 API 文件：http://localhost:8000/docs")
-    print(f"🔒 個資保護：已啟用（完全去識別化）")
+    print(f"\n[START] {settings.PROJECT_NAME} 啟動中...")
+    print(f"  API 端點：http://localhost:8000{settings.API_V1_PREFIX}")
+    print(f"  API 文件：http://localhost:8000/docs")
+    print(f"  個資保護：已啟用（完全去識別化）")
 
     # 初始化資料庫
     try:
         init_db()
     except Exception as e:
-        print(f"⚠️  資料庫初始化警告：{e}")
+        print(f"[WARN] 資料庫初始化警告：{e}")
 
     yield
 
     # 關閉時
-    print(f"\n🌿 {settings.PROJECT_NAME} 關閉中...")
+    print(f"\n[STOP] {settings.PROJECT_NAME} 關閉中...")
 
 
 # ============================================
@@ -124,13 +130,29 @@ app.include_router(
     tags=["AI 報告"],
 )
 
+app.include_router(
+    evehicle.router,
+    prefix=f"{settings.API_V1_PREFIX}/evehicle",
+    tags=["慢車與微電車分析"],
+)
+
+app.include_router(
+    enforcement.router,
+    prefix=f"{settings.API_V1_PREFIX}/enforcement",
+    tags=["執法績效統計"],
+)
+
 
 # ============================================
 # 根路由
 # ============================================
 @app.get("/", tags=["系統"])
 async def root():
-    """系統資訊"""
+    """系統資訊 / 前端入口"""
+    # Production 模式：回傳前端頁面
+    if STATIC_DIR.exists() and (STATIC_DIR / "index.html").exists():
+        return FileResponse(str(STATIC_DIR / "index.html"))
+    # Development 模式：回傳 API 資訊
     return {
         "name": settings.PROJECT_NAME,
         "version": settings.VERSION,
@@ -163,17 +185,39 @@ async def health_check():
 
 
 # ============================================
+# 前端靜態檔案服務（Production 模式）
+# ============================================
+if STATIC_DIR.exists() and (STATIC_DIR / "index.html").exists():
+    # 掛載 assets 子目錄（JS/CSS/圖片等）
+    app.mount("/assets", StaticFiles(directory=str(STATIC_DIR / "assets")), name="static-assets")
+
+    # 所有非 API 路徑都回傳 index.html（支援前端 SPA 路由）
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(request: Request, full_path: str):
+        # 如果檔案存在就直接回傳（favicon 等）
+        file_path = STATIC_DIR / full_path
+        if full_path and file_path.exists() and file_path.is_file():
+            return FileResponse(str(file_path))
+        # 否則回傳 index.html（SPA fallback）
+        return FileResponse(str(STATIC_DIR / "index.html"))
+
+    print("[Production] 前端靜態檔案已掛載")
+else:
+    print("[Development] 前端請透過 Vite dev server 存取")
+
+
+# ============================================
 # 主程式入口（開發用）
 # ============================================
 if __name__ == "__main__":
     import uvicorn
 
     print("\n" + "=" * 60)
-    print("🌿 精準執法儀表板系統 - 開發伺服器")
+    print("精準執法儀表板系統 - 開發伺服器")
     print("=" * 60)
-    print(f"📍 API：http://localhost:8000{settings.API_V1_PREFIX}")
-    print(f"📚 文件：http://localhost:8000/docs")
-    print(f"🔒 個資保護：已啟用")
+    print(f"  API：http://localhost:8000{settings.API_V1_PREFIX}")
+    print(f"  文件：http://localhost:8000/docs")
+    print(f"  個資保護：已啟用")
     print("=" * 60 + "\n")
 
     uvicorn.run(

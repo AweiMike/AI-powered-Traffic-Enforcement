@@ -3,9 +3,23 @@
  * 參考「歸仁分局114年12月份順安專案執法與事故關聯性分析」樣式
  */
 import React, { useState, useMemo } from 'react';
-import { useAccidentHotspots, useAccidentPeakTimes, useCrossAnalysis, useHeatmap } from '../hooks/useAPI';
+import { useAccidentHotspots, useAccidentPeakTimes, useCrossAnalysis } from '../hooks/useAPI';
 import { AccidentHotspot, ShiftData } from '../api/client';
-import { AccidentViolationMap, TopAccidentLocations } from './AccidentViolationMap';
+import DateRangePicker, { type DateRange, getCompareRange } from './DateRangePicker';
+
+// 同期比較標籤
+const YoYBadge: React.FC<{ current: number; previous: number }> = ({ current, previous }) => {
+    if (previous === 0 && current === 0) return <span className="text-xs text-gray-400">去年 0</span>;
+    const diff = current - previous;
+    const color = diff > 0 ? 'text-red-600' : diff < 0 ? 'text-green-600' : 'text-gray-500';
+    const arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '—';
+    return (
+        <span className={`text-xs ${color}`}>
+            去年 {previous} {arrow}{Math.abs(diff) > 0 ? Math.abs(diff) : ''}
+        </span>
+    );
+};
+// AccidentViolationMap removed — 地圖視覺化頁面已完整呈現點位分布
 
 // 時段分析圖表
 const ShiftChart: React.FC<{ shifts: ShiftData[]; peakShifts: string[] }> = ({ shifts, peakShifts }) => {
@@ -88,45 +102,23 @@ const HotspotCard: React.FC<{ hotspot: AccidentHotspot; rank: number; onSelect: 
 // 主頁面組件
 const AccidentAnalysisPage: React.FC = () => {
     const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
-    const [days, setDays] = useState<number>(30);
-    const [activeTab, setActiveTab] = useState<'map' | 'list' | 'dui'>('map');
+    const [dateRange, setDateRange] = useState<DateRange>(() => {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), 0, 1);
+        const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        return { startDate: fmt(start), endDate: fmt(now) };
+    });
+    const [activeTab, setActiveTab] = useState<'list' | 'dui'>('list');
 
-    const { data: hotspots, loading: hotspotsLoading } = useAccidentHotspots(days);
-    const { data: peakTimes, loading: peakLoading } = useAccidentPeakTimes(selectedDistrict || '__SKIP__', days);
-    const { data: crossAnalysis, loading: crossLoading } = useCrossAnalysis(selectedDistrict || undefined, days);
-    const { data: heatmap, loading: heatmapLoading } = useHeatmap('DUI', undefined, days);
+    // 去年同期
+    const prevRange = useMemo(() => getCompareRange(dateRange), [dateRange]);
 
-    // 準備地圖用資料
-    const accidentMapData = useMemo(() => {
-        if (!hotspots?.hotspots) return [];
-        return hotspots.hotspots.map(h => ({
-            district: h.district,
-            total: h.accidents.total,
-            a1_count: h.accidents.a1_count,
-            a2_count: h.accidents.a2_count,
-            a3_count: h.accidents.a3_count || 0,
-            severity_score: (h.accidents.a1_count * 5 + h.accidents.a2_count * 3 + (h.accidents.a3_count || 0))
-        }));
-    }, [hotspots]);
-
-    const violationMapData = useMemo(() => {
-        if (!heatmap?.points) return [];
-        return heatmap.points.map(p => ({
-            district: p.district,
-            count: p.intensity,
-            dui: p.intensity
-        }));
-    }, [heatmap]);
-
-    const dayOptions = [
-        { value: 30, label: '近 30 天' },
-        { value: 90, label: '近 90 天' },
-        { value: 180, label: '近 180 天' },
-        { value: 365, label: '近 1 年' },
-    ];
+    const { data: hotspots, loading: hotspotsLoading } = useAccidentHotspots(365, false, dateRange.startDate, dateRange.endDate);
+    const { data: prevHotspots } = useAccidentHotspots(365, false, prevRange.startDate, prevRange.endDate);
+    const { data: peakTimes, loading: peakLoading } = useAccidentPeakTimes(selectedDistrict || '__SKIP__', 365, false, dateRange.startDate, dateRange.endDate);
+    const { data: crossAnalysis, loading: crossLoading } = useCrossAnalysis(selectedDistrict || undefined, 365, dateRange.startDate, dateRange.endDate);
 
     const tabs = [
-        { id: 'map' as const, label: '🗺️ 關聯性地圖', desc: '事故與執法分布' },
         { id: 'list' as const, label: '📊 詳細分析', desc: '時段與缺口' },
         { id: 'dui' as const, label: '🍺 酒駕分析', desc: '酒駕肇事熱點' },
     ];
@@ -139,20 +131,8 @@ const AccidentAnalysisPage: React.FC = () => {
                     <h2 className="text-2xl font-bold text-nook-text mb-2">🎯 執法缺口分析</h2>
                     <p className="text-nook-text/60">事故熱點、時段分析與精準執法建議</p>
                 </div>
-                <div className="flex items-center gap-2 bg-white/80 rounded-2xl px-4 py-2 nook-shadow">
-                    <span className="text-sm text-nook-text/60">📅 資料範圍：</span>
-                    <div className="flex gap-1">
-                        {dayOptions.map(opt => (
-                            <button
-                                key={opt.value}
-                                onClick={() => setDays(opt.value)}
-                                className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${days === opt.value ? 'bg-nook-leaf text-white' : 'bg-nook-leaf/10 text-nook-text hover:bg-nook-leaf/20'
-                                    }`}
-                            >
-                                {opt.label}
-                            </button>
-                        ))}
-                    </div>
+                <div className="bg-white/80 rounded-2xl px-4 py-2 nook-shadow">
+                    <DateRangePicker value={dateRange} onChange={setDateRange} showCompare={true} />
                 </div>
             </div>
 
@@ -162,18 +142,22 @@ const AccidentAnalysisPage: React.FC = () => {
                     <div className="bg-white/80 rounded-2xl p-4 nook-shadow text-center">
                         <p className="text-3xl font-bold text-nook-text">{hotspots.summary.total_accidents}</p>
                         <p className="text-sm text-nook-text/60">事故總數</p>
+                        {prevHotspots && <YoYBadge current={hotspots.summary.total_accidents} previous={prevHotspots.summary.total_accidents} />}
                     </div>
                     <div className="bg-red-50 rounded-2xl p-4 text-center border-l-4 border-red-500">
                         <p className="text-3xl font-bold text-red-600">{hotspots.summary.a1_total}</p>
                         <p className="text-sm text-red-500">A1 死亡</p>
+                        {prevHotspots && <YoYBadge current={hotspots.summary.a1_total} previous={prevHotspots.summary.a1_total} />}
                     </div>
                     <div className="bg-orange-50 rounded-2xl p-4 text-center border-l-4 border-orange-500">
                         <p className="text-3xl font-bold text-orange-600">{hotspots.summary.a2_total}</p>
                         <p className="text-sm text-orange-500">A2 受傷</p>
+                        {prevHotspots && <YoYBadge current={hotspots.summary.a2_total} previous={prevHotspots.summary.a2_total} />}
                     </div>
                     <div className="bg-yellow-50 rounded-2xl p-4 text-center border-l-4 border-yellow-500">
                         <p className="text-3xl font-bold text-yellow-600">{hotspots.summary.a3_total}</p>
                         <p className="text-sm text-yellow-500">A3 財損</p>
+                        {prevHotspots && <YoYBadge current={hotspots.summary.a3_total} previous={prevHotspots.summary.a3_total} />}
                     </div>
                     <div className="bg-blue-50 rounded-2xl p-4 text-center border-l-4 border-blue-500">
                         <p className="text-3xl font-bold text-blue-600">{hotspots.total_districts}</p>
@@ -195,22 +179,6 @@ const AccidentAnalysisPage: React.FC = () => {
                     </button>
                 ))}
             </div>
-
-            {/* 地圖分頁 */}
-            {activeTab === 'map' && (
-                <div className="grid grid-cols-3 gap-6">
-                    <div className="col-span-2">
-                        <AccidentViolationMap
-                            accidentData={accidentMapData}
-                            violationData={violationMapData}
-                            loading={hotspotsLoading || heatmapLoading}
-                        />
-                    </div>
-                    <div>
-                        <TopAccidentLocations data={accidentMapData} loading={hotspotsLoading} />
-                    </div>
-                </div>
-            )}
 
             {/* 詳細分析分頁 */}
             {activeTab === 'list' && (
@@ -360,10 +328,11 @@ const AccidentAnalysisPage: React.FC = () => {
                             </p>
                             <p className="text-sm text-gray-500">酒駕告發總數</p>
                         </div>
-                        {/* 統計天數 */}
+                        {/* 統計區間 */}
                         <div className="bg-blue-50 rounded-2xl p-4 nook-shadow text-center border-l-4 border-blue-500">
-                            <p className="text-3xl font-bold text-blue-600">{days}</p>
-                            <p className="text-sm text-blue-500">統計天數</p>
+                            <p className="text-sm font-bold text-blue-600">{dateRange.startDate}</p>
+                            <p className="text-sm font-bold text-blue-600">~ {dateRange.endDate}</p>
+                            <p className="text-sm text-blue-500">統計區間</p>
                         </div>
                     </div>
 

@@ -1,9 +1,23 @@
 /**
  * 高齡者防治頁面 - 專注於高齡者事故分析與防治
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAccidentHotspots, useAccidentPeakTimes } from '../hooks/useAPI';
 import { AccidentHotspot, ShiftData, apiClient } from '../api/client';
+import DateRangePicker, { type DateRange, getCompareRange } from './DateRangePicker';
+
+// 同期比較標籤
+const YoYBadge: React.FC<{ current: number; previous: number }> = ({ current, previous }) => {
+    if (previous === 0 && current === 0) return <span className="text-xs text-gray-400">去年 0</span>;
+    const diff = current - previous;
+    const color = diff > 0 ? 'text-red-600' : diff < 0 ? 'text-green-600' : 'text-gray-500';
+    const arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '—';
+    return (
+        <span className={`text-xs ${color}`}>
+            去年 {previous} {arrow}{Math.abs(diff) > 0 ? Math.abs(diff) : ''}
+        </span>
+    );
+};
 
 // 時段分析圖表 (簡化版，專注事故)
 const ShiftChart: React.FC<{ shifts: ShiftData[]; peakShifts: string[] }> = ({ shifts, peakShifts }) => {
@@ -57,18 +71,26 @@ const ElderlyHotspotCard: React.FC<{ hotspot: AccidentHotspot; rank: number; onS
                     <h4 className="font-bold text-nook-text">{hotspot.district}</h4>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-center text-xs mb-3">
+                <div className="grid grid-cols-5 gap-2 text-center text-xs mb-3">
                     <div className="bg-orange-50 rounded-lg p-2">
                         <p className="font-bold text-lg text-orange-700">{hotspot.accidents.total}</p>
-                        <p className="text-orange-600">高齡事故</p>
+                        <p className="text-orange-600">事故</p>
                     </div>
                     <div className="bg-red-50 rounded-lg p-2">
                         <p className="font-bold text-lg text-red-600">{hotspot.accidents.a1_count}</p>
-                        <p className="text-red-500">A1 死亡</p>
+                        <p className="text-red-500">A1</p>
                     </div>
                     <div className="bg-yellow-50 rounded-lg p-2">
                         <p className="font-bold text-lg text-yellow-600">{hotspot.accidents.a2_count}</p>
-                        <p className="text-yellow-500">A2 受傷</p>
+                        <p className="text-yellow-500">A2</p>
+                    </div>
+                    <div className="bg-gray-100 rounded-lg p-2">
+                        <p className="font-bold text-lg text-gray-800">{hotspot.accidents.death_count ?? 0}</p>
+                        <p className="text-gray-600">死亡</p>
+                    </div>
+                    <div className="bg-orange-100 rounded-lg p-2">
+                        <p className="font-bold text-lg text-orange-600">{hotspot.accidents.injury_count ?? 0}</p>
+                        <p className="text-orange-500">受傷</p>
                     </div>
                 </div>
             </div>
@@ -77,32 +99,34 @@ const ElderlyHotspotCard: React.FC<{ hotspot: AccidentHotspot; rank: number; onS
 
 const ElderlyPreventionPage: React.FC = () => {
     const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
-    const [days, setDays] = useState<number>(30);
+    const [dateRange, setDateRange] = useState<DateRange>(() => {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), 0, 1);
+        const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        return { startDate: fmt(start), endDate: fmt(now) };
+    });
     const [vehicleData, setVehicleData] = useState<any>(null);
 
+    // 去年同期日期
+    const prevRange = useMemo(() => getCompareRange(dateRange), [dateRange]);
+
     // isElderly = true 強制篩選高齡者數據
-    const { data: hotspots, loading: hotspotsLoading } = useAccidentHotspots(days, true);
-    const { data: peakTimes, loading: peakLoading } = useAccidentPeakTimes(selectedDistrict || '__SKIP__', days, true);
+    const { data: hotspots, loading: hotspotsLoading } = useAccidentHotspots(365, true, dateRange.startDate, dateRange.endDate);
+    const { data: prevHotspots } = useAccidentHotspots(365, true, prevRange.startDate, prevRange.endDate);
+    const { data: peakTimes, loading: peakLoading } = useAccidentPeakTimes(selectedDistrict || '__SKIP__', 365, true, dateRange.startDate, dateRange.endDate);
 
     // 載入車種分析數據
     useEffect(() => {
         const fetchVehicleData = async () => {
             try {
-                const data = await apiClient.getElderlyVehicleAnalysis(days);
+                const data = await apiClient.getElderlyVehicleAnalysis(365, dateRange.startDate, dateRange.endDate);
                 setVehicleData(data);
             } catch (e) {
                 console.error('Failed to load vehicle analysis:', e);
             }
         };
         fetchVehicleData();
-    }, [days]);
-
-    const dayOptions = [
-        { value: 30, label: '近 30 天' },
-        { value: 90, label: '近 90 天' },
-        { value: 180, label: '近 180 天' },
-        { value: 365, label: '近 1 年' },
-    ];
+    }, [dateRange]);
 
     return (
         <div className="p-8 space-y-6">
@@ -112,37 +136,36 @@ const ElderlyPreventionPage: React.FC = () => {
                     <h2 className="text-2xl font-bold text-nook-text mb-2">👵 高齡者事故防制專區</h2>
                     <p className="text-nook-text/60">針對 65 歲以上長者事故分析與防治建議</p>
                 </div>
-                <div className="flex items-center gap-2 bg-white/80 rounded-2xl px-4 py-2 nook-shadow">
-                    <span className="text-sm text-nook-text/60">📅 資料範圍：</span>
-                    <div className="flex gap-1">
-                        {dayOptions.map(opt => (
-                            <button
-                                key={opt.value}
-                                onClick={() => setDays(opt.value)}
-                                className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${days === opt.value ? 'bg-orange-500 text-white' : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
-                                    }`}
-                            >
-                                {opt.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                <DateRangePicker value={dateRange} onChange={setDateRange} showCompare={true} />
             </div>
 
             {/* 總覽數據 */}
             {hotspots && (
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-6 gap-4">
                     <div className="bg-white/80 rounded-2xl p-4 nook-shadow text-center border-b-4 border-orange-500">
                         <p className="text-4xl font-bold text-nook-text">{hotspots.summary.total_accidents}</p>
                         <p className="text-sm text-nook-text/60">高齡事故總數</p>
+                        {prevHotspots && <YoYBadge current={hotspots.summary.total_accidents} previous={prevHotspots.summary.total_accidents} />}
                     </div>
                     <div className="bg-red-50 rounded-2xl p-4 nook-shadow text-center border-b-4 border-red-500">
                         <p className="text-4xl font-bold text-red-600">{hotspots.summary.a1_total}</p>
-                        <p className="text-sm text-red-500">涉及 A1 死亡</p>
+                        <p className="text-sm text-red-500">A1 事故件數</p>
+                        {prevHotspots && <YoYBadge current={hotspots.summary.a1_total} previous={prevHotspots.summary.a1_total} />}
                     </div>
                     <div className="bg-yellow-50 rounded-2xl p-4 nook-shadow text-center border-b-4 border-yellow-500">
                         <p className="text-4xl font-bold text-yellow-600">{hotspots.summary.a2_total}</p>
-                        <p className="text-sm text-yellow-500">涉及 A2 受傷</p>
+                        <p className="text-sm text-yellow-500">A2 事故件數</p>
+                        {prevHotspots && <YoYBadge current={hotspots.summary.a2_total} previous={prevHotspots.summary.a2_total} />}
+                    </div>
+                    <div className="bg-gray-50 rounded-2xl p-4 nook-shadow text-center border-b-4 border-gray-800">
+                        <p className="text-4xl font-bold text-gray-800">{hotspots.summary.death_total ?? 0}</p>
+                        <p className="text-sm text-gray-600">死亡人數</p>
+                        {prevHotspots && <YoYBadge current={hotspots.summary.death_total ?? 0} previous={prevHotspots.summary.death_total ?? 0} />}
+                    </div>
+                    <div className="bg-orange-50 rounded-2xl p-4 nook-shadow text-center border-b-4 border-orange-400">
+                        <p className="text-4xl font-bold text-orange-600">{hotspots.summary.injury_total ?? 0}</p>
+                        <p className="text-sm text-orange-500">受傷人數</p>
+                        {prevHotspots && <YoYBadge current={hotspots.summary.injury_total ?? 0} previous={prevHotspots.summary.injury_total ?? 0} />}
                     </div>
                     <div className="bg-blue-50 rounded-2xl p-4 nook-shadow text-center border-b-4 border-blue-500">
                         <p className="text-4xl font-bold text-blue-600">{hotspots.hotspots.length}</p>

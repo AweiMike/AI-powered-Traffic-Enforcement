@@ -14,8 +14,9 @@ import 'leaflet/dist/leaflet.css';
 import { Map, AlertTriangle, FileText } from 'lucide-react';
 
 // 台南市新化分局轄區中心座標
-const TAINAN_CENTER: L.LatLngExpression = [23.04, 120.31];
-const DEFAULT_ZOOM = 11;
+// 新化分局轄區中心（新化區、山上區、左鎮區）
+const TAINAN_CENTER: L.LatLngExpression = [23.04, 120.33];
+const DEFAULT_ZOOM = 12;
 
 // 台南市完整區域座標對照表
 const DISTRICT_COORDS: Record<string, [number, number]> = {
@@ -236,9 +237,13 @@ export const AccidentViolationMap: React.FC<AccidentViolationMapProps> = ({
             });
         }
 
-        // 自動調整視野
+        // 自動調整視野 — 以轄區三區為基準，避免離群點拉偏地圖
         if (bounds.length > 0) {
-            map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+            const jurisdictionBounds: L.LatLngBoundsExpression = [
+                [22.96, 120.26],  // 左下（左鎮區南端）
+                [23.15, 120.48],  // 右上（山上區北端）
+            ];
+            map.fitBounds(jurisdictionBounds, { padding: [20, 20] });
         }
     }, [accidentData, violationData, maxAccident, maxViolation, mapReady, showAccidents, showViolations]);
 

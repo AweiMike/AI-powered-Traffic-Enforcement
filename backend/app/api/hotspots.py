@@ -8,6 +8,7 @@ from sqlalchemy import func, and_, desc, case
 from typing import List, Optional
 from datetime import datetime, timedelta
 from pydantic import BaseModel
+from math import radians, cos, sqrt
 
 from app.database import get_db
 from app.models.core import Crash, Ticket
@@ -42,6 +43,109 @@ class HotspotResponse(BaseModel):
     total_in_period: int
 
 
+# ============================================
+# GPS 聚類工具（100m 半徑）
+# ============================================
+
+# 台灣緯度 ~23°N 下的公尺換算
+_DEG_LAT_TO_M = 111_320.0  # 1度緯度 ≈ 111,320m
+_COS_23 = cos(radians(23.0))
+_DEG_LNG_TO_M = 111_320.0 * _COS_23  # 1度經度 ≈ 102,470m
+
+CLUSTER_RADIUS_M = 100  # 聚類半徑(公尺)
+
+
+def _distance_m(lat1, lng1, lat2, lng2):
+    """兩點間近似距離（公尺），適用於台灣小範圍"""
+    dlat = (lat1 - lat2) * _DEG_LAT_TO_M
+    dlng = (lng1 - lng2) * _DEG_LNG_TO_M
+    return sqrt(dlat * dlat + dlng * dlng)
+
+
+def _clean_district(district: str) -> str:
+    """清理區域名稱，移除「市」前綴"""
+    if district and district.startswith('市'):
+        return district[1:]
+    return district or "未知區"
+
+
+def _pick_best_location(location_counts: dict) -> str:
+    """
+    從一組 location_desc -> count 中挑出最佳代表名稱。
+    優先選含「/」的交叉路口描述（但其票數需 >= 最多單一名稱的 30%），
+    否則選票數最多的名稱。
+    """
+    if not location_counts:
+        return "未知地點"
+    top_name = max(location_counts, key=location_counts.get)
+    top_count = location_counts[top_name]
+    # 找交叉路口中票數最多的
+    intersections = {k: v for k, v in location_counts.items() if '/' in k}
+    if intersections:
+        best_inter = max(intersections, key=intersections.get)
+        # 交叉路口票數夠多才優先選（至少佔最多單一名稱的 30%）
+        if intersections[best_inter] >= top_count * 0.3:
+            return best_inter
+    return top_name
+
+
+def cluster_crashes_by_gps(rows, radius_m=CLUSTER_RADIUS_M):
+    """
+    將事故記錄依 GPS 座標聚類。
+
+    rows: list of dicts with keys: lat, lng, district, location_desc, severity
+    returns: list of cluster dicts sorted by total desc
+    """
+    clusters = []  # each: {lat, lng, district, locations: {desc: count}, a1, a2, a3, total, ids: set}
+
+    for row in rows:
+        lat, lng = row['lat'], row['lng']
+        if lat is None or lng is None:
+            continue
+
+        matched = None
+        min_dist = radius_m + 1
+        for c in clusters:
+            d = _distance_m(lat, lng, c['lat'], c['lng'])
+            if d < min_dist:
+                min_dist = d
+                matched = c
+
+        if matched and min_dist <= radius_m:
+            # 更新 cluster 中心為加權平均
+            n = matched['total']
+            matched['lat'] = (matched['lat'] * n + lat) / (n + 1)
+            matched['lng'] = (matched['lng'] * n + lng) / (n + 1)
+            matched['total'] += 1
+            sev = row.get('severity', '')
+            if sev == 'A1':
+                matched['a1'] += 1
+            elif sev == 'A2':
+                matched['a2'] += 1
+            else:
+                matched['a3'] += 1
+            loc = row.get('location_desc', '')
+            matched['locations'][loc] = matched['locations'].get(loc, 0) + 1
+            # district 取最常見
+            matched['districts'][row['district']] = matched['districts'].get(row['district'], 0) + 1
+        else:
+            sev = row.get('severity', '')
+            clusters.append({
+                'lat': lat,
+                'lng': lng,
+                'districts': {row['district']: 1},
+                'locations': {row.get('location_desc', ''): 1},
+                'a1': 1 if sev == 'A1' else 0,
+                'a2': 1 if sev == 'A2' else 0,
+                'a3': 1 if sev != 'A1' and sev != 'A2' else 0,
+                'total': 1,
+            })
+
+    # Sort by total descending
+    clusters.sort(key=lambda c: c['total'], reverse=True)
+    return clusters
+
+
 class TicketHotspotItem(BaseModel):
     """違規熱點項目"""
     rank: int
@@ -58,139 +162,112 @@ class TicketHotspotItem(BaseModel):
 # 事故熱點 API
 # ============================================
 
-@router.get("/accident-hotspots", response_model=HotspotResponse)
-async def get_accident_hotspots(
-    year: Optional[int] = Query(default=None, description="年份 (若指定則忽略 days)"),
-    month: Optional[int] = Query(default=None, ge=1, le=12, description="月份 (需配合 year)"),
-    days: int = Query(default=30, description="分析期間天數 (若未指定 year/month)"),
-    top_n: int = Query(default=10, ge=1, le=50, description="返回前 N 名"),
-    severity: Optional[str] = Query(default=None, description="嚴重度篩選: A1, A2, A1+A2"),
-    compare_baseline: bool = Query(default=True, description="是否比較去年同期"),
-    db: Session = Depends(get_db)
-):
-    """
-    取得事故熱點排名
-    
-    - 依地點聚合事故數量
-    - 支援嚴重度篩選
-    - 可比較去年同期趨勢
-    - 支援年月篩選
-    """
-    # 決定日期範圍
-    if year and month:
-        # 使用指定年月
-        import calendar
-        _, last_day = calendar.monthrange(year, month)
-        start_date = datetime(year, month, 1).date()
-        end_date = datetime(year, month, last_day).date()
-    else:
-        # 使用 days 參數
-        end_date = datetime.now().date()
-        start_date = end_date - timedelta(days=days)
-    
-    # 基礎查詢 - 使用正確的 case() 語法
+def _fetch_crash_rows(db, start_dt, end_dt, severity=None):
+    """查詢指定日期範圍內的事故記錄，回傳 list of dicts"""
     query = db.query(
-        Crash.district,
-        Crash.location_desc,
-        func.sum(case((Crash.severity == 'A1', 1), else_=0)).label('a1_count'),
-        func.sum(case((Crash.severity == 'A2', 1), else_=0)).label('a2_count'),
-        func.sum(case((Crash.severity == 'A3', 1), else_=0)).label('a3_count'),
-        func.count(Crash.id).label('total'),
-        func.avg(Crash.latitude).label('avg_lat'),
-        func.avg(Crash.longitude).label('avg_lng')
+        Crash.latitude, Crash.longitude, Crash.district,
+        Crash.location_desc, Crash.severity
     ).filter(
         and_(
-            Crash.occurred_date >= start_date,
-            Crash.occurred_date <= end_date,
-            Crash.location_desc.isnot(None),
-            Crash.location_desc != ''
+            Crash.occurred_date >= start_dt,
+            Crash.occurred_date <= end_dt,
+            Crash.latitude.isnot(None),
+            Crash.longitude.isnot(None),
         )
     )
-    
-    # 嚴重度篩選
     if severity == 'A1':
         query = query.filter(Crash.severity == 'A1')
     elif severity == 'A2':
         query = query.filter(Crash.severity == 'A2')
     elif severity == 'A1+A2':
         query = query.filter(Crash.severity.in_(['A1', 'A2']))
-    
-    # 聚合與排序
-    results = query.group_by(
-        Crash.district, Crash.location_desc
-    ).order_by(
-        desc('total')
-    ).limit(top_n).all()
-    
-    # 計算去年同期數據（用於趨勢比較）
-    baseline_data = {}
+
+    return [
+        {'lat': r.latitude, 'lng': r.longitude,
+         'district': r.district or '', 'location_desc': r.location_desc or '',
+         'severity': r.severity or ''}
+        for r in query.all()
+    ]
+
+
+@router.get("/accident-hotspots", response_model=HotspotResponse)
+async def get_accident_hotspots(
+    year: Optional[int] = Query(default=None, description="年份 (若指定則忽略 days)"),
+    month: Optional[int] = Query(default=None, ge=1, le=12, description="月份 (需配合 year)"),
+    days: int = Query(default=30, description="分析期間天數 (若未指定 year/month)"),
+    start_date: Optional[str] = Query(default=None, description="起始日期 YYYY-MM-DD"),
+    end_date: Optional[str] = Query(default=None, description="結束日期 YYYY-MM-DD"),
+    top_n: int = Query(default=10, ge=1, le=50, description="返回前 N 名"),
+    severity: Optional[str] = Query(default=None, description="嚴重度篩選: A1, A2, A1+A2"),
+    compare_baseline: bool = Query(default=True, description="是否比較去年同期"),
+    db: Session = Depends(get_db)
+):
+    """
+    取得事故熱點排名（GPS 100m 半徑聚類）
+
+    - 以 GPS 座標方圓 100m 聚類，將地理位置相近的事故歸為同一熱點
+    - 自動從聚類內的 location_desc 挑選最具代表性的路口名稱
+    - 支援嚴重度篩選、去年同期趨勢比較
+    """
+    # 決定日期範圍 (優先 start_date/end_date > year/month > days)
+    if start_date and end_date:
+        start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+    elif year and month:
+        import calendar
+        _, last_day = calendar.monthrange(year, month)
+        start_date = datetime(year, month, 1).date()
+        end_date = datetime(year, month, last_day).date()
+    else:
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=days)
+
+    # 取得所有個別事故記錄並做 GPS 聚類
+    rows = _fetch_crash_rows(db, start_date, end_date, severity)
+    clusters = cluster_crashes_by_gps(rows)
+
+    # 去年同期聚類（用於趨勢比較）
+    baseline_clusters = []
+    baseline_start = None
+    baseline_end = None
     if compare_baseline:
         baseline_start = start_date.replace(year=start_date.year - 1)
         baseline_end = end_date.replace(year=end_date.year - 1)
-        
-        baseline_query = db.query(
-            Crash.district,
-            Crash.location_desc,
-            func.count(Crash.id).label('total')
-        ).filter(
-            and_(
-                Crash.occurred_date >= baseline_start,
-                Crash.occurred_date <= baseline_end,
-                Crash.location_desc.isnot(None)
-            )
-        ).group_by(Crash.district, Crash.location_desc).all()
-        
-        for row in baseline_query:
-            key = f"{row.district}|{row.location_desc}"
-            baseline_data[key] = row.total
-    
-    def clean_district(district: str) -> str:
-        """清理區域名稱，移除「市」前綴"""
-        if district and district.startswith('市'):
-            return district[1:]  # 移除開頭的「市」
-        return district or "未知區"
-    
-    def clean_location(location: str, district: str) -> str:
-        """清理地點名稱，移除與區域重複的前綴"""
-        if not location:
-            return "未知地點"
-        # 如果地點開頭與區域名稱的首字相同，可能是重複的簡寫
-        # 例如：district=新化區, location=新中山路 → 中山路
-        cleaned_district = clean_district(district)
-        if cleaned_district and len(cleaned_district) >= 2:
-            district_prefix = cleaned_district[0]  # 例如「新」
-            if location.startswith(district_prefix) and len(location) > 1:
-                # 確保不是完整路名開頭（如「新生路」應保留「新」）
-                # 檢查是否是「新X路」格式而非正常路名
-                # 簡單檢查：如果第二個字是常見路名用字，則視為重複前綴
-                common_road_chars = ['中', '大', '正', '民', '建', '信', '光', '和', '竹', '北', '南', '東', '西']
-                if len(location) > 1 and location[1] in common_road_chars:
-                    return location[1:]  # 移除重複的區域前綴
-        return location
-    
+        baseline_rows = _fetch_crash_rows(db, baseline_start, baseline_end, severity)
+        baseline_clusters = cluster_crashes_by_gps(baseline_rows)
+
     # 組裝結果
     hotspots = []
-    for i, row in enumerate(results, 1):
-        key = f"{row.district}|{row.location_desc}"
-        baseline_count = baseline_data.get(key, 0)
-        
+    for i, c in enumerate(clusters[:top_n], 1):
+        district = max(c['districts'], key=c['districts'].get)
+        location = _pick_best_location(c['locations'])
+
+        # 與去年同期比較：找 baseline 中距離最近的 cluster
         trend_pct = None
-        if compare_baseline and baseline_count > 0:
-            trend_pct = round((row.total - baseline_count) / baseline_count * 100, 1)
-        
+        if compare_baseline and baseline_clusters:
+            best_bl = None
+            best_dist = CLUSTER_RADIUS_M * 2  # 容許 200m 匹配
+            for bl in baseline_clusters:
+                d = _distance_m(c['lat'], c['lng'], bl['lat'], bl['lng'])
+                if d < best_dist:
+                    best_dist = d
+                    best_bl = bl
+            if best_bl and best_bl['total'] > 0:
+                trend_pct = round((c['total'] - best_bl['total']) / best_bl['total'] * 100, 1)
+
         hotspots.append(HotspotItem(
             rank=i,
-            location=clean_location(row.location_desc, row.district),
-            district=clean_district(row.district),
-            a1_count=row.a1_count or 0,
-            a2_count=row.a2_count or 0,
-            a3_count=row.a3_count or 0,
-            total=row.total,
+            location=_clean_district(location) if not location else location,
+            district=_clean_district(district),
+            a1_count=c['a1'],
+            a2_count=c['a2'],
+            a3_count=c['a3'],
+            total=c['total'],
             trend_pct=trend_pct,
-            latitude=row.avg_lat,
-            longitude=row.avg_lng
+            latitude=round(c['lat'], 6),
+            longitude=round(c['lng'], 6),
         ))
-    
+
     # 總數
     total_in_period = db.query(func.count(Crash.id)).filter(
         and_(
@@ -198,7 +275,7 @@ async def get_accident_hotspots(
             Crash.occurred_date <= end_date
         )
     ).scalar() or 0
-    
+
     return HotspotResponse(
         period={
             "start": start_date.isoformat(),
@@ -208,10 +285,10 @@ async def get_accident_hotspots(
             "month": month
         },
         baseline={
-            "start": (start_date.replace(year=start_date.year - 1)).isoformat(),
-            "end": (end_date.replace(year=end_date.year - 1)).isoformat(),
+            "start": baseline_start.isoformat(),
+            "end": baseline_end.isoformat(),
             "type": "去年同期"
-        } if compare_baseline else None,
+        } if compare_baseline and baseline_start else None,
         hotspots=hotspots,
         total_in_period=total_in_period
     )
@@ -226,19 +303,24 @@ async def get_ticket_hotspots(
     year: Optional[int] = Query(default=None, description="年份 (若指定則忽略 days)"),
     month: Optional[int] = Query(default=None, ge=1, le=12, description="月份 (需配合 year)"),
     days: int = Query(default=30, description="分析期間天數 (若未指定 year/month)"),
+    start_date: Optional[str] = Query(default=None, description="起始日期 YYYY-MM-DD"),
+    end_date: Optional[str] = Query(default=None, description="結束日期 YYYY-MM-DD"),
     top_n: int = Query(default=10, ge=1, le=50, description="返回前 N 名"),
     topic: Optional[str] = Query(default=None, description="主題篩選: DUI, RED_LIGHT, DANGEROUS"),
     db: Session = Depends(get_db)
 ):
     """
     取得違規熱點排名
-    
+
     - 依地點聚合違規數量
     - 支援主題篩選（酒駕/闘紅燈/危駕）
-    - 支援年月篩選
+    - 支援年月篩選或自訂日期區間
     """
-    # 決定日期範圍
-    if year and month:
+    # 決定日期範圍 (優先 start_date/end_date > year/month > days)
+    if start_date and end_date:
+        start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+    elif year and month:
         import calendar
         _, last_day = calendar.monthrange(year, month)
         start_date = datetime(year, month, 1).date()
@@ -279,32 +361,13 @@ async def get_ticket_hotspots(
     ).order_by(
         desc('count')
     ).limit(top_n).all()
-    
-    def clean_district(district: str) -> str:
-        """清理區域名稱，移除「市」前綴"""
-        if district and district.startswith('市'):
-            return district[1:]
-        return district or "未知區"
-    
-    def clean_location(location: str, district: str) -> str:
-        """清理地點名稱，移除與區域重複的前綴"""
-        if not location:
-            return "未知地點"
-        cleaned_district = clean_district(district)
-        if cleaned_district and len(cleaned_district) >= 2:
-            district_prefix = cleaned_district[0]
-            if location.startswith(district_prefix) and len(location) > 1:
-                common_road_chars = ['中', '大', '正', '民', '建', '信', '光', '和', '竹', '北', '南', '東', '西']
-                if len(location) > 1 and location[1] in common_road_chars:
-                    return location[1:]
-        return location
-    
+
     hotspots = []
     for i, row in enumerate(results, 1):
         hotspots.append(TicketHotspotItem(
             rank=i,
-            location=clean_location(row.location_desc, row.district),
-            district=clean_district(row.district),
+            location=row.location_desc or "未知地點",
+            district=_clean_district(row.district),
             count=row.count,
             topic=topic_label,
             latitude=row.avg_lat,
@@ -427,3 +490,63 @@ def generate_overlap_interpretation(all_overlap: float, dui_overlap: float) -> s
         return "事故與違規熱點中度重疊，建議檢視未覆蓋的事故熱點"
     else:
         return "事故與違規熱點重疊率偏低，建議重新評估執法熱點部署"
+
+
+# ============================================
+# A1 事故明細清單
+# ============================================
+
+@router.get("/a1-accident-list")
+async def get_a1_accident_list(
+    start_date: Optional[str] = Query(default=None, description="起始日期 YYYY-MM-DD"),
+    end_date: Optional[str] = Query(default=None, description="結束日期 YYYY-MM-DD"),
+    days: int = Query(default=365, description="分析期間天數 (若未指定日期區間)"),
+    db: Session = Depends(get_db)
+):
+    """
+    取得 A1 死亡事故明細清單（去識別化）
+
+    回傳每筆 A1 事故的日期、地點、肇因等資訊，供分析使用
+    """
+    # 決定日期範圍
+    if start_date and end_date:
+        sd = datetime.strptime(start_date, "%Y-%m-%d").date()
+        ed = datetime.strptime(end_date, "%Y-%m-%d").date()
+    else:
+        ed = datetime.now().date()
+        sd = ed - timedelta(days=days)
+
+    results = db.query(Crash).filter(
+        and_(
+            Crash.severity == "A1",
+            Crash.occurred_date >= sd,
+            Crash.occurred_date <= ed,
+        )
+    ).order_by(Crash.occurred_date.desc()).all()
+
+    items = []
+    for r in results:
+        district = r.district or "未知區"
+        if district.startswith("市"):
+            district = district[1:]
+
+        items.append({
+            "date": str(r.occurred_date),
+            "time": r.occurred_time.strftime("%H:%M") if r.occurred_time else None,
+            "district": district,
+            "location": r.location_desc or "未知地點",
+            "cause": r.cause or "未記載",
+            "party_type": r.party_type or "未記載",
+            "death_count": r.death_count or 0,
+            "injury_count": r.injury_count or 0,
+            "is_elderly": r.is_elderly or False,
+            "precinct": r.precinct or "",
+            "latitude": r.latitude,
+            "longitude": r.longitude,
+        })
+
+    return {
+        "period": {"start": str(sd), "end": str(ed)},
+        "total": len(items),
+        "items": items,
+    }

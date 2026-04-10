@@ -1,16 +1,17 @@
 /**
- * PerformanceComparisonPage - 成效比較頁面
- * 提供本期 vs 去年同期比較、趨勢圖表、報表導出功能
+ * PerformanceComparisonPage - 綜合執法成效頁面
+ * 提供本期 vs 去年同期比較、趨勢圖表、A1事故清單、報表導出功能
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    Calendar, TrendingUp, TrendingDown, Minus, Download, FileText,
-    ChevronLeft, ChevronRight, BarChart3, LineChart, AlertTriangle,
-    CheckCircle, ArrowUpRight, ArrowDownRight
+    TrendingUp, TrendingDown, Minus, Download, FileText,
+    BarChart3, LineChart, AlertTriangle, Skull, MapPin,
+    CheckCircle, ArrowUpRight, ArrowDownRight, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { apiClient, MonthlyStats } from '../api/client';
 import HotspotRankingCard from './HotspotRankingCard';
+import DateRangePicker, { DateRange, getCompareRange } from './DateRangePicker';
 
 // ============================================
 // 類型定義
@@ -43,53 +44,6 @@ const getTrendColor = (trend: string, isGoodWhenDown = true) => {
     if (isGood) return 'text-nook-leaf bg-nook-leaf/10';
     if (trend === '持平') return 'text-nook-text/60 bg-nook-cream/30';
     return 'text-nook-red bg-nook-red/10';
-};
-
-// ============================================
-// 月份選擇器組件
-// ============================================
-interface MonthSelectorProps {
-    year: number;
-    month: number;
-    onChange: (year: number, month: number) => void;
-}
-
-const MonthSelector: React.FC<MonthSelectorProps> = ({ year, month, onChange }) => {
-    const handlePrev = () => {
-        if (month === 1) {
-            onChange(year - 1, 12);
-        } else {
-            onChange(year, month - 1);
-        }
-    };
-
-    const handleNext = () => {
-        if (month === 12) {
-            onChange(year + 1, 1);
-        } else {
-            onChange(year, month + 1);
-        }
-    };
-
-    return (
-        <div className="flex items-center gap-4 bg-white/80 backdrop-blur-sm rounded-2xl px-4 py-2 nook-shadow">
-            <button
-                onClick={handlePrev}
-                className="p-2 hover:bg-nook-leaf/10 rounded-xl transition-colors"
-            >
-                <ChevronLeft className="w-5 h-5 text-nook-text" />
-            </button>
-            <div className="text-center min-w-[120px]">
-                <span className="text-xl font-bold text-nook-text">{year} 年 {month} 月</span>
-            </div>
-            <button
-                onClick={handleNext}
-                className="p-2 hover:bg-nook-leaf/10 rounded-xl transition-colors"
-            >
-                <ChevronRight className="w-5 h-5 text-nook-text" />
-            </button>
-        </div>
-    );
 };
 
 // ============================================
@@ -398,20 +352,49 @@ const CrossAnalysisChart: React.FC<{ data: TrendDataPoint[] }> = ({ data }) => {
 
 const PerformanceComparisonPage: React.FC = () => {
     const now = new Date();
-    const [year, setYear] = useState(now.getFullYear());
-    const [month, setMonth] = useState(now.getMonth() + 1);
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+
+    const [dateRange, setDateRange] = useState<DateRange>({
+        startDate: `${y}-01-01`,
+        endDate: `${y}-${m}-${d}`,
+    });
     const [data, setData] = useState<MonthlyStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [trendData, setTrendData] = useState<TrendDataPoint[]>([]);
+    const [a1List, setA1List] = useState<Array<{
+        date: string; time: string | null; district: string; location: string;
+        cause: string; party_type: string; death_count: number; injury_count: number;
+        is_elderly: boolean; precinct: string; latitude: number | null; longitude: number | null;
+    }>>([]);
+    const [a1Loading, setA1Loading] = useState(false);
+    const [a1Expanded, setA1Expanded] = useState(true);
 
-    // 載入月度數據
+    // 載入 A1 事故清單
+    useEffect(() => {
+        const fetchA1 = async () => {
+            setA1Loading(true);
+            try {
+                const result = await apiClient.getA1AccidentList(dateRange.startDate, dateRange.endDate);
+                setA1List(result.items || []);
+            } catch {
+                setA1List([]);
+            } finally {
+                setA1Loading(false);
+            }
+        };
+        fetchA1();
+    }, [dateRange]);
+
+    // 載入區間數據
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             setError(null);
             try {
-                const result = await apiClient.getMonthlyStats(year, month);
+                const result = await apiClient.getMonthlyStatsByRange(dateRange.startDate, dateRange.endDate);
                 setData(result);
             } catch (err) {
                 setError(err instanceof Error ? err.message : '載入失敗');
@@ -420,23 +403,28 @@ const PerformanceComparisonPage: React.FC = () => {
             }
         };
         fetchData();
-    }, [year, month]);
+    }, [dateRange]);
 
-    // 載入趨勢數據（過去6個月）
+    // 載入趨勢數據（依選擇區間自動拆分為最近6個月）
     useEffect(() => {
         const fetchTrend = async () => {
+            // 從 endDate 往回推6個月
+            const ed = new Date(dateRange.endDate);
+            const endMonth = ed.getMonth() + 1;
+            const endYear = ed.getFullYear();
+
             const promises = [];
             for (let i = 5; i >= 0; i--) {
-                let m = month - i;
-                let y = year;
-                while (m <= 0) {
-                    m += 12;
-                    y -= 1;
+                let tm = endMonth - i;
+                let ty = endYear;
+                while (tm <= 0) {
+                    tm += 12;
+                    ty -= 1;
                 }
-                const monthStr = `${y}/${m.toString().padStart(2, '0')}`;
+                const monthStr = `${ty}/${tm.toString().padStart(2, '0')}`;
 
                 promises.push(
-                    apiClient.getMonthlyStats(y, m)
+                    apiClient.getMonthlyStats(ty, tm)
                         .then(result => ({
                             month: monthStr,
                             tickets: result.current.tickets,
@@ -445,17 +433,14 @@ const PerformanceComparisonPage: React.FC = () => {
                             red_light: result.current.topics.red_light,
                             dangerous: result.current.topics.dangerous_driving,
                         }))
-                        .catch(err => {
-                            console.warn(`Failed to fetch stats for ${monthStr}, using 0`, err);
-                            return {
-                                month: monthStr,
-                                tickets: 0,
-                                crashes: 0,
-                                dui: 0,
-                                red_light: 0,
-                                dangerous: 0,
-                            };
-                        })
+                        .catch(() => ({
+                            month: monthStr,
+                            tickets: 0,
+                            crashes: 0,
+                            dui: 0,
+                            red_light: 0,
+                            dangerous: 0,
+                        }))
                 );
             }
 
@@ -463,14 +448,14 @@ const PerformanceComparisonPage: React.FC = () => {
             setTrendData(results);
         };
         fetchTrend();
-    }, [year, month]);
+    }, [dateRange]);
 
     // 導出 CSV
     const handleExportCSV = () => {
         if (!data) return;
 
         const csvContent = [
-            ['成效比較報表', `${year}年${month}月`],
+            ['綜合執法成效報表', `${dateRange.startDate} ~ ${dateRange.endDate}`],
             [],
             ['項目', '本期', '去年同期', '增減', '變化率'],
             ['違規案件', data.current.tickets, data.last_year.tickets,
@@ -488,7 +473,7 @@ const PerformanceComparisonPage: React.FC = () => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `成效比較_${year}年${month}月.csv`;
+        a.download = `綜合執法成效_${dateRange.startDate}_${dateRange.endDate}.csv`;
         a.click();
         URL.revokeObjectURL(url);
     };
@@ -498,48 +483,16 @@ const PerformanceComparisonPage: React.FC = () => {
         window.print();
     };
 
-    if (loading) {
-        return (
-            <div className="p-8">
-                <div className="animate-pulse space-y-6">
-                    <div className="h-12 bg-nook-cream rounded-2xl w-1/3"></div>
-                    <div className="grid grid-cols-2 gap-6">
-                        <div className="h-48 bg-nook-cream rounded-3xl"></div>
-                        <div className="h-48 bg-nook-cream rounded-3xl"></div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="p-8">
-                <div className="bg-nook-red/10 rounded-3xl p-8 text-center">
-                    <AlertTriangle className="w-12 h-12 text-nook-red mx-auto mb-4" />
-                    <h2 className="text-xl font-bold text-nook-red mb-2">載入失敗</h2>
-                    <p className="text-nook-text/60">{error}</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (!data) return null;
-
-    return (
-        <div className="p-8 print:p-4">
+    // 標題區 + 日期選擇器始終顯示（不受 loading 影響）
+    const headerSection = (
+        <>
             {/* 標題區 */}
-            <div className="flex items-center justify-between mb-8 print:mb-4">
+            <div className="flex items-center justify-between mb-6 print:mb-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-nook-text mb-2">📊 成效比較</h2>
-                    <p className="text-nook-text/60">本期 vs 去年同期數據對比分析</p>
+                    <h2 className="text-2xl font-bold text-nook-text mb-2">📊 綜合執法成效</h2>
+                    <p className="text-nook-text/60">執法數據總覽 · 事故趨勢 · A1 事故清單</p>
                 </div>
                 <div className="flex items-center gap-4 print:hidden">
-                    <MonthSelector
-                        year={year}
-                        month={month}
-                        onChange={(y, m) => { setYear(y); setMonth(m); }}
-                    />
                     <button
                         onClick={handleExportCSV}
                         className="flex items-center gap-2 px-4 py-2 bg-nook-leaf text-white rounded-xl hover:bg-nook-leaf/90 transition-colors shadow-lg shadow-nook-leaf/30"
@@ -555,6 +508,63 @@ const PerformanceComparisonPage: React.FC = () => {
                         列印報表
                     </button>
                 </div>
+            </div>
+
+            {/* 日期區間選擇器 */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl px-5 py-3 nook-shadow mb-6 print:hidden">
+                <DateRangePicker
+                    value={dateRange}
+                    onChange={setDateRange}
+                    showCompare={true}
+                />
+            </div>
+        </>
+    );
+
+    if (loading) {
+        return (
+            <div className="p-8 print:p-4">
+                {headerSection}
+                <div className="animate-pulse space-y-6">
+                    <div className="h-12 bg-nook-cream rounded-2xl w-1/3"></div>
+                    <div className="grid grid-cols-2 gap-6">
+                        <div className="h-48 bg-nook-cream rounded-3xl"></div>
+                        <div className="h-48 bg-nook-cream rounded-3xl"></div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="p-8 print:p-4">
+                {headerSection}
+                <div className="bg-nook-red/10 rounded-3xl p-8 text-center">
+                    <AlertTriangle className="w-12 h-12 text-nook-red mx-auto mb-4" />
+                    <h2 className="text-xl font-bold text-nook-red mb-2">載入失敗</h2>
+                    <p className="text-nook-text/60">{error}</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!data) return null;
+
+    return (
+        <div className="p-8 print:p-4">
+            {headerSection}
+
+            {/* ★ Top 10 事故路口（佔總事故比例）— 置頂 */}
+            <div className="mb-8 print:hidden">
+                <HotspotRankingCard
+                    type="accident"
+                    startDate={dateRange.startDate}
+                    endDate={dateRange.endDate}
+                    topN={10}
+                    showPercentage={true}
+                    title={`🚨 前 10 大事故路口（${dateRange.startDate} ~ ${dateRange.endDate}）`}
+                />
             </div>
 
             {/* 總覽卡片 */}
@@ -649,6 +659,109 @@ const PerformanceComparisonPage: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* A1 死亡事故清單 */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 nook-shadow mb-8">
+                <div
+                    className="flex items-center justify-between cursor-pointer"
+                    onClick={() => setA1Expanded(!a1Expanded)}
+                >
+                    <h3 className="text-lg font-bold text-nook-text flex items-center gap-2">
+                        <Skull className="w-5 h-5 text-red-600" />
+                        A1 死亡事故清單
+                        <span className="text-sm font-normal text-nook-text/50 ml-2">
+                            共 {a1List.length} 件
+                        </span>
+                    </h3>
+                    <button className="p-1 hover:bg-nook-cream/50 rounded-lg transition-colors">
+                        {a1Expanded ? <ChevronUp className="w-5 h-5 text-nook-text/50" /> : <ChevronDown className="w-5 h-5 text-nook-text/50" />}
+                    </button>
+                </div>
+
+                {a1Expanded && (
+                    <div className="mt-4">
+                        {a1Loading ? (
+                            <div className="animate-pulse space-y-2">
+                                {[...Array(3)].map((_, i) => (
+                                    <div key={i} className="h-10 bg-nook-cream rounded-xl"></div>
+                                ))}
+                            </div>
+                        ) : a1List.length === 0 ? (
+                            <div className="text-center py-8 text-nook-text/50">
+                                <Skull className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                                <p>此區間無 A1 死亡事故紀錄</p>
+                            </div>
+                        ) : (
+                            <>
+                                {/* 表頭 */}
+                                <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-bold text-nook-text/60 border-b border-nook-cream">
+                                    <div className="col-span-2">日期</div>
+                                    <div className="col-span-1">時間</div>
+                                    <div className="col-span-1">區域</div>
+                                    <div className="col-span-3">事故地點</div>
+                                    <div className="col-span-3">肇事原因</div>
+                                    <div className="col-span-1">當事人</div>
+                                    <div className="col-span-1 text-center">死/傷</div>
+                                </div>
+                                {/* 資料列 */}
+                                <div className="max-h-[400px] overflow-y-auto">
+                                    {a1List.map((item, idx) => (
+                                        <div
+                                            key={idx}
+                                            className={`grid grid-cols-12 gap-2 px-3 py-2.5 text-sm items-center transition-colors hover:bg-red-50/50 ${idx % 2 === 0 ? 'bg-nook-cream/20' : ''}`}
+                                        >
+                                            <div className="col-span-2 font-medium text-nook-text">
+                                                {item.date}
+                                            </div>
+                                            <div className="col-span-1 text-nook-text/70">
+                                                {item.time || '—'}
+                                            </div>
+                                            <div className="col-span-1 text-nook-text/70">
+                                                <span className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded text-xs font-medium">
+                                                    {item.district}
+                                                </span>
+                                            </div>
+                                            <div className="col-span-3 text-nook-text truncate" title={item.location}>
+                                                <MapPin className="w-3 h-3 inline mr-1 text-red-400" />
+                                                {item.location}
+                                            </div>
+                                            <div className="col-span-3 text-nook-text/70 truncate" title={item.cause}>
+                                                {item.cause}
+                                            </div>
+                                            <div className="col-span-1 text-nook-text/70 text-xs">
+                                                {item.party_type}
+                                                {item.is_elderly && (
+                                                    <span className="ml-1 text-orange-500" title="高齡者">65+</span>
+                                                )}
+                                            </div>
+                                            <div className="col-span-1 text-center">
+                                                <span className="text-red-600 font-bold">{item.death_count}</span>
+                                                <span className="text-nook-text/30 mx-0.5">/</span>
+                                                <span className="text-orange-500">{item.injury_count}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                {/* 統計摘要 */}
+                                <div className="mt-3 pt-3 border-t border-nook-cream/50 flex items-center gap-6 text-xs text-nook-text/50">
+                                    <span>
+                                        總死亡：<span className="font-bold text-red-600">{a1List.reduce((s, i) => s + i.death_count, 0)}</span> 人
+                                    </span>
+                                    <span>
+                                        總受傷：<span className="font-bold text-orange-500">{a1List.reduce((s, i) => s + i.injury_count, 0)}</span> 人
+                                    </span>
+                                    <span>
+                                        高齡者事故：<span className="font-bold text-orange-500">{a1List.filter(i => i.is_elderly).length}</span> 件
+                                    </span>
+                                    <span>
+                                        涉及區域：<span className="font-bold">{new Set(a1List.map(i => i.district)).size}</span> 區
+                                    </span>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
+            </div>
 
             {/* 主題分類比較 */}
             <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 nook-shadow mb-8">
@@ -763,19 +876,19 @@ const PerformanceComparisonPage: React.FC = () => {
             <div className="grid grid-cols-2 gap-6 mb-8 print:hidden">
                 <HotspotRankingCard
                     type="accident"
-                    year={year}
-                    month={month}
+                    startDate={dateRange.startDate}
+                    endDate={dateRange.endDate}
                     topN={5}
                     severity="A1+A2"
-                    title={`🚨 ${year}年${month}月 A1/A2 事故熱點 Top 5`}
+                    title="🚨 A1/A2 事故熱點 Top 5"
                 />
                 <HotspotRankingCard
                     type="ticket"
-                    year={year}
-                    month={month}
+                    startDate={dateRange.startDate}
+                    endDate={dateRange.endDate}
                     topN={5}
                     topic="DUI"
-                    title={`🍺 ${year}年${month}月 酒駕違規熱點 Top 5`}
+                    title="🍺 酒駕違規熱點 Top 5"
                 />
             </div>
 

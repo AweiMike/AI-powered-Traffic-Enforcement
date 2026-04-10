@@ -221,8 +221,8 @@ async def get_briefing_card(topic_code: str, shift_id: str, date: str = None):
 
 if __name__ == "__main__":
     import uvicorn
-    print("🌿 精準執法儀表板系統（簡化版）啟動中...")
-    print("📍 API 端點：http://localhost:8000/api/v1")
-    print("📚 API 文件：http://localhost:8000/docs")
-    print("⚠️  注意：使用模擬數據，非真實資料")
+    print("[START] 精準執法儀表板系統（簡化版）啟動中...")
+    print("  API 端點：http://localhost:8000/api/v1")
+    print("  API 文件：http://localhost:8000/docs")
+    print("[WARN] 注意：使用模擬數據，非真實資料")
     uvicorn.run(app, host="0.0.0.0", port=8000)

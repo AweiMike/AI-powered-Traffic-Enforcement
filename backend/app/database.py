@@ -1,7 +1,7 @@
 """
 資料庫連線設定
 """
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -53,4 +53,46 @@ def init_db():
     from app.models import core, dimension, aggregate
 
     Base.metadata.create_all(bind=engine)
-    print("✅ 資料庫表格創建完成")
+
+    # EIS 欄位自動遷移：若既有資料庫缺少新欄位則自動補上
+    _migrate_eis_columns()
+
+    print("[OK] Database tables ready")
+
+
+def _migrate_eis_columns():
+    """檢查並補上 EIS 整合所需的新欄位（不刪資料）"""
+    inspector = inspect(engine)
+
+    # core_crash 表需要的新欄位（EIS 整合 + 慢車分析）
+    _ensure_columns(inspector, "core_crash", {
+        "precinct": "VARCHAR(100)",
+        "sub_unit": "VARCHAR(100)",
+        "death_count": "INTEGER DEFAULT 0",
+        "injury_count": "INTEGER DEFAULT 0",
+        "evehicle_type": "VARCHAR(50)",
+        "is_youth": "BOOLEAN DEFAULT 0",
+        "is_underage_14": "BOOLEAN DEFAULT 0",
+    })
+
+    # core_ticket 表可能缺少的欄位
+    _ensure_columns(inspector, "core_ticket", {
+        "evehicle_type": "VARCHAR(50)",
+        "evehicle_violation": "VARCHAR(50)",
+        "is_youth": "BOOLEAN DEFAULT 0",
+    })
+
+
+def _ensure_columns(inspector, table_name: str, columns: dict):
+    """若表格存在但缺少指定欄位，執行 ALTER TABLE ADD COLUMN"""
+    if table_name not in inspector.get_table_names():
+        return
+    existing = {col["name"] for col in inspector.get_columns(table_name)}
+    with engine.connect() as conn:
+        for col_name, col_type in columns.items():
+            if col_name not in existing:
+                conn.execute(text(
+                    f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}"
+                ))
+                print(f"  [+] {table_name}.{col_name} ({col_type}) added")
+        conn.commit()

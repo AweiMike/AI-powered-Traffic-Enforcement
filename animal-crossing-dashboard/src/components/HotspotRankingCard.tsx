@@ -26,10 +26,13 @@ interface HotspotRankingCardProps {
     days?: number;
     year?: number;
     month?: number;
+    startDate?: string;
+    endDate?: string;
     topN?: number;
     severity?: string;
     topic?: string;
     title?: string;
+    showPercentage?: boolean;
     onHotspotClick?: (item: HotspotItem) => void;
 }
 
@@ -38,10 +41,13 @@ const HotspotRankingCard: React.FC<HotspotRankingCardProps> = ({
     days = 30,
     year,
     month,
+    startDate,
+    endDate,
     topN = 5,
     severity,
     topic,
     title,
+    showPercentage = false,
     onHotspotClick
 }) => {
     const [hotspots, setHotspots] = useState<HotspotItem[]>([]);
@@ -59,13 +65,15 @@ const HotspotRankingCard: React.FC<HotspotRankingCardProps> = ({
                         days,
                         year,
                         month,
+                        startDate,
+                        endDate,
                         topN,
                         severity
                     });
                     setHotspots(result.hotspots || []);
                     setTotalInPeriod(result.total_in_period || 0);
                 } else {
-                    const result = await apiClient.getTicketHotspots(days, topN, topic, year, month);
+                    const result = await apiClient.getTicketHotspots(days, topN, topic, year, month, startDate, endDate);
                     setHotspots(result.hotspots || []);
                 }
             } catch (err) {
@@ -76,7 +84,7 @@ const HotspotRankingCard: React.FC<HotspotRankingCardProps> = ({
             }
         };
         fetchData();
-    }, [type, days, year, month, topN, severity, topic]);
+    }, [type, days, year, month, startDate, endDate, topN, severity, topic]);
 
     const getRankBadge = (rank: number) => {
         if (rank === 1) return <span className="w-6 h-6 flex items-center justify-center bg-yellow-400 text-white rounded-full text-xs font-bold">🥇</span>;
@@ -174,9 +182,19 @@ const HotspotRankingCard: React.FC<HotspotRankingCardProps> = ({
                                 <p className="font-bold text-nook-text text-lg">
                                     {type === 'accident' ? item.total : (item.count || item.total)}
                                 </p>
-                                {type === 'accident' && item.a1_count !== undefined && (
+                                {type === 'accident' && showPercentage && totalInPeriod > 0 && (
+                                    <p className="text-xs font-medium text-nook-leaf">
+                                        佔 {((item.total / totalInPeriod) * 100).toFixed(1)}%
+                                    </p>
+                                )}
+                                {type === 'accident' && !showPercentage && item.a1_count !== undefined && (
                                     <p className="text-xs text-nook-text/60">
                                         A1:{item.a1_count} A2:{item.a2_count}
+                                    </p>
+                                )}
+                                {type === 'accident' && showPercentage && item.a1_count !== undefined && (
+                                    <p className="text-xs text-nook-text/60">
+                                        A1:{item.a1_count} A2:{item.a2_count} A3:{item.a3_count}
                                     </p>
                                 )}
                             </div>

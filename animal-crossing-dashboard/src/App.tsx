@@ -3,7 +3,7 @@
  * 專注於事故分析和違規取締
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Home,
   AlertTriangle,
@@ -18,7 +18,13 @@ import {
   Calendar,
   ChevronRight,
   BarChart3,
-  Shield
+  Shield,
+  Zap,
+  Eye,
+  Lock,
+  LogOut,
+  Wine,
+  Truck
 } from 'lucide-react';
 
 // Import custom components
@@ -26,7 +32,6 @@ import { StatCard } from './components/StatCard';
 import { TopicSelector } from './components/TopicSelector';
 import { ShiftSelector } from './components/ShiftSelector';
 import { Top5List } from './components/Top5Card';
-import { BriefingCard } from './components/BriefingCard';
 import { MonthlyComparison } from './components/MonthlyComparison';
 import DataImportPage from './components/DataImportPage';
 import ViolationsPage from './components/ViolationsPage';
@@ -36,44 +41,73 @@ import ElderlyPreventionPage from './components/ElderlyPreventionPage';
 import PerformanceComparisonPage from './components/PerformanceComparisonPage';
 import MapViewPage from './components/MapViewPage';
 import AIReportPage from './components/AIReportPage';
+import EVehicleAnalysisPage from './components/EVehicleAnalysisPage';
+import DuiPerformancePage from './components/DuiPerformancePage';
+import HeavyVehiclePerformancePage from './components/HeavyVehiclePerformancePage';
 
 // Import hooks
 import {
   useOverview,
   useTop5,
   useMonthlyStats,
-  useBriefingCard,
   useHealthCheck,
   useHeatmap,
   useAccidentHotspots,
   useCrossAnalysis
 } from './hooks/useAPI';
 
-import { TopicCode } from './api/client';
+import { TopicCode, apiClient } from './api/client';
 
 // ============================================
 // Sidebar Component
 // ============================================
+// ============================================
+// Read-only mode detection (唯讀模式偵測)
+// URL hash #view = read-only for field units
+// ============================================
+function useReadOnlyMode(): boolean {
+  const [isReadOnly, setIsReadOnly] = useState(() => window.location.hash === '#view');
+
+  useEffect(() => {
+    const handleHashChange = () => setIsReadOnly(window.location.hash === '#view');
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  return isReadOnly;
+}
+
+// Items hidden in read-only mode (唯讀模式隱藏的頁面)
+const ADMIN_ONLY_VIEWS = new Set(['ai-report', 'import']);
+
 interface SidebarProps {
   activeView: string;
   onViewChange: (view: string) => void;
+  readOnly: boolean;
+  onLogout?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) => {
-  const menuItems = [
+const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, readOnly, onLogout }) => {
+  const allMenuItems = [
     { id: 'dashboard', icon: Home, label: '總覽', emoji: '🏠', description: '整體統計概覽' },
     { id: 'accidents', icon: MapPin, label: '執法缺口分析', emoji: '🎯', description: '事故與違規綜合分析' },
     { id: 'map', icon: MapPin, label: '地圖視覺化', emoji: '🗺️', description: '精準座標點位分布' },
     { id: 'elderly', icon: Users, label: '高齡者事故防制專區', emoji: '👴', description: '高齡者事故防治' },
-    { id: 'monthly', icon: Calendar, label: '成效比較', emoji: '📊', description: '同期比較與報表' },
+    { id: 'evehicle', icon: Zap, label: '青少年慢車與微電車專區', emoji: '🚵', description: '青少年微電車/電輔車事故分析' },
+    { id: 'dui', icon: Wine, label: '酒駕防制成效', emoji: '🍺', description: '各派出所酒駕取締與事故統計' },
+    { id: 'heavy-vehicle', icon: Truck, label: '大型車防制成效', emoji: '🚛', description: '各派出所大型車取締與事故統計' },
+    { id: 'monthly', icon: Calendar, label: '綜合執法成效', emoji: '📊', description: '數據總覽·趨勢·A1清單' },
     { id: 'ai-report', icon: BarChart3, label: 'AI 智慧報告', emoji: '🤖', description: 'AI 自動生成分析報告' },
-    { id: 'briefing', icon: FileText, label: '班前勤務卡', emoji: '📋', description: '勤務建議' },
     { id: 'import', icon: FileText, label: '資料匯入', emoji: '📥', description: '匯入 Excel 資料' },
   ];
 
+  const menuItems = readOnly
+    ? allMenuItems.filter(item => !ADMIN_ONLY_VIEWS.has(item.id))
+    : allMenuItems;
+
   return (
-    <aside className="w-72 bg-white/80 backdrop-blur-sm h-screen fixed left-0 top-0 nook-shadow z-50 overflow-y-auto">
-      <div className="p-6 border-b border-nook-leaf/20">
+    <aside className="w-72 bg-white/80 backdrop-blur-sm h-screen fixed left-0 top-0 nook-shadow z-50 flex flex-col">
+      <div className="p-6 border-b border-nook-leaf/20 shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 bg-nook-leaf rounded-2xl flex items-center justify-center">
             <Shield className="w-7 h-7 text-white" />
@@ -81,11 +115,17 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) => {
           <div>
             <h1 className="font-bold text-nook-text text-lg">精準執法儀表板</h1>
             <p className="text-sm text-nook-text/60">事故與違規分析</p>
+            {readOnly && (
+              <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                <Eye className="w-3 h-3" />
+                唯讀模式
+              </span>
+            )}
           </div>
         </div>
       </div>
 
-      <nav className="p-4 space-y-2">
+      <nav className="p-4 space-y-2 flex-1 overflow-y-auto min-h-0">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeView === item.id;
@@ -107,7 +147,17 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) => {
         })}
       </nav>
 
-      <div className="absolute bottom-6 left-4 right-4">
+      <div className="shrink-0 p-4 space-y-3 border-t border-nook-leaf/10">
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-nook-text/60 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            登出
+          </button>
+        )}
+        <DataInfo />
         <SystemStatus />
       </div>
     </aside>
@@ -147,6 +197,51 @@ const SystemStatus: React.FC = () => {
       {health?.mode === 'simple' && (
         <div className="mt-2 text-xs text-nook-orange bg-nook-orange/10 rounded-lg p-2">
           ⚠️ 目前使用模擬數據。請安裝 PostgreSQL 以使用真實資料。
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================
+// Data Info Component (資料庫涵蓋範圍)
+// ============================================
+const DataInfo: React.FC = () => {
+  const [info, setInfo] = useState<{
+    crash: { earliest: string | null; latest: string | null; count: number; last_upload: string | null };
+    ticket: { earliest: string | null; latest: string | null; count: number; last_upload: string | null };
+    last_upload: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    apiClient.getDataInfo().then(setInfo).catch(() => {});
+  }, []);
+
+  if (!info) return null;
+
+  const formatDate = (d: string | null) => d ? d.replace(/-/g, '/') : '--';
+  const formatUpload = (d: string | null) => {
+    if (!d) return '--';
+    const dt = new Date(d);
+    return `${dt.getMonth() + 1}/${dt.getDate()} ${dt.getHours().toString().padStart(2, '0')}:${dt.getMinutes().toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="bg-nook-sky/20 rounded-2xl p-3 text-xs text-nook-text/70 space-y-1.5">
+      <p className="font-medium text-nook-text text-xs">資料涵蓋範圍</p>
+      <div>
+        <span className="font-medium">事故</span>{' '}
+        {formatDate(info.crash.earliest)}~{formatDate(info.crash.latest)}{' '}
+        <span className="text-nook-text/50">({info.crash.count}筆)</span>
+      </div>
+      <div>
+        <span className="font-medium">違規</span>{' '}
+        {formatDate(info.ticket.earliest)}~{formatDate(info.ticket.latest)}{' '}
+        <span className="text-nook-text/50">({info.ticket.count}筆)</span>
+      </div>
+      {info.last_upload && (
+        <div className="text-nook-text/50 pt-0.5 border-t border-nook-leaf/10">
+          最後上傳: {formatUpload(info.last_upload)}
         </div>
       )}
     </div>
@@ -724,53 +819,6 @@ const RecommendationsView: React.FC = () => {
 };
 
 // ============================================
-// Briefing View (班前勤務卡)
-// ============================================
-const BriefingView: React.FC = () => {
-  const [selectedTopic, setSelectedTopic] = useState<TopicCode>('DUI');
-  const [selectedShift, setSelectedShift] = useState<string>('11');
-
-  const { data: briefing, loading } = useBriefingCard(
-    selectedTopic,
-    selectedShift,
-    undefined
-  );
-
-  return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-nook-text mb-2">📋 班前勤務建議卡</h2>
-        <p className="text-nook-text/60">為您準備的執法勤務建議（無個資）</p>
-      </div>
-
-      <div className="grid grid-cols-4 gap-6">
-        <div className="space-y-6">
-          <TopicSelector
-            selectedTopic={selectedTopic}
-            onTopicChange={setSelectedTopic}
-          />
-          <ShiftSelector
-            selectedShift={selectedShift}
-            onShiftChange={(shift) => shift && setSelectedShift(shift)}
-          />
-        </div>
-
-        <div className="col-span-3">
-          {briefing ? (
-            <BriefingCard data={briefing} loading={loading} />
-          ) : (
-            <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-12 nook-shadow text-center">
-              <div className="text-6xl mb-4">📋</div>
-              <p className="text-nook-text/60">載入勤務建議卡中...</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ============================================
 // Placeholder Views (其他視圖)
 // ============================================
 const PlaceholderView: React.FC<{ title: string; emoji: string; description: string }> = ({ title, emoji, description }) => {
@@ -787,10 +835,136 @@ const PlaceholderView: React.FC<{ title: string; emoji: string; description: str
 };
 
 // ============================================
+// Login Page (管理登入頁面)
+// ============================================
+const AUTH_KEY = 'dashboard_auth';
+
+function useAuth() {
+  const [authenticated, setAuthenticated] = useState(
+    () => sessionStorage.getItem(AUTH_KEY) === 'true'
+  );
+
+  const login = (username: string, password: string): boolean => {
+    if (username === 'xinhua' && password === 'xinhua3736') {
+      sessionStorage.setItem(AUTH_KEY, 'true');
+      setAuthenticated(true);
+      return true;
+    }
+    return false;
+  };
+
+  const logout = () => {
+    sessionStorage.removeItem(AUTH_KEY);
+    setAuthenticated(false);
+  };
+
+  return { authenticated, login, logout };
+}
+
+const LoginPage: React.FC<{ onLogin: (u: string, p: string) => boolean }> = ({ onLogin }) => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState(false);
+  const [shake, setShake] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const ok = onLogin(username, password);
+    if (!ok) {
+      setError(true);
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-nook-cream via-white to-nook-sky/10 flex items-center justify-center">
+      <div className={`bg-white/90 backdrop-blur-sm rounded-3xl p-10 nook-shadow w-full max-w-md ${shake ? 'animate-shake' : ''}`}>
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-nook-leaf rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Shield className="w-9 h-9 text-white" />
+          </div>
+          <h1 className="text-2xl font-bold text-nook-text">精準執法儀表板</h1>
+          <p className="text-sm text-nook-text/60 mt-1">管理員登入</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-nook-text mb-1.5">帳號</label>
+            <div className="relative">
+              <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-nook-text/40" />
+              <input
+                type="text"
+                value={username}
+                onChange={e => { setUsername(e.target.value); setError(false); }}
+                className="w-full pl-10 pr-4 py-2.5 border border-nook-leaf/30 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-nook-leaf/50 text-nook-text"
+                placeholder="請輸入帳號"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-nook-text mb-1.5">密碼</label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-nook-text/40" />
+              <input
+                type="password"
+                value={password}
+                onChange={e => { setPassword(e.target.value); setError(false); }}
+                className="w-full pl-10 pr-4 py-2.5 border border-nook-leaf/30 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-nook-leaf/50 text-nook-text"
+                placeholder="請輸入密碼"
+              />
+            </div>
+          </div>
+
+          {error && (
+            <p className="text-red-500 text-sm text-center">帳號或密碼錯誤，請重新輸入</p>
+          )}
+
+          <button
+            type="submit"
+            className="w-full py-2.5 bg-nook-leaf text-white font-medium rounded-xl hover:bg-nook-leaf/90 transition-colors shadow-lg shadow-nook-leaf/30"
+          >
+            登入
+          </button>
+        </form>
+
+        <p className="text-xs text-nook-text/40 text-center mt-6">新化分局精準執法儀表板系統</p>
+      </div>
+
+      <style>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          20%, 60% { transform: translateX(-8px); }
+          40%, 80% { transform: translateX(8px); }
+        }
+        .animate-shake { animation: shake 0.4s ease-in-out; }
+      `}</style>
+    </div>
+  );
+};
+
+// ============================================
 // Main App
 // ============================================
 const App: React.FC = () => {
   const [activeView, setActiveView] = useState('dashboard');
+  const readOnly = useReadOnlyMode();
+  const { authenticated, login, logout } = useAuth();
+
+  // Read-only mode: no login needed; admin mode: require login
+  // 唯讀模式免登入，管理模式需登入
+  if (!readOnly && !authenticated) {
+    return <LoginPage onLogin={login} />;
+  }
+
+  // In read-only mode, redirect admin-only views back to dashboard
+  // 唯讀模式下，管理頁面自動導回總覽
+  const safeSetView = (view: string) => {
+    if (readOnly && ADMIN_ONLY_VIEWS.has(view)) return;
+    setActiveView(view);
+  };
 
   const renderView = () => {
     switch (activeView) {
@@ -799,17 +973,21 @@ const App: React.FC = () => {
       case 'accidents':
         return <AccidentAnalysisPage />;
       case 'map':
-        return <MapViewPage />;
+        return <MapViewPage readOnly={readOnly} />;
       case 'elderly':
         return <ElderlyPreventionPage />;
+      case 'evehicle':
+        return <EVehicleAnalysisPage />;
+      case 'dui':
+        return <DuiPerformancePage />;
+      case 'heavy-vehicle':
+        return <HeavyVehiclePerformancePage />;
       case 'monthly':
         return <PerformanceComparisonPage />;
       case 'ai-report':
-        return <AIReportPage />;
-      case 'briefing':
-        return <BriefingView />;
+        return readOnly ? <DashboardView /> : <AIReportPage />;
       case 'import':
-        return <DataImportPage />;
+        return readOnly ? <DashboardView /> : <DataImportPage />;
       default:
         return <DashboardView />;
     }
@@ -817,7 +995,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-nook-cream via-white to-nook-sky/10">
-      <Sidebar activeView={activeView} onViewChange={setActiveView} />
+      <Sidebar activeView={activeView} onViewChange={safeSetView} readOnly={readOnly} onLogout={!readOnly ? logout : undefined} />
       <main className="ml-72 min-h-screen">
         <Header />
         {renderView()}

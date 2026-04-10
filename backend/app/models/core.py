@@ -84,6 +84,24 @@ class Crash(Base):
     )
     driver_gender = Column(String(10), index=True, comment="性別：男/女/未知")
 
+    # === EIS 擴充欄位 ===
+    precinct = Column(String(100), index=True, comment="處理分局（如：新化分局）")
+    sub_unit = Column(String(100), index=True, comment="所轄單位名稱（如：新化派出所）")
+    death_count = Column(Integer, default=0, comment="24小時內死亡人數")
+    injury_count = Column(Integer, default=0, comment="受傷人數")
+
+    # === 慢車/微電車分析欄位 ===
+    evehicle_type = Column(
+        String(50), index=True,
+        comment="慢車類型：微型電動二輪車/電動輔助自行車/一般自行車/其他"
+    )
+    is_youth = Column(
+        Boolean, default=False, index=True, comment="是否為青少年（<18歲）"
+    )
+    is_underage_14 = Column(
+        Boolean, default=False, index=True, comment="未滿14歲騎乘微電車"
+    )
+
     # === 系統欄位 ===
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -157,6 +175,7 @@ class Ticket(Base):
     unit_code = Column(String(50), index=True, comment="舉發單位代碼（如：新化分局）")
 
     # === 駕駛人特徵（統計用，去識別化） ===
+    driver_age = Column(Integer, index=True, comment="駕駛人年齡（原始值）")
     driver_age_group = Column(
         String(20), index=True, comment="駕駛年齡組：<18/18-24/25-44/45-64/65+/未知"
     )
@@ -165,6 +184,19 @@ class Ticket(Base):
     )
     vehicle_type = Column(String(50), index=True, comment="車種（如：汽車、機車）")
     driver_gender = Column(String(10), index=True, comment="性別：男/女/未知")
+
+    # === 慢車/微電車分析欄位 ===
+    evehicle_type = Column(
+        String(50), index=True,
+        comment="慢車類型：微型電動二輪車/電動輔助自行車/一般自行車/其他"
+    )
+    evehicle_violation = Column(
+        String(50), index=True,
+        comment="慢車違規態樣：未掛牌/未戴安全帽/雙載/改裝/無照駕駛"
+    )
+    is_youth = Column(
+        Boolean, default=False, index=True, comment="是否為青少年（<18歲）"
+    )
 
     # === 系統欄位 ===
     created_at = Column(DateTime, default=datetime.utcnow)

@@ -430,11 +430,17 @@ TOPIC_NAMES = {
 async def get_accident_hotspots(
     days: int = Query(30, ge=1, le=365, description="統計天數"),
     is_elderly: Optional[bool] = Query(False, description="是否僅統計高齡者事故"),
+    start_date_param: str = Query(None, alias="start_date", description="起始日期 YYYY-MM-DD"),
+    end_date_param: str = Query(None, alias="end_date", description="結束日期 YYYY-MM-DD"),
     db: Session = Depends(get_db)
 ):
     """事故熱點分析"""
-    end_date = get_data_end_date(db)
-    start_date = end_date - timedelta(days=days)
+    if start_date_param and end_date_param:
+        end_date = datetime.strptime(end_date_param, "%Y-%m-%d").date()
+        start_date = datetime.strptime(start_date_param, "%Y-%m-%d").date()
+    else:
+        end_date = get_data_end_date(db)
+        start_date = end_date - timedelta(days=days)
     
     # 建立基礎篩選條件
     filters = [
@@ -454,15 +460,18 @@ async def get_accident_hotspots(
         func.sum(case((Crash.severity == 'A2', 1), else_=0)).label('a2_count'),
         func.sum(case((Crash.severity == 'A3', 1), else_=0)).label('a3_count'),
         func.sum(Crash.severity_weight).label('severity_score'),
-        func.sum(case((Crash.suspected_alcohol == True, 1), else_=0)).label('dui_crashes')
+        func.sum(case((Crash.suspected_alcohol == True, 1), else_=0)).label('dui_crashes'),
+        func.coalesce(func.sum(Crash.death_count), 0).label('death_total'),
+        func.coalesce(func.sum(Crash.injury_count), 0).label('injury_total'),
     ).filter(
         *filters
     ).group_by(Crash.district).order_by(desc('severity_score')).all()
-    
+
     hotspots = []
     a1_total = a2_total = a3_total = dui_crash_total = 0
-    
-    for district, total, a1, a2, a3, severity_score, dui_crashes in crash_stats:
+    death_grand_total = injury_grand_total = 0
+
+    for district, total, a1, a2, a3, severity_score, dui_crashes, deaths, injuries in crash_stats:
         if not district:
             continue
         
@@ -478,6 +487,8 @@ async def get_accident_hotspots(
         a2_total += a2
         a3_total += a3
         dui_crash_total += dui_crashes
+        death_grand_total += deaths or 0
+        injury_grand_total += injuries or 0
         
         violation_stats = db.query(
             func.count(Ticket.id).label('total_violations'),
@@ -511,7 +522,9 @@ async def get_accident_hotspots(
                 'a1_count': a1,
                 'a2_count': a2,
                 'a3_count': a3,
-                'severity_score': severity_score or 0
+                'severity_score': severity_score or 0,
+                'death_count': deaths or 0,
+                'injury_count': injuries or 0,
             },
             'violations': {
                 'total': violation_stats.total_violations or 0,
@@ -545,7 +558,9 @@ async def get_accident_hotspots(
             'a2_total': a2_total,
             'a3_total': a3_total,
             'dui_crash_total': dui_crash_total,
-            'total_dui_violations': sum(h['violations']['dui'] for h in hotspots)
+            'total_dui_violations': sum(h['violations']['dui'] for h in hotspots),
+            'death_total': death_grand_total,
+            'injury_total': injury_grand_total,
         }
     }
 
@@ -555,11 +570,17 @@ async def get_accident_peak_times(
     district: str,
     days: int = Query(30, ge=1, le=365, description="統計天數"),
     is_elderly: Optional[bool] = Query(False, description="是否僅統計高齡者事故"),
+    start_date_param: str = Query(None, alias="start_date", description="起始日期 YYYY-MM-DD"),
+    end_date_param: str = Query(None, alias="end_date", description="結束日期 YYYY-MM-DD"),
     db: Session = Depends(get_db)
 ):
     """特定區域的時段分布分析"""
-    end_date = get_data_end_date(db)
-    start_date = end_date - timedelta(days=days)
+    if start_date_param and end_date_param:
+        end_date = datetime.strptime(end_date_param, "%Y-%m-%d").date()
+        start_date = datetime.strptime(start_date_param, "%Y-%m-%d").date()
+    else:
+        end_date = get_data_end_date(db)
+        start_date = end_date - timedelta(days=days)
     
     shift_names = {
         "01": "00:00-02:00", "02": "02:00-04:00", "03": "04:00-06:00",
@@ -700,11 +721,17 @@ async def get_accident_heatmap(
 async def get_cross_analysis(
     district: Optional[str] = Query(None, description="區域篩選"),
     days: int = Query(30, ge=1, le=365, description="統計天數"),
+    start_date_param: str = Query(None, alias="start_date", description="起始日期 YYYY-MM-DD"),
+    end_date_param: str = Query(None, alias="end_date", description="結束日期 YYYY-MM-DD"),
     db: Session = Depends(get_db)
 ):
     """事故與違規交叉分析"""
-    end_date = get_data_end_date(db)
-    start_date = end_date - timedelta(days=days)
+    if start_date_param and end_date_param:
+        end_date = datetime.strptime(end_date_param, "%Y-%m-%d").date()
+        start_date = datetime.strptime(start_date_param, "%Y-%m-%d").date()
+    else:
+        end_date = get_data_end_date(db)
+        start_date = end_date - timedelta(days=days)
     
     shift_names = {
         "01": "00:00-02:00", "02": "02:00-04:00", "03": "04:00-06:00",
@@ -806,14 +833,20 @@ async def get_cross_analysis(
 @router.get("/analysis/elderly-vehicle-types")
 async def get_elderly_vehicle_analysis(
     days: int = Query(default=365, description="分析期間天數"),
+    start_date_param: str = Query(None, alias="start_date", description="起始日期 YYYY-MM-DD"),
+    end_date_param: str = Query(None, alias="end_date", description="結束日期 YYYY-MM-DD"),
     db: Session = Depends(get_db)
 ):
     """
     高齡者車種分析
     分析高齡者事故中的車種分佈（機車、行人、自小客等）
     """
-    end_date = get_data_end_date(db)
-    start_date = end_date - timedelta(days=days)
+    if start_date_param and end_date_param:
+        end_date = datetime.strptime(end_date_param, "%Y-%m-%d").date()
+        start_date = datetime.strptime(start_date_param, "%Y-%m-%d").date()
+    else:
+        end_date = get_data_end_date(db)
+        start_date = end_date - timedelta(days=days)
     
     # 查詢高齡者事故的車種分佈
     vehicle_stats = db.query(
@@ -941,9 +974,11 @@ async def get_dui_environment_analysis(
 
 @router.get("/map/points")
 async def get_map_points(
-    days: int = Query(default=90, description="分析期間天數"),
+    days: int = Query(default=90, description="分析期間天數（當 start_date/end_date 未提供時使用）"),
+    start_date: str = Query(default=None, description="起始日期 YYYY-MM-DD"),
+    end_date_param: str = Query(default=None, alias="end_date", description="結束日期 YYYY-MM-DD"),
     point_type: str = Query(default="all", description="資料類型: all, crash, ticket"),
-    severity: str = Query(default=None, description="嚴重度篩選: A1, A2, A3"),
+    severity: str = Query(default=None, description="嚴重度篩選: A1, A2, A3（逗號分隔可複選）"),
     topic: str = Query(default=None, description="主題篩選: DUI, RED_LIGHT, DANGEROUS_DRIVING"),
     db: Session = Depends(get_db)
 ):
@@ -951,8 +986,13 @@ async def get_map_points(
     取得地圖點位資料
     返回帶有真實座標的事故/違規資料供地圖顯示
     """
-    end_date = get_data_end_date(db)
-    start_date = end_date - timedelta(days=days)
+    if start_date and end_date_param:
+        from datetime import datetime as dt
+        end_date = dt.strptime(end_date_param, "%Y-%m-%d").date()
+        start_date = dt.strptime(start_date, "%Y-%m-%d").date()
+    else:
+        end_date = get_data_end_date(db)
+        start_date = end_date - timedelta(days=days)
     
     result = {
         'period': {
@@ -990,7 +1030,11 @@ async def get_map_points(
         )
         
         if severity:
-            crash_query = crash_query.filter(Crash.severity == severity)
+            sev_list = [s.strip() for s in severity.split(",")]
+            if len(sev_list) == 1:
+                crash_query = crash_query.filter(Crash.severity == sev_list[0])
+            else:
+                crash_query = crash_query.filter(Crash.severity.in_(sev_list))
         
         crashes = crash_query.all()
         result['summary']['total_crashes'] = len(crashes)
@@ -1023,6 +1067,7 @@ async def get_map_points(
             Ticket.topic_dui,
             Ticket.topic_red_light,
             Ticket.topic_dangerous,
+            Ticket.violation_name,
             Ticket.violation_date,
             Ticket.shift_id,
             Ticket.is_elderly,
@@ -1061,6 +1106,7 @@ async def get_map_points(
                     'district': t.district,
                     'location': t.location_desc,
                     'topic': topic_name,
+                    'violation_name': t.violation_name,
                     'date': t.violation_date.isoformat() if t.violation_date else None,
                     'shift': t.shift_id,
                     'is_elderly': t.is_elderly,
@@ -1171,6 +1217,37 @@ async def update_crash_coordinates(
     return {
         'success': True,
         'crash_id': crash_id,
+        'old_coordinates': {'lat': old_lat, 'lng': old_lng},
+        'new_coordinates': {'lat': latitude, 'lng': longitude},
+        'message': '座標已更新'
+    }
+
+
+@router.put("/map/ticket/{ticket_id}/coordinates")
+async def update_ticket_coordinates(
+    ticket_id: int,
+    latitude: float = Query(..., description="新緯度"),
+    longitude: float = Query(..., description="新經度"),
+    db: Session = Depends(get_db)
+):
+    """
+    更新違規點位座標
+    用於手動校正自動分配的區域座標
+    """
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="違規資料不存在")
+
+    old_lat = ticket.latitude
+    old_lng = ticket.longitude
+
+    ticket.latitude = latitude
+    ticket.longitude = longitude
+    db.commit()
+
+    return {
+        'success': True,
+        'ticket_id': ticket_id,
         'old_coordinates': {'lat': old_lat, 'lng': old_lng},
         'new_coordinates': {'lat': latitude, 'lng': longitude},
         'message': '座標已更新'
