@@ -62,7 +62,7 @@ interface UploadCardProps {
 }
 
 const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -73,20 +73,30 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
     crash: {
       title: '交通事故資料',
       emoji: '🚗',
-      description: '上傳事故 Excel 檔案（需含「案件編號」、「發生時間」、「發生地點」欄位）',
+      description: '上傳事故檔案（支援多檔選擇，需含「案件編號」、「發生時間」、「發生地點」欄位）',
       color: 'nook-orange',
       endpoint: `${API_BASE}/import/crash`,
+      batchEndpoint: `${API_BASE}/import/crash/upload-batch`,
+      accept: '.xlsx,.xls,.txt',
     },
     ticket: {
       title: '舉發案件資料',
       emoji: '📋',
-      description: '上傳舉發 Excel 檔案（需含「舉發單號」、「違規時間(出)」、「違規地點一」欄位）',
+      description: '上傳舉發 Excel 檔案（支援多檔選擇，需含「舉發單號」、「違規時間(出)」欄位）',
       color: 'nook-sky',
       endpoint: `${API_BASE}/import/ticket`,
+      batchEndpoint: `${API_BASE}/import/ticket/upload-batch`,
+      accept: '.xlsx,.xls',
     },
   };
 
   const cfg = config[type];
+
+  const isValidFile = (f: File) => {
+    const ext = f.name.toLowerCase();
+    if (type === 'crash') return ext.endsWith('.xlsx') || ext.endsWith('.xls') || ext.endsWith('.txt');
+    return ext.endsWith('.xlsx') || ext.endsWith('.xls');
+  };
 
   // 處理拖放
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -102,29 +112,41 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile && (droppedFile.name.endsWith('.xlsx') || droppedFile.name.endsWith('.xls') || droppedFile.name.endsWith('.txt'))) {
-      setFile(droppedFile);
+    const droppedFiles = Array.from(e.dataTransfer.files).filter(isValidFile);
+    if (droppedFiles.length > 0) {
+      setFiles(prev => [...prev, ...droppedFiles]);
       setResult(null);
       setError(null);
     } else {
-      setError('請上傳 Excel (.xlsx, .xls) 或 TXT (.txt) 檔案');
+      setError(type === 'crash'
+        ? '請上傳 Excel (.xlsx, .xls) 或 TXT (.txt) 檔案'
+        : '請上傳 Excel (.xlsx, .xls) 檔案');
     }
-  }, []);
+  }, [type]);
 
   // 處理檔案選擇
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-      setResult(null);
-      setError(null);
+    const selectedFiles = e.target.files;
+    if (selectedFiles && selectedFiles.length > 0) {
+      const validFiles = Array.from(selectedFiles).filter(isValidFile);
+      if (validFiles.length > 0) {
+        setFiles(prev => [...prev, ...validFiles]);
+        setResult(null);
+        setError(null);
+      }
     }
+    // 重置 input 以允許再次選擇相同檔案
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // 移除單個檔案
+  const handleRemoveFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   // 處理上傳
   const handleUpload = async () => {
-    if (!file) return;
+    if (files.length === 0) return;
 
     setIsUploading(true);
     setError(null);
@@ -132,20 +154,37 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
 
     try {
       const formData = new FormData();
-      formData.append('file', file);
 
-      const response = await fetch(cfg.endpoint, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || '上傳失敗');
+      if (files.length === 1) {
+        // 單檔：使用原有的單檔 endpoint
+        formData.append('file', files[0]);
+        const response = await fetch(cfg.endpoint, {
+          method: 'POST',
+          body: formData,
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || '上傳失敗');
+        }
+        const data: ImportResult = await response.json();
+        setResult(data);
+      } else {
+        // 多檔：使用批次上傳 endpoint
+        for (const f of files) {
+          formData.append('files', f);
+        }
+        const response = await fetch(cfg.batchEndpoint, {
+          method: 'POST',
+          body: formData,
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || '批次上傳失敗');
+        }
+        const data: ImportResult = await response.json();
+        setResult(data);
       }
 
-      const data: ImportResult = await response.json();
-      setResult(data);
       onUploadComplete();
     } catch (err) {
       setError(err instanceof Error ? err.message : '上傳過程發生錯誤');
@@ -156,13 +195,15 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
 
   // 重置
   const handleReset = () => {
-    setFile(null);
+    setFiles([]);
     setResult(null);
     setError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
+
+  const totalSize = files.reduce((sum, f) => sum + f.size, 0);
 
   return (
     <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 nook-shadow">
@@ -185,7 +226,7 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
             ? `border-${cfg.color} bg-${cfg.color}/10`
             : `border-nook-text/20 hover:border-${cfg.color}/50 hover:bg-${cfg.color}/5`
           }
-          ${file ? 'border-nook-leaf bg-nook-leaf/5' : ''}
+          ${files.length > 0 ? 'border-nook-leaf bg-nook-leaf/5' : ''}
         `}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -195,29 +236,48 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".xlsx,.xls,.txt"
+          accept={cfg.accept}
+          multiple
           onChange={handleFileSelect}
           className="hidden"
         />
 
-        {file ? (
-          <div className="flex items-center justify-center gap-3">
-            <FileSpreadsheet className="w-8 h-8 text-nook-leaf" />
-            <div className="text-left">
-              <p className="font-medium text-nook-text">{file.name}</p>
-              <p className="text-sm text-nook-text/60">
-                {(file.size / 1024).toFixed(1)} KB
-              </p>
+        {files.length > 0 ? (
+          <div className="space-y-2" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <FileSpreadsheet className="w-6 h-6 text-nook-leaf" />
+              <span className="font-medium text-nook-text">
+                已選擇 {files.length} 個檔案（{(totalSize / 1024).toFixed(1)} KB）
+              </span>
             </div>
+            <div className="max-h-32 overflow-y-auto space-y-1">
+              {files.map((f, i) => (
+                <div key={i} className="flex items-center justify-between text-sm bg-white/60 rounded-xl px-3 py-1.5">
+                  <span className="text-nook-text truncate mr-2">{f.name}</span>
+                  <button
+                    onClick={() => handleRemoveFile(i)}
+                    className="text-nook-text/40 hover:text-nook-red flex-shrink-0"
+                  >
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="mt-2 text-sm text-nook-leaf hover:text-nook-leaf/80 font-medium"
+            >
+              + 繼續新增檔案
+            </button>
           </div>
         ) : (
           <>
             <Upload className={`w-12 h-12 mx-auto mb-4 text-${cfg.color}/60`} />
             <p className="text-nook-text font-medium mb-1">
-              拖放 Excel 檔案到此處
+              拖放檔案到此處（支援多檔）
             </p>
             <p className="text-sm text-nook-text/60">
-              或點擊選擇檔案（.xlsx, .xls, .txt）
+              或點擊選擇檔案（{cfg.accept}）
             </p>
           </>
         )}
@@ -245,12 +305,18 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
             )}
             <div className="flex-1">
               <p className={`font-medium ${result.success ? 'text-nook-leaf' : 'text-nook-red'}`}>
-                {result.success ? '✅ 匯入成功' : '❌ 匯入失敗'}
+                {result.success ? (result.message || '匯入成功') : '匯入失敗'}
               </p>
               <div className="mt-2 text-sm text-nook-text/80 space-y-1">
-                <p>📊 新增：<strong>{result.stats.new}</strong> 筆</p>
-                <p>⏭️ 略過（重複）：<strong>{result.stats.skipped}</strong> 筆</p>
-                <p>⚠️ 錯誤：<strong>{result.stats.errors}</strong> 筆</p>
+                {(result.stats as any).files !== undefined && (
+                  <p>檔案數：<strong>{(result.stats as any).files}</strong> 個</p>
+                )}
+                <p>新增：<strong>{result.stats.new}</strong> 筆</p>
+                <p>略過（重複）：<strong>{result.stats.skipped}</strong> 筆</p>
+                <p>錯誤：<strong>{result.stats.errors}</strong> 筆</p>
+                {(result as any).coordinates && (
+                  <p>GPS 定位：<strong>{(result as any).coordinates.with_gps}</strong> 筆 / 備援座標：<strong>{(result as any).coordinates.fallback}</strong> 筆</p>
+                )}
               </div>
 
               {/* 主題分類統計（僅舉發） */}
@@ -258,9 +324,9 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
                 <div className="mt-3 pt-3 border-t border-nook-text/10">
                   <p className="text-sm font-medium text-nook-text mb-2">本次匯入主題分類：</p>
                   <div className="flex gap-4 text-sm">
-                    <span>🍺 酒駕 {result.topics_imported.dui}</span>
-                    <span>🚦 闘紅燈 {result.topics_imported.red_light}</span>
-                    <span>⚡ 危駕 {result.topics_imported.dangerous}</span>
+                    <span>酒駕 {result.topics_imported.dui}</span>
+                    <span>闘紅燈 {result.topics_imported.red_light}</span>
+                    <span>危駕 {result.topics_imported.dangerous}</span>
                   </div>
                 </div>
               )}
@@ -268,7 +334,7 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
               {/* 錯誤詳情 */}
               {result.errors.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-nook-text/10">
-                  <p className="text-sm font-medium text-nook-text mb-2">錯誤詳情（前 10 筆）：</p>
+                  <p className="text-sm font-medium text-nook-text mb-2">錯誤詳情：</p>
                   <ul className="text-xs text-nook-text/60 space-y-1">
                     {result.errors.map((err, idx) => (
                       <li key={idx}>• {err}</li>
@@ -285,10 +351,10 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
       <div className="mt-4 flex gap-3">
         <button
           onClick={handleUpload}
-          disabled={!file || isUploading}
+          disabled={files.length === 0 || isUploading}
           className={`
             flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl font-medium transition-all duration-200
-            ${file && !isUploading
+            ${files.length > 0 && !isUploading
               ? `bg-${cfg.color} text-white hover:opacity-90 shadow-lg shadow-${cfg.color}/30`
               : 'bg-nook-text/10 text-nook-text/40 cursor-not-allowed'
             }
@@ -302,12 +368,12 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
           ) : (
             <>
               <Upload className="w-5 h-5" />
-              開始匯入
+              {files.length > 1 ? `批次匯入 ${files.length} 個檔案` : '開始匯入'}
             </>
           )}
         </button>
 
-        {(file || result) && (
+        {(files.length > 0 || result) && (
           <button
             onClick={handleReset}
             className="px-4 py-3 rounded-2xl font-medium text-nook-text/60 hover:bg-nook-text/10 transition-colors"

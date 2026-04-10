@@ -1426,6 +1426,415 @@ def _get_ticket_db_stats(db):
     }
 
 
+@router.post("/crash/upload-batch")
+async def import_crash_upload_batch(
+    files: list[UploadFile] = File(..., description="多個事故檔案（.xlsx/.xls/.txt）"),
+    db: Session = Depends(get_db),
+):
+    """
+    透過瀏覽器上傳多個事故檔案進行批次匯入。
+    支援同時上傳多個 .xlsx / .xls / .txt 檔案。
+    """
+    import traceback
+
+    ALLOWED_EXTENSIONS = (".xlsx", ".xls", ".txt")
+
+    total_stats = {"files": 0, "total": 0, "new": 0, "skipped": 0, "errors": 0, "files_skipped": 0}
+    coords_total = {"with_gps": 0, "fallback": 0}
+    all_errors = []
+    seen_case_ids: set = set()
+
+    for file in files:
+        if not file.filename or not file.filename.endswith(ALLOWED_EXTENSIONS):
+            all_errors.append(f"[{file.filename}] 不支援的檔案格式")
+            continue
+
+        is_txt = file.filename.endswith(".txt")
+
+        try:
+            suffix = ".txt" if is_txt else ".xlsx"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                content = await file.read()
+                tmp.write(content)
+                tmp_path = tmp.name
+        except Exception as e:
+            all_errors.append(f"[{file.filename}] 檔案儲存失敗: {str(e)}")
+            continue
+
+        try:
+            if is_txt:
+                df = _read_eis_txt(tmp_path)
+            else:
+                df_raw = pd.read_excel(tmp_path, header=None)
+                header_row = 0
+                for i in range(min(10, len(df_raw))):
+                    row_values = [str(v).strip() for v in df_raw.iloc[i] if pd.notna(v)]
+                    row_text = " ".join(row_values)
+                    if any(kw in row_text for kw in ["案件編號", "發生時間", "事故編號", "總編號", "GPS緯度"]):
+                        header_row = i
+                        break
+                df = pd.read_excel(tmp_path, header=header_row)
+
+            df.columns = [str(c).strip().replace("\n", "") for c in df.columns]
+            data_format = detect_crash_format(list(df.columns))
+            batch_id = f"UPLOAD_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}"
+
+            stats = {"total": len(df), "new": 0, "skipped": 0, "errors": 0}
+            coords_stats = {"with_gps": 0, "fallback": 0}
+
+            for idx, row in df.iterrows():
+                try:
+                    # 案件編號
+                    case_id = None
+                    id_candidates = (
+                        ["總編號(案件編號)", "總編號（案件編號）", "案件編號", "總編號", "案號", "CaseID"]
+                        if data_format == "EIS"
+                        else ["案件編號", "案號", "事故編號", "編號", "案件序號", "序號", "CaseID", "case_id"]
+                    )
+                    for col_name in id_candidates:
+                        if col_name in row.index and pd.notna(row.get(col_name)):
+                            val = str(row.get(col_name)).strip()
+                            if val and any(c.isdigit() for c in val):
+                                case_id = val
+                                break
+
+                    if not case_id:
+                        non_empty_count = sum(1 for v in row if pd.notna(v) and str(v).strip())
+                        if non_empty_count < 3:
+                            continue
+                        stats["errors"] += 1
+                        continue
+
+                    if case_id in seen_case_ids:
+                        stats["skipped"] += 1
+                        continue
+                    existing = db.query(Crash).filter(Crash.case_id == case_id).first()
+                    if existing:
+                        seen_case_ids.add(case_id)
+                        stats["skipped"] += 1
+                        continue
+
+                    if data_format == "EIS":
+                        time_col = "1.發生時間" if "1.發生時間" in row.index else "發生時間"
+                        occurred_dt = parse_eis_datetime(row.get("發生日期"), row.get(time_col))
+                        if not occurred_dt:
+                            occurred_dt = parse_roc_datetime(row.get("發生日期"))
+                        if not occurred_dt:
+                            stats["errors"] += 1
+                            continue
+
+                        eis_lat = pd.to_numeric(row.get("GPS緯度"), errors="coerce")
+                        eis_lon = pd.to_numeric(row.get("GPS經度"), errors="coerce")
+                        if validate_taiwan_coords(eis_lat, eis_lon):
+                            latitude, longitude = float(eis_lat), float(eis_lon)
+                            coords_stats["with_gps"] += 1
+                        else:
+                            district_temp = extract_eis_district(row)
+                            latitude, longitude = get_district_coordinates(district_temp)
+                            coords_stats["fallback"] += 1
+
+                        district = extract_eis_district(row)
+                        location_desc = build_eis_location(row)[:200]
+                        severity = derive_eis_severity(row)
+                        death_count = get_eis_int(row, "3-1.24小時內死亡人數", "死亡")
+                        injury_count = get_eis_int(row, "3-2.受傷人數", "受傷")
+                        precinct = clean_precinct_name(row.get("處理單位名稱分局層"))
+                        sub_unit_val = (
+                            _safe_eis_str(row, "處理單位名稱派出所")
+                            or _safe_eis_str(row, "所轄單位名稱")
+                        )
+                        sub_unit = clean_precinct_name(sub_unit_val)[:100] if sub_unit_val else None
+                        cause = (
+                            _safe_eis_str(row, "34.初步分析研判子類別-主要")
+                            or _safe_eis_str(row, "34.初步分析研判-個別")
+                            or _safe_eis_str(row, "34.初步分析研判-個別代碼")
+                            or _safe_eis_str(row, "肇事主要原因")
+                            or None
+                        )
+                        weather = _safe_eis_str(row, "天候") or None
+                        light = _safe_eis_str(row, "光線") or None
+
+                        suspected_alcohol = False
+                        alcohol_val = _safe_eis_str(row, "酒測值") or _safe_eis_str(row, "飲酒情形")
+                        if alcohol_val:
+                            if "飲酒" in alcohol_val or "酒後" in alcohol_val:
+                                suspected_alcohol = True
+                            else:
+                                try:
+                                    if float(alcohol_val) > 0:
+                                        suspected_alcohol = True
+                                except (ValueError, TypeError):
+                                    pass
+                    else:
+                        occurred_dt = None
+                        for time_col in ["發生時間", "事故時間", "發生日期時間", "日期時間", "時間", "發生日期"]:
+                            if time_col in row.index and pd.notna(row.get(time_col)):
+                                occurred_dt = parse_roc_datetime(row.get(time_col))
+                                if occurred_dt:
+                                    break
+                        if not occurred_dt:
+                            stats["errors"] += 1
+                            continue
+
+                        location_val = None
+                        for loc_col in ["發生地點", "事故地點", "地點", "地址", "發生地址", "事故位置"]:
+                            if loc_col in row.index and pd.notna(row.get(loc_col)):
+                                location_val = row.get(loc_col)
+                                break
+                        district, location_desc = deidentify_address(location_val)
+
+                        severity = "A3"
+                        for sev_col in ["交通事故類別", "事故類別", "類別", "嚴重程度", "事故等級"]:
+                            if sev_col in row.index and pd.notna(row.get(sev_col)):
+                                severity = str(row.get(sev_col)).strip().upper()
+                                break
+                        if severity not in ["A1", "A2", "A3"]:
+                            severity = "A3"
+
+                        legacy_lat = pd.to_numeric(row.get("緯度"), errors="coerce")
+                        legacy_lon = pd.to_numeric(row.get("經度"), errors="coerce")
+                        if validate_taiwan_coords(legacy_lat, legacy_lon):
+                            latitude, longitude = float(legacy_lat), float(legacy_lon)
+                        else:
+                            latitude, longitude = get_district_coordinates(district)
+
+                        death_count = 0
+                        injury_count = 0
+                        precinct = None
+                        sub_unit = None
+                        cause = str(row.get("肇事主要原因") or row.get("肇事原因") or "").strip() or None
+                        weather = str(row.get("天候") or "").strip() or None
+                        light = str(row.get("光線") or "").strip() or None
+
+                        suspected_alcohol = False
+                        alcohol_val = row.get("酒測值") or row.get("飲酒情形")
+                        if alcohol_val:
+                            val_str = str(alcohol_val)
+                            if "飲酒" in val_str or "酒後" in val_str:
+                                suspected_alcohol = True
+                            else:
+                                try:
+                                    if float(val_str) > 0:
+                                        suspected_alcohol = True
+                                except (ValueError, TypeError):
+                                    pass
+
+                    # 共用欄位
+                    age_val = (
+                        _safe_eis_str(row, "當事者事故發生時年齡")
+                        or _safe_eis_str(row, "25.當事者事故發生時年齡")
+                        or _safe_eis_str(row, "當事人年齡")
+                        or _safe_eis_str(row, "年齡")
+                    ) or None
+                    birth_date_val = (
+                        _safe_eis_str(row, "當事者出生日期")
+                        or _safe_eis_str(row, "出生年月日")
+                        or _safe_eis_str(row, "出生日期")
+                    ) or None
+
+                    is_elderly = False
+                    is_youth = False
+                    driver_age_group = "未知"
+                    if age_val:
+                        driver_age_group, is_elderly, is_youth = classify_age(age_val)
+                    elif birth_date_val:
+                        birth_dt = parse_eis_datetime(birth_date_val, 0) or parse_roc_datetime(birth_date_val)
+                        if birth_dt and occurred_dt:
+                            age = occurred_dt.year - birth_dt.year - (
+                                (occurred_dt.month, occurred_dt.day) < (birth_dt.month, birth_dt.day)
+                            )
+                            driver_age_group, is_elderly, is_youth = classify_age(age)
+
+                    party_type_raw = (
+                        _safe_eis_str(row, "當事人車種")
+                        or _safe_eis_str(row, "車種")
+                        or _safe_eis_str(row, "26.當事者區分(類別)")
+                        or _safe_eis_str(row, "26.當事者區分(大類別)")
+                    )
+                    party_type = party_type_raw or None
+                    evehicle_type, _ = classify_evehicle(party_type)
+
+                    is_underage_14_riding = False
+                    if evehicle_type == "微型電動二輪車" and driver_age_group == "<18":
+                        try:
+                            raw_age = age_val or _safe_eis_str(row, "當事人年齡") or _safe_eis_str(row, "年齡")
+                            if raw_age and int(float(raw_age)) < 14:
+                                is_underage_14_riding = True
+                        except (ValueError, TypeError):
+                            pass
+
+                    driver_gender = (
+                        _safe_eis_str(row, "17.當事者屬(性)別")
+                        or _safe_eis_str(row, "當事者屬(性)別")
+                        or _safe_eis_str(row, "當事者性別")
+                        or _safe_eis_str(row, "當事人性別")
+                        or _safe_eis_str(row, "性別")
+                    ) or None
+
+                    crash = Crash(
+                        case_id=case_id,
+                        import_batch_id=batch_id,
+                        occurred_date=occurred_dt.date(),
+                        occurred_time=occurred_dt,
+                        shift_id=calculate_shift(occurred_dt),
+                        district=district,
+                        location_desc=location_desc,
+                        latitude=latitude,
+                        longitude=longitude,
+                        severity=severity,
+                        severity_weight=get_severity_weight(severity),
+                        year=occurred_dt.year,
+                        month=occurred_dt.month,
+                        day_of_week=occurred_dt.weekday(),
+                        driver_age_group=driver_age_group,
+                        is_elderly=is_elderly,
+                        driver_gender=driver_gender,
+                        weather=weather,
+                        light=light,
+                        party_type=party_type,
+                        cause=cause,
+                        suspected_alcohol=suspected_alcohol,
+                        precinct=precinct,
+                        sub_unit=sub_unit,
+                        death_count=death_count,
+                        injury_count=injury_count,
+                        evehicle_type=evehicle_type,
+                        is_youth=is_youth,
+                        is_underage_14=is_underage_14_riding,
+                    )
+
+                    db.add(crash)
+                    seen_case_ids.add(case_id)
+                    stats["new"] += 1
+
+                    if stats["new"] % 100 == 0:
+                        db.commit()
+
+                except Exception as e:
+                    db.rollback()
+                    stats["errors"] += 1
+                    if len(all_errors) < 20:
+                        all_errors.append(f"[{file.filename}] 第 {idx + 2} 列: {str(e)}")
+
+            db.commit()
+            total_stats["files"] += 1
+            total_stats["total"] += stats["total"]
+            total_stats["new"] += stats["new"]
+            total_stats["skipped"] += stats["skipped"]
+            total_stats["errors"] += stats["errors"]
+            coords_total["with_gps"] += coords_stats["with_gps"]
+            coords_total["fallback"] += coords_stats["fallback"]
+
+        except Exception as e:
+            all_errors.append(f"[{file.filename}] 檔案處理失敗: {str(e)}")
+
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    total_crashes = db.query(Crash).count()
+    severity_stats = {
+        "A1": db.query(Crash).filter(Crash.severity == "A1").count(),
+        "A2": db.query(Crash).filter(Crash.severity == "A2").count(),
+        "A3": db.query(Crash).filter(Crash.severity == "A3").count(),
+    }
+
+    msg_parts = []
+    if total_stats["files"] > 0:
+        msg_parts.append(f"匯入 {total_stats['files']} 個檔案，新增 {total_stats['new']} 筆")
+    if total_stats["skipped"] > 0:
+        msg_parts.append(f"略過 {total_stats['skipped']} 筆重複")
+    if total_stats["errors"] > 0:
+        msg_parts.append(f"錯誤 {total_stats['errors']} 筆")
+    if not msg_parts:
+        msg_parts.append("無新資料")
+
+    return {
+        "success": True,
+        "message": "批次上傳匯入完成：" + "，".join(msg_parts),
+        "stats": total_stats,
+        "coordinates": coords_total,
+        "errors": all_errors[:20] if all_errors else [],
+        "database": {
+            "total_crashes": total_crashes,
+            "severity": severity_stats,
+        },
+    }
+
+
+@router.post("/ticket/upload-batch")
+async def import_ticket_upload_batch(
+    files: list[UploadFile] = File(..., description="多個舉發 Excel 檔案"),
+    db: Session = Depends(get_db),
+):
+    """
+    透過瀏覽器上傳多個舉發檔案進行批次匯入。
+    支援同時上傳多個 .xlsx / .xls 檔案。
+    """
+    total_stats = {"files": 0, "total": 0, "new": 0, "skipped": 0, "errors": 0}
+    total_topics = {"dui": 0, "red_light": 0, "dangerous": 0}
+    all_errors = []
+
+    for file in files:
+        if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
+            all_errors.append(f"[{file.filename}] 不支援的檔案格式（僅支援 .xlsx/.xls）")
+            continue
+
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
+                content = await file.read()
+                tmp.write(content)
+                tmp_path = tmp.name
+        except Exception as e:
+            all_errors.append(f"[{file.filename}] 檔案儲存失敗: {str(e)}")
+            continue
+
+        try:
+            df = pd.read_excel(tmp_path)
+            batch_id = f"UPLOAD_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}"
+            file_errors = []
+            stats, topic_counts, file_errors = _import_ticket_df(df, batch_id, db, file_errors)
+
+            total_stats["files"] += 1
+            total_stats["total"] += stats["total"]
+            total_stats["new"] += stats["new"]
+            total_stats["skipped"] += stats["skipped"]
+            total_stats["errors"] += stats["errors"]
+            for k in total_topics:
+                total_topics[k] += topic_counts[k]
+            for e in file_errors:
+                if len(all_errors) < 20:
+                    all_errors.append(f"[{file.filename}] {e}")
+
+        except Exception as e:
+            all_errors.append(f"[{file.filename}] 檔案處理失敗: {str(e)}")
+
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    db_stats = _get_ticket_db_stats(db)
+
+    msg_parts = []
+    if total_stats["files"] > 0:
+        msg_parts.append(f"匯入 {total_stats['files']} 個檔案，新增 {total_stats['new']} 筆")
+    if total_stats["skipped"] > 0:
+        msg_parts.append(f"略過 {total_stats['skipped']} 筆重複")
+    if total_stats["errors"] > 0:
+        msg_parts.append(f"錯誤 {total_stats['errors']} 筆")
+    if not msg_parts:
+        msg_parts.append("無新資料")
+
+    return {
+        "success": True,
+        "message": "批次上傳匯入完成：" + "，".join(msg_parts),
+        "stats": total_stats,
+        "topics_imported": total_topics,
+        "errors": all_errors[:20] if all_errors else [],
+        "database": db_stats,
+    }
+
+
 @router.post("/ticket")
 async def import_ticket_file(
     file: UploadFile = File(..., description="舉發案件 Excel 檔案"),

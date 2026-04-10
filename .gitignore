@@ -14,6 +14,7 @@ dist/
 build/
 *.egg-info/
 backend/static/
+deploy/
 
 ## Database (含真實執法資料，禁止上傳)
 *.db

@@ -450,25 +450,92 @@ const PerformanceComparisonPage: React.FC = () => {
         fetchTrend();
     }, [dateRange]);
 
-    // 導出 CSV
+    // 導出 CSV（完整內容）
     const handleExportCSV = () => {
         if (!data) return;
 
-        const csvContent = [
-            ['綜合執法成效報表', `${dateRange.startDate} ~ ${dateRange.endDate}`],
-            [],
-            ['項目', '本期', '去年同期', '增減', '變化率'],
-            ['違規案件', data.current.tickets, data.last_year.tickets,
-                data.current.tickets - data.last_year.tickets, `${data.comparison.tickets_change}%`],
-            ['交通事故', data.current.crashes, data.last_year.crashes,
-                data.current.crashes - data.last_year.crashes, `${data.comparison.crashes_change}%`],
-            [],
-            ['主題分類', '本期', '去年同期'],
-            ['酒駕', data.current.topics.dui, data.last_year.topics.dui],
-            ['闖紅燈', data.current.topics.red_light, data.last_year.topics.red_light],
-            ['危險駕駛', data.current.topics.dangerous_driving, data.last_year.topics.dangerous_driving],
-        ].map(row => row.join(',')).join('\n');
+        const esc = (v: any) => {
+            const s = String(v ?? '');
+            return s.includes(',') || s.includes('"') || s.includes('\n')
+                ? `"${s.replace(/"/g, '""')}"` : s;
+        };
 
+        const rows: any[][] = [];
+
+        // === 標題 ===
+        rows.push(['綜合執法成效報表', `${dateRange.startDate} ~ ${dateRange.endDate}`]);
+        rows.push([]);
+
+        // === 總覽比較 ===
+        rows.push(['【總覽比較】']);
+        rows.push(['項目', '本期', '去年同期', '增減', '變化率']);
+        rows.push(['違規案件', data.current.tickets, data.last_year.tickets,
+            data.current.tickets - data.last_year.tickets, `${data.comparison.tickets_change}%`]);
+        rows.push(['交通事故', data.current.crashes, data.last_year.crashes,
+            data.current.crashes - data.last_year.crashes, `${data.comparison.crashes_change}%`]);
+        rows.push([]);
+
+        // === 事故嚴重度 ===
+        if (data.current.severity) {
+            rows.push(['【事故嚴重度】']);
+            rows.push(['等級', '本期', '去年同期', '增減']);
+            const sev = data.current.severity;
+            const lastSev = data.last_year.severity;
+            rows.push(['A1(死亡)', sev.a1, lastSev?.a1 || 0, sev.a1 - (lastSev?.a1 || 0)]);
+            rows.push(['A2(受傷)', sev.a2, lastSev?.a2 || 0, sev.a2 - (lastSev?.a2 || 0)]);
+            rows.push(['A3(財損)', sev.a3, lastSev?.a3 || 0, sev.a3 - (lastSev?.a3 || 0)]);
+            rows.push([]);
+        }
+
+        // === 主題分類 ===
+        rows.push(['【主題分類】']);
+        rows.push(['主題', '本期', '去年同期', '增減']);
+        rows.push(['酒駕', data.current.topics.dui, data.last_year.topics.dui,
+            data.current.topics.dui - data.last_year.topics.dui]);
+        rows.push(['闖紅燈', data.current.topics.red_light, data.last_year.topics.red_light,
+            data.current.topics.red_light - data.last_year.topics.red_light]);
+        rows.push(['危險駕駛', data.current.topics.dangerous_driving, data.last_year.topics.dangerous_driving,
+            data.current.topics.dangerous_driving - data.last_year.topics.dangerous_driving]);
+        rows.push([]);
+
+        // === A1 死亡事故清單 ===
+        if (a1List.length > 0) {
+            rows.push(['【A1 死亡事故清單】', `共 ${a1List.length} 件`]);
+            rows.push(['日期', '時間', '區域', '事故地點', '肇事原因', '當事人類型', '死亡', '受傷', '高齡者']);
+            for (const item of a1List) {
+                rows.push([
+                    item.date,
+                    item.time || '',
+                    item.district,
+                    item.location,
+                    item.cause,
+                    item.party_type,
+                    item.death_count,
+                    item.injury_count,
+                    item.is_elderly ? '是' : '否',
+                ]);
+            }
+            rows.push([]);
+            rows.push(['A1 統計',
+                `總死亡: ${a1List.reduce((s, i) => s + i.death_count, 0)} 人`,
+                `總受傷: ${a1List.reduce((s, i) => s + i.injury_count, 0)} 人`,
+                `高齡者: ${a1List.filter(i => i.is_elderly).length} 件`,
+                `涉及區域: ${new Set(a1List.map(i => i.district)).size} 區`,
+            ]);
+            rows.push([]);
+        }
+
+        // === 月趨勢 ===
+        if (trendData.length > 0) {
+            rows.push(['【月趨勢】']);
+            rows.push(['月份', '違規案件', '交通事故', '酒駕', '闖紅燈', '危險駕駛']);
+            for (const t of trendData) {
+                rows.push([t.month, t.tickets, t.crashes, t.dui, t.red_light, t.dangerous]);
+            }
+            rows.push([]);
+        }
+
+        const csvContent = rows.map(row => row.map(esc).join(',')).join('\n');
         const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
