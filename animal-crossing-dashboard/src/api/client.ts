@@ -98,10 +98,7 @@ export interface MonthlyStats {
       a2: number;
       a3: number;
     };
-    enforcement?: {
-      stop: number;
-      auto: number;
-    };
+    enforcement?: Record<string, number>;
   };
   last_year: {
     year: number;
@@ -117,10 +114,7 @@ export interface MonthlyStats {
       a2: number;
       a3: number;
     };
-    enforcement?: {
-      stop: number;
-      auto: number;
-    };
+    enforcement?: Record<string, number>;
   };
   comparison: {
     tickets_change: number;

@@ -1075,7 +1075,7 @@ async def get_map_points(
             Ticket.shift_id,
             Ticket.is_elderly,
             Ticket.vehicle_type,
-            Ticket.enforcement_type
+            Ticket.enforcement_subtype
         ).filter(
             Ticket.violation_date >= start_date,
             Ticket.violation_date <= end_date
@@ -1116,7 +1116,7 @@ async def get_map_points(
                     'shift': t.shift_id,
                     'is_elderly': t.is_elderly,
                     'vehicle_type': t.vehicle_type,
-                    'enforcement_type': t.enforcement_type
+                    'enforcement_type': t.enforcement_subtype
                 })
         result['summary']['tickets_with_coords'] = len(result['ticket_points'])
     

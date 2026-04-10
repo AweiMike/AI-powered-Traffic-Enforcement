@@ -390,7 +390,7 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                 <table style="width: 100%; font-size: 12px;">
                                     <tr><td style="color: #666;">位置</td><td style="text-align: right;">${point.district} ${point.location || ''}</td></tr>
                                     <tr><td style="color: #666;">違規時間</td><td style="text-align: right;">${point.date?.split('T')[0] || '-'} ${point.time || ''}</td></tr>
-                                    ${point.enforcement_type ? `<tr><td style="color: #666;">舉發類型</td><td style="text-align: right;">${point.enforcement_type}</td></tr>` : ''}
+                                    ${point.enforcement_type ? `<tr><td style="color: #666;">舉發子類型</td><td style="text-align: right;">${point.enforcement_type}</td></tr>` : ''}
                                     ${point.vehicle_type ? `<tr><td style="color: #666;">車種</td><td style="text-align: right;">${point.vehicle_type}</td></tr>` : ''}
                                 </table>
                             </div>

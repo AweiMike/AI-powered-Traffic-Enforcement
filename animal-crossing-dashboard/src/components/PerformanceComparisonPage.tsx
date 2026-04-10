@@ -646,22 +646,23 @@ const PerformanceComparisonPage: React.FC = () => {
                         trend={data.comparison.tickets_trend}
                         color="bg-nook-sky/20"
                     />
-                    {/* 舉發類型細分 */}
+                    {/* 舉發子類型細分 */}
                     {data.current.enforcement && (
-                        <div className="mt-3 bg-white/60 backdrop-blur-sm rounded-2xl p-4 nook-shadow space-y-3">
-                            <p className="text-xs font-bold text-nook-text/70 mb-2">📊 舉發類型細分</p>
-                            {[
-                                { label: '攔停舉發', current: data.current.enforcement.stop, lastYear: data.last_year.enforcement?.stop ?? 0 },
-                                { label: '逕行舉發', current: data.current.enforcement.auto, lastYear: data.last_year.enforcement?.auto ?? 0 },
-                            ].map(item => {
-                                const diff = item.current - item.lastYear;
-                                const pct = item.lastYear > 0 ? Math.round(((item.current - item.lastYear) / item.lastYear) * 1000) / 10 : 0;
+                        <div className="mt-3 bg-white/60 backdrop-blur-sm rounded-2xl p-4 nook-shadow space-y-2">
+                            <p className="text-xs font-bold text-nook-text/70 mb-2">📊 舉發子類型細分</p>
+                            {Object.keys(data.current.enforcement)
+                                .filter(key => (data.current.enforcement![key] || 0) + (data.last_year.enforcement?.[key] || 0) > 0)
+                                .map(key => {
+                                const current = data.current.enforcement![key] || 0;
+                                const lastYear = data.last_year.enforcement?.[key] || 0;
+                                const diff = current - lastYear;
+                                const pct = lastYear > 0 ? Math.round(((current - lastYear) / lastYear) * 1000) / 10 : 0;
                                 return (
-                                    <div key={item.label} className="flex items-center justify-between text-sm">
+                                    <div key={key} className="flex items-center justify-between text-sm">
                                         <div className="flex items-center gap-2">
-                                            <span className="font-medium text-nook-text">{item.label}</span>
-                                            <span className="text-nook-text/80 font-bold">{item.current.toLocaleString()}</span>
-                                            <span className="text-nook-text/50 text-xs">（去年 {item.lastYear.toLocaleString()}）</span>
+                                            <span className="font-medium text-nook-text text-xs">{key}</span>
+                                            <span className="text-nook-text/80 font-bold">{current.toLocaleString()}</span>
+                                            <span className="text-nook-text/50 text-xs">（去年 {lastYear.toLocaleString()}）</span>
                                         </div>
                                         <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg ${
                                             diff > 0 ? 'bg-red-100 text-red-600' : diff < 0 ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'

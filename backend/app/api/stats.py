@@ -204,9 +204,9 @@ async def get_monthly_stats(
             and_(Ticket.violation_date >= s, Ticket.violation_date <= e, col == True)
         ).scalar() or 0
 
-    def count_tickets_enforcement(s, e, etype):
+    def count_tickets_enforcement(s, e, subtype):
         return db.query(func.count(Ticket.id)).filter(
-            and_(Ticket.violation_date >= s, Ticket.violation_date <= e, Ticket.enforcement_type == etype)
+            and_(Ticket.violation_date >= s, Ticket.violation_date <= e, Ticket.enforcement_subtype == subtype)
         ).scalar() or 0
 
     def count_crashes_severity(s, e, sev):
@@ -246,15 +246,13 @@ async def get_monthly_stats(
         "dangerous_driving": count_tickets_topic(prev_sd, prev_ed, Ticket.topic_dangerous),
     }
 
-    # 舉發類型統計
-    current_enforcement = {
-        "stop": count_tickets_enforcement(sd, ed, "攔停舉發"),
-        "auto": count_tickets_enforcement(sd, ed, "逕行舉發"),
-    }
-    last_year_enforcement = {
-        "stop": count_tickets_enforcement(prev_sd, prev_ed, "攔停舉發"),
-        "auto": count_tickets_enforcement(prev_sd, prev_ed, "逕行舉發"),
-    }
+    # 舉發子類型統計
+    enforcement_subtypes = [
+        "攔舉-一般", "攔舉-肇事", "攔舉-慢行攤",
+        "逕舉_一般", "逕舉_民眾檢舉", "逕舉_標示單", "逕舉_拖吊", "逕舉_微電車",
+    ]
+    current_enforcement = {st: count_tickets_enforcement(sd, ed, st) for st in enforcement_subtypes}
+    last_year_enforcement = {st: count_tickets_enforcement(prev_sd, prev_ed, st) for st in enforcement_subtypes}
 
     # 事故嚴重度統計
     current_severity = {

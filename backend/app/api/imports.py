@@ -1284,7 +1284,7 @@ def _import_ticket_df(df: pd.DataFrame, batch_id: str, db, error_messages: list 
                 .first()
             )
             if existing:
-                # 回補缺少的舉發類型欄位
+                # 回補缺少的舉發類型/子類型欄位
                 updated = False
                 if not existing.enforcement_type:
                     raw_et = row.get("舉發類型")
@@ -1845,7 +1845,7 @@ async def import_ticket_upload_batch(
     if total_stats["files"] > 0:
         msg_parts.append(f"匯入 {total_stats['files']} 個檔案，新增 {total_stats['new']} 筆")
     if total_stats.get("updated", 0) > 0:
-        msg_parts.append(f"回補 {total_stats['updated']} 筆舉發類型")
+        msg_parts.append(f"回補 {total_stats['updated']} 筆舉發子類型")
     if total_stats["skipped"] > 0:
         msg_parts.append(f"略過 {total_stats['skipped']} 筆重複")
     if total_stats["errors"] > 0:
@@ -1992,7 +1992,7 @@ async def import_ticket_batch(db: Session = Depends(get_db)):
         if total_stats["files"] > 0:
             msg_parts.append(f"匯入 {total_stats['files']} 個檔案，新增 {total_stats['new']} 筆")
         if total_stats.get("updated", 0) > 0:
-            msg_parts.append(f"回補 {total_stats['updated']} 筆舉發類型")
+            msg_parts.append(f"回補 {total_stats['updated']} 筆舉發子類型")
         if total_stats["files_skipped"] > 0:
             msg_parts.append(f"跳過 {total_stats['files_skipped']} 個已匯入檔案")
         if total_stats["skipped"] > 0:
