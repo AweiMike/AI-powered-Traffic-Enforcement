@@ -25,11 +25,13 @@ interface MapPoint {
     severity?: string;
     topic?: string;
     date?: string;
+    time?: string;
     shift?: string;
     is_elderly?: boolean;
     is_dui?: boolean;
     vehicle_type?: string;
     violation_name?: string;
+    enforcement_type?: string;
 }
 
 interface MapData {
@@ -286,14 +288,15 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                         }).addTo(map);
 
                         marker.bindPopup(`
-                            <div style="font-size: 13px; min-width: 180px;">
+                            <div style="font-size: 13px; min-width: 200px;">
                                 <div style="font-weight: bold; color: ${color}; margin-bottom: 6px; border-bottom: 1px solid #eee; padding-bottom: 4px;">
                                     🚧 事故點位 (${point.severity})
                                 </div>
                                 <table style="width: 100%; font-size: 12px;">
                                     <tr><td style="color: #666;">位置</td><td style="text-align: right;">${point.district} ${point.location || ''}</td></tr>
-                                    <tr><td style="color: #666;">日期</td><td style="text-align: right;">${point.date?.split('T')[0] || '-'}</td></tr>
+                                    <tr><td style="color: #666;">發生時間</td><td style="text-align: right;">${point.date?.split('T')[0] || '-'} ${point.time || ''}</td></tr>
                                     <tr><td style="color: #666;">班別</td><td style="text-align: right;">${point.shift || '-'}</td></tr>
+                                    ${point.vehicle_type ? `<tr><td style="color: #666;">車種</td><td style="text-align: right;">${point.vehicle_type}</td></tr>` : ''}
                                     ${point.is_elderly ? '<tr><td colspan="2" style="color: #EA580C;">👴 高齡者相關</td></tr>' : ''}
                                     ${point.is_dui ? '<tr><td colspan="2" style="color: #7C3AED;">🍺 疑似酒駕</td></tr>' : ''}
                                 </table>
@@ -352,12 +355,15 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                         });
 
                         marker.bindPopup(`
-                            <div style="font-size: 13px; min-width: 180px;">
+                            <div style="font-size: 13px; min-width: 200px;">
                                 <div style="font-weight: bold; color: ${color}; margin-bottom: 6px;">
                                     📋 ${violationDesc}
                                 </div>
-                                <div style="font-size: 11px; color: #666; margin-bottom: 8px;">
+                                <div style="font-size: 11px; color: #666; margin-bottom: 4px;">
                                     ${point.district} ${point.location || ''}
+                                </div>
+                                <div style="font-size: 11px; color: #666; margin-bottom: 8px;">
+                                    ${point.date?.split('T')[0] || ''} ${point.time || ''} ${point.enforcement_type ? `| ${point.enforcement_type}` : ''}
                                 </div>
                                 <div style="font-size: 11px; background: #f0f9ff; padding: 6px; border-radius: 4px;">
                                     <strong>📍 拖曳此點位以校正位置</strong>
@@ -377,13 +383,14 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                         }).addTo(map);
 
                         marker.bindPopup(`
-                            <div style="font-size: 13px; min-width: 200px;">
+                            <div style="font-size: 13px; min-width: 220px;">
                                 <div style="font-weight: bold; color: ${color}; margin-bottom: 6px; border-bottom: 1px solid #eee; padding-bottom: 4px;">
                                     📋 ${violationDesc}
                                 </div>
                                 <table style="width: 100%; font-size: 12px;">
                                     <tr><td style="color: #666;">位置</td><td style="text-align: right;">${point.district} ${point.location || ''}</td></tr>
-                                    <tr><td style="color: #666;">日期</td><td style="text-align: right;">${point.date?.split('T')[0] || '-'}</td></tr>
+                                    <tr><td style="color: #666;">違規時間</td><td style="text-align: right;">${point.date?.split('T')[0] || '-'} ${point.time || ''}</td></tr>
+                                    ${point.enforcement_type ? `<tr><td style="color: #666;">舉發類型</td><td style="text-align: right;">${point.enforcement_type}</td></tr>` : ''}
                                     ${point.vehicle_type ? `<tr><td style="color: #666;">車種</td><td style="text-align: right;">${point.vehicle_type}</td></tr>` : ''}
                                 </table>
                             </div>

@@ -171,6 +171,10 @@ class Ticket(Base):
     day_of_week = Column(Integer, comment="星期幾 0-6")
     is_holiday = Column(Boolean, default=False)
 
+    # === 舉發方式（統計用） ===
+    enforcement_type = Column(String(20), index=True, comment="舉發類型：攔停舉發/逕行舉發")
+    enforcement_subtype = Column(String(50), comment="舉發子類型：攔舉-一般/逕舉_一般/逕舉_民眾檢舉等")
+
     # === 舉發單位（統計用） ===
     unit_code = Column(String(50), index=True, comment="舉發單位代碼（如：新化分局）")
 

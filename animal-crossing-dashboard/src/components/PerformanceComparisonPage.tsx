@@ -636,15 +636,45 @@ const PerformanceComparisonPage: React.FC = () => {
 
             {/* 總覽卡片 */}
             <div className="grid grid-cols-2 gap-6 mb-8">
-                <ComparisonCard
-                    title="違規案件"
-                    emoji="📋"
-                    current={data.current.tickets}
-                    lastYear={data.last_year.tickets}
-                    change={data.comparison.tickets_change}
-                    trend={data.comparison.tickets_trend}
-                    color="bg-nook-sky/20"
-                />
+                <div>
+                    <ComparisonCard
+                        title="違規案件"
+                        emoji="📋"
+                        current={data.current.tickets}
+                        lastYear={data.last_year.tickets}
+                        change={data.comparison.tickets_change}
+                        trend={data.comparison.tickets_trend}
+                        color="bg-nook-sky/20"
+                    />
+                    {/* 舉發類型細分 */}
+                    {data.current.enforcement && (
+                        <div className="mt-3 bg-white/60 backdrop-blur-sm rounded-2xl p-4 nook-shadow space-y-3">
+                            <p className="text-xs font-bold text-nook-text/70 mb-2">📊 舉發類型細分</p>
+                            {[
+                                { label: '攔停舉發', current: data.current.enforcement.stop, lastYear: data.last_year.enforcement?.stop ?? 0 },
+                                { label: '逕行舉發', current: data.current.enforcement.auto, lastYear: data.last_year.enforcement?.auto ?? 0 },
+                            ].map(item => {
+                                const diff = item.current - item.lastYear;
+                                const pct = item.lastYear > 0 ? Math.round(((item.current - item.lastYear) / item.lastYear) * 1000) / 10 : 0;
+                                return (
+                                    <div key={item.label} className="flex items-center justify-between text-sm">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-medium text-nook-text">{item.label}</span>
+                                            <span className="text-nook-text/80 font-bold">{item.current.toLocaleString()}</span>
+                                            <span className="text-nook-text/50 text-xs">（去年 {item.lastYear.toLocaleString()}）</span>
+                                        </div>
+                                        <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg ${
+                                            diff > 0 ? 'bg-red-100 text-red-600' : diff < 0 ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'
+                                        }`}>
+                                            {diff > 0 ? <ArrowUpRight className="w-3 h-3" /> : diff < 0 ? <ArrowDownRight className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                                            {diff > 0 ? '+' : ''}{pct}%
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
                 <ComparisonCard
                     title="交通事故"
                     emoji="🚗"

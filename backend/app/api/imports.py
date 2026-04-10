@@ -13,6 +13,7 @@ from typing import Dict, Optional, Tuple
 
 import pandas as pd
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -1283,6 +1284,24 @@ def _import_ticket_df(df: pd.DataFrame, batch_id: str, db, error_messages: list 
                 .first()
             )
             if existing:
+                # 回補缺少的舉發類型欄位
+                updated = False
+                if not existing.enforcement_type:
+                    raw_et = row.get("舉發類型")
+                    if raw_et is not None and not pd.isna(raw_et):
+                        et = str(raw_et).strip()
+                        if et:
+                            existing.enforcement_type = et[:20]
+                            updated = True
+                if not existing.enforcement_subtype:
+                    raw_est = row.get("舉發子類型")
+                    if raw_est is not None and not pd.isna(raw_est):
+                        est = str(raw_est).strip()
+                        if est:
+                            existing.enforcement_subtype = est[:50]
+                            updated = True
+                if updated:
+                    stats["updated"] = stats.get("updated", 0) + 1
                 seen_ids.add(ticket_number)
                 stats["skipped"] += 1
                 continue
@@ -1365,6 +1384,10 @@ def _import_ticket_df(df: pd.DataFrame, batch_id: str, db, error_messages: list 
                 elif is_underage_14 and evehicle_type == "微型電動二輪車":
                     evehicle_violation = "未滿14歲騎乘"
 
+            # 舉發類型
+            enforcement_type = str(row.get("舉發類型", "")).strip() if not pd.isna(row.get("舉發類型")) else None
+            enforcement_subtype = str(row.get("舉發子類型", "")).strip() if not pd.isna(row.get("舉發子類型")) else None
+
             ticket = Ticket(
                 ticket_number=ticket_number,
                 import_batch_id=batch_id,
@@ -1383,6 +1406,8 @@ def _import_ticket_df(df: pd.DataFrame, batch_id: str, db, error_messages: list 
                 year=violation_dt.year,
                 month=violation_dt.month,
                 day_of_week=violation_dt.weekday(),
+                enforcement_type=enforcement_type[:20] if enforcement_type else None,
+                enforcement_subtype=enforcement_subtype[:50] if enforcement_subtype else None,
                 unit_code=str(row.get("舉發單位", ""))[:50]
                 if not pd.isna(row.get("舉發單位"))
                 else None,
@@ -1800,6 +1825,7 @@ async def import_ticket_upload_batch(
             total_stats["new"] += stats["new"]
             total_stats["skipped"] += stats["skipped"]
             total_stats["errors"] += stats["errors"]
+            total_stats["updated"] = total_stats.get("updated", 0) + stats.get("updated", 0)
             for k in total_topics:
                 total_topics[k] += topic_counts[k]
             for e in file_errors:
@@ -1818,6 +1844,8 @@ async def import_ticket_upload_batch(
     msg_parts = []
     if total_stats["files"] > 0:
         msg_parts.append(f"匯入 {total_stats['files']} 個檔案，新增 {total_stats['new']} 筆")
+    if total_stats.get("updated", 0) > 0:
+        msg_parts.append(f"回補 {total_stats['updated']} 筆舉發類型")
     if total_stats["skipped"] > 0:
         msg_parts.append(f"略過 {total_stats['skipped']} 筆重複")
     if total_stats["errors"] > 0:
@@ -1868,7 +1896,7 @@ async def import_ticket_file(
 
         return {
             "success": True,
-            "message": f"匯入完成：新增 {stats['new']} 筆，略過 {stats['skipped']} 筆（重複），錯誤 {stats['errors']} 筆",
+            "message": f"匯入完成：新增 {stats['new']} 筆，回補 {stats.get('updated', 0)} 筆，略過 {stats['skipped']} 筆（重複），錯誤 {stats['errors']} 筆",
             "batch_id": batch_id,
             "stats": stats,
             "topics_imported": topic_counts,
@@ -1918,11 +1946,16 @@ async def import_ticket_batch(db: Session = Depends(get_db)):
         # 取得已匯入過的檔案名稱
         imported_files = _get_imported_filenames(db, Ticket)
 
+        # 檢查是否有需要回補的欄位（enforcement_type 為 NULL 的筆數）
+        needs_backfill = db.query(func.count(Ticket.id)).filter(
+            Ticket.enforcement_type.is_(None)
+        ).scalar() > 0
+
         for fpath in xlsx_files:
             fname = os.path.basename(fpath)
 
-            # 跳過已匯入的檔案
-            if fname in imported_files:
+            # 跳過已匯入的檔案（除非需要回補欄位）
+            if fname in imported_files and not needs_backfill:
                 total_stats["files_skipped"] += 1
                 skipped_files.append(fname)
                 continue
@@ -1933,11 +1966,17 @@ async def import_ticket_batch(db: Session = Depends(get_db)):
                 file_errors = []
                 stats, topic_counts, file_errors = _import_ticket_df(df, batch_id, db, file_errors)
 
-                total_stats["files"] += 1
+                if fname in imported_files:
+                    # 已匯入過的檔案，只計算回補數
+                    total_stats["files_skipped"] += 1
+                    skipped_files.append(fname)
+                else:
+                    total_stats["files"] += 1
                 total_stats["total"] += stats["total"]
                 total_stats["new"] += stats["new"]
                 total_stats["skipped"] += stats["skipped"]
                 total_stats["errors"] += stats["errors"]
+                total_stats["updated"] = total_stats.get("updated", 0) + stats.get("updated", 0)
                 for k in total_topics:
                     total_topics[k] += topic_counts[k]
                 for e in file_errors:
@@ -1952,6 +1991,8 @@ async def import_ticket_batch(db: Session = Depends(get_db)):
         msg_parts = []
         if total_stats["files"] > 0:
             msg_parts.append(f"匯入 {total_stats['files']} 個檔案，新增 {total_stats['new']} 筆")
+        if total_stats.get("updated", 0) > 0:
+            msg_parts.append(f"回補 {total_stats['updated']} 筆舉發類型")
         if total_stats["files_skipped"] > 0:
             msg_parts.append(f"跳過 {total_stats['files_skipped']} 個已匯入檔案")
         if total_stats["skipped"] > 0:

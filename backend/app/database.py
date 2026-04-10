@@ -80,6 +80,8 @@ def _migrate_eis_columns():
         "evehicle_type": "VARCHAR(50)",
         "evehicle_violation": "VARCHAR(50)",
         "is_youth": "BOOLEAN DEFAULT 0",
+        "enforcement_type": "VARCHAR(20)",
+        "enforcement_subtype": "VARCHAR(50)",
     })
 
 

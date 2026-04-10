@@ -110,11 +110,30 @@ echo ========================================
 echo   內網分享模式 (Port 80)
 echo ========================================
 echo.
-echo 同事可透過 http://10.128.44.65 連線
-echo 唯讀模式: http://10.128.44.65/#view
+
+REM 取得本機 IP
+for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4" ^| findstr /v "127.0.0.1"') do (
+    set "LOCAL_IP=%%a"
+    goto :got_ip
+)
+:got_ip
+set LOCAL_IP=%LOCAL_IP: =%
+
+echo 同事連線: http://%LOCAL_IP%
+echo 唯讀模式: http://%LOCAL_IP%/#view
 echo.
-echo 正在啟動服務 (Port 80)...
-start "Production Server" cmd /k "cd /d %~dp0backend && call venv\Scripts\activate.bat && python -m uvicorn app.main:app --host 0.0.0.0 --port 80"
+
+REM 優先使用 deploy 的 embedded Python（繞過防火牆封鎖 python.exe）
+set "DEPLOY_PYTHON=%~dp0deploy\精準執法儀表板\python\python.exe"
+
+if exist "%DEPLOY_PYTHON%" (
+    echo 使用 embedded Python 啟動（繞過防火牆）...
+    start "Production Server" cmd /k "cd /d %~dp0backend && "%DEPLOY_PYTHON%" -m uvicorn app.main:app --host 0.0.0.0 --port 80"
+) else (
+    echo 找不到 embedded Python，使用 venv 啟動...
+    echo 若同事無法連線，請先執行 python build_portable.py 建立 deploy 資料夾
+    start "Production Server" cmd /k "cd /d %~dp0backend && call venv\Scripts\activate.bat && python -m uvicorn app.main:app --host 0.0.0.0 --port 80"
+)
 timeout /t 3 >nul
 echo 正在開啟瀏覽器...
 start "" "http://localhost"

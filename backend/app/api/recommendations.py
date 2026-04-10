@@ -1020,6 +1020,7 @@ async def get_map_points(
             Crash.location_desc,
             Crash.severity,
             Crash.occurred_date,
+            Crash.occurred_time,
             Crash.shift_id,
             Crash.is_elderly,
             Crash.suspected_alcohol,
@@ -1049,6 +1050,7 @@ async def get_map_points(
                     'location': c.location_desc,
                     'severity': c.severity,
                     'date': c.occurred_date.isoformat() if c.occurred_date else None,
+                    'time': c.occurred_time.strftime('%H:%M') if c.occurred_time else None,
                     'shift': c.shift_id,
                     'is_elderly': c.is_elderly,
                     'is_dui': c.suspected_alcohol,
@@ -1069,9 +1071,11 @@ async def get_map_points(
             Ticket.topic_dangerous,
             Ticket.violation_name,
             Ticket.violation_date,
+            Ticket.violation_time,
             Ticket.shift_id,
             Ticket.is_elderly,
-            Ticket.vehicle_type
+            Ticket.vehicle_type,
+            Ticket.enforcement_type
         ).filter(
             Ticket.violation_date >= start_date,
             Ticket.violation_date <= end_date
@@ -1108,9 +1112,11 @@ async def get_map_points(
                     'topic': topic_name,
                     'violation_name': t.violation_name,
                     'date': t.violation_date.isoformat() if t.violation_date else None,
+                    'time': t.violation_time.strftime('%H:%M') if t.violation_time else None,
                     'shift': t.shift_id,
                     'is_elderly': t.is_elderly,
-                    'vehicle_type': t.vehicle_type
+                    'vehicle_type': t.vehicle_type,
+                    'enforcement_type': t.enforcement_type
                 })
         result['summary']['tickets_with_coords'] = len(result['ticket_points'])
     

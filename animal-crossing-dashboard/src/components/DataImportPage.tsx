@@ -312,6 +312,9 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
                   <p>檔案數：<strong>{(result.stats as any).files}</strong> 個</p>
                 )}
                 <p>新增：<strong>{result.stats.new}</strong> 筆</p>
+                {(result.stats as any).updated > 0 && (
+                  <p className="text-blue-600">回補舉發類型：<strong>{(result.stats as any).updated}</strong> 筆</p>
+                )}
                 <p>略過（重複）：<strong>{result.stats.skipped}</strong> 筆</p>
                 <p>錯誤：<strong>{result.stats.errors}</strong> 筆</p>
                 {(result as any).coordinates && (
@@ -625,6 +628,9 @@ const BatchImportCard: React.FC<BatchImportProps> = ({
               </p>
               <div className="mt-2 text-sm text-nook-text/80 space-y-1">
                 <p>新增：<strong>{result.stats.new}</strong> 筆</p>
+                {(result.stats as any).updated > 0 && (
+                  <p className="text-blue-600">回補舉發類型：<strong>{(result.stats as any).updated}</strong> 筆</p>
+                )}
                 <p>略過（重複）：<strong>{result.stats.skipped}</strong> 筆</p>
                 <p>錯誤：<strong>{result.stats.errors}</strong> 筆</p>
                 {(result as any).coordinates && (

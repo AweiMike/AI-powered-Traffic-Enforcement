@@ -204,6 +204,11 @@ async def get_monthly_stats(
             and_(Ticket.violation_date >= s, Ticket.violation_date <= e, col == True)
         ).scalar() or 0
 
+    def count_tickets_enforcement(s, e, etype):
+        return db.query(func.count(Ticket.id)).filter(
+            and_(Ticket.violation_date >= s, Ticket.violation_date <= e, Ticket.enforcement_type == etype)
+        ).scalar() or 0
+
     def count_crashes_severity(s, e, sev):
         return db.query(func.count(Crash.id)).filter(
             and_(Crash.occurred_date >= s, Crash.occurred_date <= e, Crash.severity == sev)
@@ -241,6 +246,16 @@ async def get_monthly_stats(
         "dangerous_driving": count_tickets_topic(prev_sd, prev_ed, Ticket.topic_dangerous),
     }
 
+    # 舉發類型統計
+    current_enforcement = {
+        "stop": count_tickets_enforcement(sd, ed, "攔停舉發"),
+        "auto": count_tickets_enforcement(sd, ed, "逕行舉發"),
+    }
+    last_year_enforcement = {
+        "stop": count_tickets_enforcement(prev_sd, prev_ed, "攔停舉發"),
+        "auto": count_tickets_enforcement(prev_sd, prev_ed, "逕行舉發"),
+    }
+
     # 事故嚴重度統計
     current_severity = {
         "a1": count_crashes_severity(sd, ed, "A1"),
@@ -264,6 +279,7 @@ async def get_monthly_stats(
             "crashes": current_crashes,
             "topics": current_topics,
             "severity": current_severity,
+            "enforcement": current_enforcement,
         },
         "last_year": {
             "year": prev_sd.year,
@@ -271,6 +287,7 @@ async def get_monthly_stats(
             "crashes": last_year_crashes,
             "topics": last_year_topics,
             "severity": last_year_severity,
+            "enforcement": last_year_enforcement,
         },
         "comparison": {
             "tickets_change": tickets_change,
