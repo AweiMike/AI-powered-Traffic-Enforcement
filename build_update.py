@@ -157,13 +157,14 @@ def create_update_bat():
         echo.
         echo [1/3] 備份舊版後端...
         if exist "%TARGET%\backend\app" (
-            set "BACKUP=%TARGET%\backend\app_backup_%date:~0,4%%date:~5,2%%date:~8,2%"
-            xcopy "%TARGET%\backend\app" "%BACKUP%\app\" /E /I /Q >nul 2>&1
+            set "BACKUP=%TARGET%\backend\app_backup"
+            if exist "%BACKUP%" rmdir /S /Q "%BACKUP%" >nul 2>&1
+            robocopy "%TARGET%\backend\app" "%BACKUP%\app" /E /NFL /NDL /NJH /NJS /NC /NS /NP >nul 2>&1
             echo       備份完成
         )
 
         echo [2/3] 更新後端程式碼...
-        xcopy "%UPDATE_DIR%backend" "%TARGET%\backend" /E /I /Y /Q >nul
+        robocopy "%UPDATE_DIR%backend" "%TARGET%\backend" /E /NFL /NDL /NJH /NJS /NC /NS /NP >nul 2>&1
         echo       後端更新完成
 
         echo [3/3] 更新啟動腳本...
