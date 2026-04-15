@@ -758,7 +758,7 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                     </button>
                                 )}
                             </div>
-                            <div className="grid grid-cols-2 gap-1 max-h-56 overflow-y-auto pr-1">
+                            <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
                                 {availableUnits.map(unit => {
                                     const active = unitFilter.has(unit);
                                     const displayName = unit.replace(/^新化分局/, '');
@@ -772,13 +772,13 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                                 setUnitFilter(next);
                                             }}
                                             title={displayName}
-                                            className={`w-full text-center px-1.5 py-1.5 rounded-lg text-[11px] leading-tight truncate transition-all ${
+                                            className={`px-2 py-1.5 rounded-lg text-xs font-medium bg-emerald-100 text-emerald-700 truncate transition-all ${
                                                 active
-                                                    ? 'bg-nook-leaf/20 text-nook-leaf font-bold ring-1 ring-nook-leaf'
-                                                    : 'bg-gray-50 text-nook-text/70 hover:bg-nook-cream/50'
+                                                    ? 'ring-2 ring-nook-leaf'
+                                                    : 'opacity-40 hover:opacity-70'
                                             }`}
                                         >
-                                            {active && '✓ '}{displayName}
+                                            {displayName}
                                         </button>
                                     );
                                 })}
