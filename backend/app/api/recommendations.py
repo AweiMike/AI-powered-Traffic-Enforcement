@@ -1076,8 +1076,9 @@ async def get_map_points(
                 crash_query = crash_query.filter(Crash.severity.in_(sev_list))
 
         if unit_list:
-            # 事故資料 95% 集中於「交通分隊」，因此除了直接對 sub_unit 比對外，
-            # 也透過派出所→行政區對照表，把 district 落在所選派出所轄區內的事故一併納入。
+            # 直接以 sub_unit 比對「所轄單位名稱」。
+            # 對於尚未回補轄區派出所的舊資料（sub_unit 仍為交通分隊），
+            # 以派出所→行政區對照表將 district 吻合的舊資料納入，避免選派出所時事故歸零。
             mapped_districts: set[str] = set()
             for u in unit_list:
                 for d in STATION_TO_DISTRICTS.get(u, []):
@@ -1085,7 +1086,11 @@ async def get_map_points(
 
             crash_filters = [Crash.sub_unit.in_(unit_list)]
             if mapped_districts:
-                crash_filters.append(Crash.district.in_(list(mapped_districts)))
+                # 僅在 sub_unit 仍為「交通分隊」等催化單位時才套用 district fallback
+                crash_filters.append(and_(
+                    Crash.sub_unit.like('%交通分隊%'),
+                    Crash.district.in_(list(mapped_districts))
+                ))
             crash_query = crash_query.filter(or_(*crash_filters))
 
         crashes = crash_query.all()

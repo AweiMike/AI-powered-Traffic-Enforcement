@@ -785,9 +785,8 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                             <p className="text-[10px] text-nook-text/50 mt-2">
                                 {unitFilter.size === 0 ? '未選擇 = 顯示全部' : `已選 ${unitFilter.size} 個單位`}
                             </p>
-                            <p className="text-[10px] text-amber-700/70 mt-1 leading-tight">
-                                ⚠ 事故資料 95% 歸於交通分隊未細分到派出所，
-                                因此選派出所時會以「該所所在行政區」全部事故為準。
+                            <p className="text-[10px] text-nook-text/50 mt-1 leading-tight">
+                                事故以「所轄單位名稱」為準；舊資料尚未回補者則以該派出所所屬行政區代替。
                             </p>
                         </div>
                     )}

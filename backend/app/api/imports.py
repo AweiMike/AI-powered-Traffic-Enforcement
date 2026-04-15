@@ -698,10 +698,12 @@ async def import_crash_file(
                     injury_count = get_eis_int(row, "3-2.受傷人數", "受傷")
 
                     # --- 分局 / 所轄單位 / 派出所 ---
+                    # 優先使用「所轄單位名稱」= 案件發生地的轄區派出所（用於地圖與統計）
+                    # 若新匯出的 TXT 沒有該欄位，才退回「處理單位名稱派出所」（= 實際處理單位，通常為交通分隊）
                     precinct = clean_precinct_name(row.get("處理單位名稱分局層"))
                     sub_unit_val = (
-                        _safe_eis_str(row, "處理單位名稱派出所")
-                        or _safe_eis_str(row, "所轄單位名稱")
+                        _safe_eis_str(row, "所轄單位名稱")
+                        or _safe_eis_str(row, "處理單位名稱派出所")
                     )
                     sub_unit = clean_precinct_name(sub_unit_val)[:100] if sub_unit_val else None
 
@@ -999,7 +1001,7 @@ def _get_imported_filenames(db, model, pattern_prefix="BATCH_") -> set:
 
 def _do_batch_import(txt_files: list, db):
     """批次匯入的實際邏輯（同步函數，避免 async 問題）"""
-    total_stats = {"files": 0, "total": 0, "new": 0, "skipped": 0, "errors": 0, "files_skipped": 0}
+    total_stats = {"files": 0, "total": 0, "new": 0, "skipped": 0, "errors": 0, "files_skipped": 0, "updated": 0}
     coords_total = {"with_gps": 0, "fallback": 0}
     all_errors = []
     skipped_files = []
@@ -1008,11 +1010,17 @@ def _do_batch_import(txt_files: list, db):
     # 取得已匯入過的檔案名稱
     imported_files = _get_imported_filenames(db, Crash)
 
+    # 檢查是否有舊版 sub_unit（= 交通分隊，代表尚未套用「所轄單位名稱」欄位）
+    # 若有，允許已匯入的檔案重新進入流程以回補 sub_unit 欄位
+    needs_backfill = db.query(func.count(Crash.id)).filter(
+        Crash.sub_unit.like('%交通分隊%')
+    ).scalar() > 0
+
     for txt_path in txt_files:
         fname = os.path.basename(txt_path)
 
-        # 跳過已匯入的檔案
-        if fname in imported_files:
+        # 跳過已匯入的檔案（除非需要回補轄區派出所）
+        if fname in imported_files and not needs_backfill:
             total_stats["files_skipped"] += 1
             skipped_files.append(fname)
             continue
@@ -1023,7 +1031,7 @@ def _do_batch_import(txt_files: list, db):
             data_format = detect_crash_format(list(df.columns))
 
             batch_id = f"BATCH_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{fname}"
-            stats = {"total": len(df), "new": 0, "skipped": 0, "errors": 0}
+            stats = {"total": len(df), "new": 0, "skipped": 0, "errors": 0, "updated": 0}
             coords_stats = {"with_gps": 0, "fallback": 0}
 
             for idx, row in df.iterrows():
@@ -1056,6 +1064,14 @@ def _do_batch_import(txt_files: list, db):
                     existing = db.query(Crash).filter(Crash.case_id == case_id).first()
                     if existing:
                         seen_case_ids.add(case_id)
+                        # 回補轄區派出所：若既有 sub_unit 含「交通分隊」且新檔帶了所轄單位，更新之
+                        if needs_backfill and existing.sub_unit and "交通分隊" in existing.sub_unit:
+                            new_sub_val = _safe_eis_str(row, "所轄單位名稱")
+                            if new_sub_val:
+                                new_sub = clean_precinct_name(new_sub_val)
+                                if new_sub and new_sub != existing.sub_unit:
+                                    existing.sub_unit = new_sub[:100]
+                                    stats["updated"] += 1
                         stats["skipped"] += 1
                         continue
 
@@ -1085,9 +1101,10 @@ def _do_batch_import(txt_files: list, db):
                         death_count = get_eis_int(row, "3-1.24小時內死亡人數", "死亡")
                         injury_count = get_eis_int(row, "3-2.受傷人數", "受傷")
                         precinct = clean_precinct_name(row.get("處理單位名稱分局層"))
+                        # 優先使用「所轄單位名稱」= 轄區派出所，備援為處理單位（通常為交通分隊）
                         sub_unit_val = (
-                            _safe_eis_str(row, "處理單位名稱派出所")
-                            or _safe_eis_str(row, "所轄單位名稱")
+                            _safe_eis_str(row, "所轄單位名稱")
+                            or _safe_eis_str(row, "處理單位名稱派出所")
                         )
                         sub_unit = clean_precinct_name(sub_unit_val)[:100] if sub_unit_val else None
                         cause = (
@@ -1216,6 +1233,7 @@ def _do_batch_import(txt_files: list, db):
             total_stats["new"] += stats["new"]
             total_stats["skipped"] += stats["skipped"]
             total_stats["errors"] += stats["errors"]
+            total_stats["updated"] = total_stats.get("updated", 0) + stats.get("updated", 0)
             coords_total["with_gps"] += coords_stats["with_gps"]
             coords_total["fallback"] += coords_stats["fallback"]
 
@@ -1233,6 +1251,8 @@ def _do_batch_import(txt_files: list, db):
     msg_parts = []
     if total_stats["files"] > 0:
         msg_parts.append(f"匯入 {total_stats['files']} 個檔案，新增 {total_stats['new']} 筆")
+    if total_stats.get("updated", 0) > 0:
+        msg_parts.append(f"回補轄區派出所 {total_stats['updated']} 筆")
     if total_stats["files_skipped"] > 0:
         msg_parts.append(f"跳過 {total_stats['files_skipped']} 個已匯入檔案")
     if total_stats["skipped"] > 0:
@@ -1464,10 +1484,15 @@ async def import_crash_upload_batch(
 
     ALLOWED_EXTENSIONS = (".xlsx", ".xls", ".txt")
 
-    total_stats = {"files": 0, "total": 0, "new": 0, "skipped": 0, "errors": 0, "files_skipped": 0}
+    total_stats = {"files": 0, "total": 0, "new": 0, "skipped": 0, "errors": 0, "files_skipped": 0, "updated": 0}
     coords_total = {"with_gps": 0, "fallback": 0}
     all_errors = []
     seen_case_ids: set = set()
+
+    # 檢查是否需要回補 sub_unit（舊版匯入時未讀「所轄單位名稱」）
+    needs_backfill = db.query(func.count(Crash.id)).filter(
+        Crash.sub_unit.like('%交通分隊%')
+    ).scalar() > 0
 
     for file in files:
         if not file.filename or not file.filename.endswith(ALLOWED_EXTENSIONS):
@@ -1504,7 +1529,7 @@ async def import_crash_upload_batch(
             data_format = detect_crash_format(list(df.columns))
             batch_id = f"UPLOAD_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}"
 
-            stats = {"total": len(df), "new": 0, "skipped": 0, "errors": 0}
+            stats = {"total": len(df), "new": 0, "skipped": 0, "errors": 0, "updated": 0}
             coords_stats = {"with_gps": 0, "fallback": 0}
 
             for idx, row in df.iterrows():
@@ -1536,6 +1561,14 @@ async def import_crash_upload_batch(
                     existing = db.query(Crash).filter(Crash.case_id == case_id).first()
                     if existing:
                         seen_case_ids.add(case_id)
+                        # 回補轄區派出所
+                        if needs_backfill and existing.sub_unit and "交通分隊" in existing.sub_unit:
+                            new_sub_val = _safe_eis_str(row, "所轄單位名稱")
+                            if new_sub_val:
+                                new_sub = clean_precinct_name(new_sub_val)
+                                if new_sub and new_sub != existing.sub_unit:
+                                    existing.sub_unit = new_sub[:100]
+                                    stats["updated"] += 1
                         stats["skipped"] += 1
                         continue
 
@@ -1564,9 +1597,10 @@ async def import_crash_upload_batch(
                         death_count = get_eis_int(row, "3-1.24小時內死亡人數", "死亡")
                         injury_count = get_eis_int(row, "3-2.受傷人數", "受傷")
                         precinct = clean_precinct_name(row.get("處理單位名稱分局層"))
+                        # 優先使用「所轄單位名稱」= 轄區派出所，備援為處理單位（通常為交通分隊）
                         sub_unit_val = (
-                            _safe_eis_str(row, "處理單位名稱派出所")
-                            or _safe_eis_str(row, "所轄單位名稱")
+                            _safe_eis_str(row, "所轄單位名稱")
+                            or _safe_eis_str(row, "處理單位名稱派出所")
                         )
                         sub_unit = clean_precinct_name(sub_unit_val)[:100] if sub_unit_val else None
                         cause = (
@@ -1747,6 +1781,7 @@ async def import_crash_upload_batch(
             total_stats["new"] += stats["new"]
             total_stats["skipped"] += stats["skipped"]
             total_stats["errors"] += stats["errors"]
+            total_stats["updated"] = total_stats.get("updated", 0) + stats.get("updated", 0)
             coords_total["with_gps"] += coords_stats["with_gps"]
             coords_total["fallback"] += coords_stats["fallback"]
 
@@ -1767,6 +1802,8 @@ async def import_crash_upload_batch(
     msg_parts = []
     if total_stats["files"] > 0:
         msg_parts.append(f"匯入 {total_stats['files']} 個檔案，新增 {total_stats['new']} 筆")
+    if total_stats.get("updated", 0) > 0:
+        msg_parts.append(f"回補轄區派出所 {total_stats['updated']} 筆")
     if total_stats["skipped"] > 0:
         msg_parts.append(f"略過 {total_stats['skipped']} 筆重複")
     if total_stats["errors"] > 0:
