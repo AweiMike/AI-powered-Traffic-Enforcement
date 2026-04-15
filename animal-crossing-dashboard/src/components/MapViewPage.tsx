@@ -584,9 +584,9 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-12 gap-6">
-                {/* 控制面板 */}
-                <div className="col-span-3 space-y-4">
+            <div className="grid grid-cols-12 gap-6 items-start">
+                {/* 控制面板 - 側欄獨立滾動，地圖保持可見 */}
+                <div className="col-span-3 space-y-4 sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto pr-2">
                     {/* 編輯模式控制 - 唯讀模式隱藏 */}
                     {!readOnly && (
                     <div className={`rounded-2xl p-4 nook-shadow ${editMode ? 'bg-amber-50 border-2 border-amber-300' : 'bg-white/80'}`}>
@@ -970,8 +970,8 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                     </div>
                 </div>
 
-                {/* 地圖區域 */}
-                <div className="col-span-9">
+                {/* 地圖區域 - sticky 讓地圖跟著側欄一起貼齊頂部 */}
+                <div className="col-span-9 sticky top-4 self-start">
                     <div className={`bg-white/80 rounded-2xl nook-shadow overflow-hidden ${editMode ? 'ring-4 ring-amber-300' : ''}`}>
                         {/* 地圖標題 */}
                         <div className={`p-3 border-b flex items-center justify-between ${editMode ? 'bg-amber-50 border-amber-200' : 'border-nook-cream/50 bg-white/50'}`}>
