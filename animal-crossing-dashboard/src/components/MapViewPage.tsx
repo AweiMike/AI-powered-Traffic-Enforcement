@@ -772,10 +772,10 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                                 setUnitFilter(next);
                                             }}
                                             title={displayName}
-                                            className={`px-2 py-1.5 rounded-lg text-xs font-medium bg-emerald-100 text-emerald-700 truncate transition-all ${
+                                            className={`px-2 py-1.5 rounded-lg text-xs font-medium truncate transition-all ${
                                                 active
-                                                    ? 'ring-2 ring-nook-leaf'
-                                                    : 'opacity-40 hover:opacity-70'
+                                                    ? 'bg-nook-leaf/15 text-nook-leaf ring-1 ring-nook-leaf/60'
+                                                    : 'bg-nook-cream/40 text-nook-text/60 hover:bg-nook-cream/70'
                                             }`}
                                         >
                                             {displayName}
