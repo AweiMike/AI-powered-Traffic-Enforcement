@@ -758,7 +758,7 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                     </button>
                                 )}
                             </div>
-                            <div className="space-y-1 max-h-48 overflow-y-auto">
+                            <div className="grid grid-cols-2 gap-1 max-h-56 overflow-y-auto pr-1">
                                 {availableUnits.map(unit => {
                                     const active = unitFilter.has(unit);
                                     const displayName = unit.replace(/^新化分局/, '');
@@ -771,7 +771,8 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                                 else next.add(unit);
                                                 setUnitFilter(next);
                                             }}
-                                            className={`w-full text-left px-2 py-1.5 rounded-lg text-xs transition-all ${
+                                            title={displayName}
+                                            className={`w-full text-center px-1.5 py-1.5 rounded-lg text-[11px] leading-tight truncate transition-all ${
                                                 active
                                                     ? 'bg-nook-leaf/20 text-nook-leaf font-bold ring-1 ring-nook-leaf'
                                                     : 'bg-gray-50 text-nook-text/70 hover:bg-nook-cream/50'
