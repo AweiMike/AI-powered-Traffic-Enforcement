@@ -3,7 +3,7 @@
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, desc, case
+from sqlalchemy import func, and_, desc, case, or_
 from typing import Optional, List
 from datetime import datetime, timedelta
 
@@ -972,9 +972,34 @@ async def get_dui_environment_analysis(
     }
 
 
+# ---------------------------------------------------------------------------
+# 派出所 → 行政區 對照表
+# ---------------------------------------------------------------------------
+# 事故資料絕大多數歸類於「交通分隊」，並未細分到派出所層級（本資料約 95% 是 交通分隊）。
+# 為了讓「派出所篩選」對事故仍有意義，使用以下對照表，將派出所名稱映射回所屬行政區，
+# 篩選事故時改用 district 欄位作為後備條件。
+# ---------------------------------------------------------------------------
+STATION_TO_DISTRICTS: dict[str, list[str]] = {
+    # 新化區
+    "新化分局新化派出所": ["新化區"],
+    "新化分局唪口派出所": ["新化區"],
+    "新化分局知義派出所": ["新化區"],
+    "新化分局那拔派出所": ["新化區"],
+    # 山上區
+    "新化分局山上分駐所": ["山上區"],
+    # 左鎮區
+    "新化分局左鎮分駐所": ["左鎮區"],
+    "新化分局岡林派出所": ["左鎮區"],
+    # 全分局共用單位（不限定行政區）
+    "新化分局交通分隊": ["新化區", "山上區", "左鎮區"],
+    "新化分局交通組": ["新化區", "山上區", "左鎮區"],
+    "新化分局警備隊": ["新化區", "山上區", "左鎮區"],
+}
+
+
 @router.get("/map/units")
 async def get_map_units(db: Session = Depends(get_db)):
-    """取得所有出現過的派出所/單位名稱（交集自事故與違規資料）"""
+    """取得所有出現過的派出所/單位名稱（聯集自事故與違規資料）"""
     crash_units = [r[0] for r in db.query(Crash.sub_unit).filter(Crash.sub_unit.isnot(None)).distinct().all() if r[0]]
     ticket_units = [r[0] for r in db.query(Ticket.unit_code).filter(Ticket.unit_code.isnot(None)).distinct().all() if r[0]]
     all_units = sorted(set(crash_units) | set(ticket_units))
@@ -1051,7 +1076,17 @@ async def get_map_points(
                 crash_query = crash_query.filter(Crash.severity.in_(sev_list))
 
         if unit_list:
-            crash_query = crash_query.filter(Crash.sub_unit.in_(unit_list))
+            # 事故資料 95% 集中於「交通分隊」，因此除了直接對 sub_unit 比對外，
+            # 也透過派出所→行政區對照表，把 district 落在所選派出所轄區內的事故一併納入。
+            mapped_districts: set[str] = set()
+            for u in unit_list:
+                for d in STATION_TO_DISTRICTS.get(u, []):
+                    mapped_districts.add(d)
+
+            crash_filters = [Crash.sub_unit.in_(unit_list)]
+            if mapped_districts:
+                crash_filters.append(Crash.district.in_(list(mapped_districts)))
+            crash_query = crash_query.filter(or_(*crash_filters))
 
         crashes = crash_query.all()
         result['summary']['total_crashes'] = len(crashes)
