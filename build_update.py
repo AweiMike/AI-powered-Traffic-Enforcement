@@ -221,6 +221,51 @@ def create_changelog():
     print(f"  建立: {path}")
 
 
+def sync_to_main_deploy():
+    """將更新內容同步到 deploy/精準執法儀表板/ 主程式資料夾
+    讓主程式資料夾保持最新，方便直接複製給新同事安裝。
+    """
+    if not os.path.exists(DEPLOY_DIR):
+        step("[跳過] 主程式資料夾不存在，未同步")
+        print(f"  {DEPLOY_DIR}")
+        print("  若要建立完整部署資料夾，請執行 build_portable.py")
+        return
+
+    if "--no-sync" in sys.argv:
+        step("[跳過] --no-sync 已指定，未同步主程式資料夾")
+        return
+
+    step("同步更新到主程式資料夾...")
+
+    # 同步 backend
+    src_backend = os.path.join(UPDATE_DIR, "backend")
+    dst_backend = os.path.join(DEPLOY_DIR, "backend")
+
+    # 使用 shutil 逐檔覆蓋（避免 robocopy 編碼問題）
+    count = 0
+    for root, dirs, files in os.walk(src_backend):
+        # 排除 __pycache__
+        dirs[:] = [d for d in dirs if d != '__pycache__']
+        rel = os.path.relpath(root, src_backend)
+        dst_dir = os.path.join(dst_backend, rel)
+        os.makedirs(dst_dir, exist_ok=True)
+        for f in files:
+            shutil.copy2(os.path.join(root, f), os.path.join(dst_dir, f))
+            count += 1
+
+    print(f"  backend/ 已同步 {count} 個檔案")
+
+    # 同步 bat 檔案
+    for bat_name in ["啟動儀表板.bat", "匯入資料.bat"]:
+        src = os.path.join(UPDATE_DIR, bat_name)
+        if os.path.exists(src):
+            shutil.copy2(src, os.path.join(DEPLOY_DIR, bat_name))
+            print(f"  {bat_name} 已同步")
+
+    print(f"\n  主程式資料夾已更新至最新版：{DEPLOY_DIR}")
+    print("  可直接複製此資料夾給新同事安裝")
+
+
 def show_summary():
     """顯示結果"""
     total_size = 0
@@ -266,6 +311,7 @@ def main():
     copy_bat_files()
     create_update_bat()
     create_changelog()
+    sync_to_main_deploy()
     show_summary()
 
 
