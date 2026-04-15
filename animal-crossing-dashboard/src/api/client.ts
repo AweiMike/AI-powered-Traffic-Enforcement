@@ -630,13 +630,19 @@ class APIClient {
     topic?: string,
     startDate?: string,
     endDate?: string,
+    units?: string,
   ): Promise<any> {
     const params = new URLSearchParams({ days: days.toString(), point_type: pointType });
     if (severity) params.append('severity', severity);
     if (topic) params.append('topic', topic);
     if (startDate) params.append('start_date', startDate);
     if (endDate) params.append('end_date', endDate);
+    if (units) params.append('units', units);
     return this.request(`/recommendations/map/points?${params}`);
+  }
+
+  async getMapUnits(): Promise<{ units: string[] }> {
+    return this.request('/recommendations/map/units');
   }
 
   async getPreciseHeatmapData(days: number = 90, dataType: string = 'crash'): Promise<any> {

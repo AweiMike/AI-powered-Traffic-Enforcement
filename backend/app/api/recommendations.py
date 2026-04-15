@@ -972,6 +972,15 @@ async def get_dui_environment_analysis(
     }
 
 
+@router.get("/map/units")
+async def get_map_units(db: Session = Depends(get_db)):
+    """取得所有出現過的派出所/單位名稱（交集自事故與違規資料）"""
+    crash_units = [r[0] for r in db.query(Crash.sub_unit).filter(Crash.sub_unit.isnot(None)).distinct().all() if r[0]]
+    ticket_units = [r[0] for r in db.query(Ticket.unit_code).filter(Ticket.unit_code.isnot(None)).distinct().all() if r[0]]
+    all_units = sorted(set(crash_units) | set(ticket_units))
+    return {"units": all_units}
+
+
 @router.get("/map/points")
 async def get_map_points(
     days: int = Query(default=90, description="分析期間天數（當 start_date/end_date 未提供時使用）"),
@@ -980,6 +989,7 @@ async def get_map_points(
     point_type: str = Query(default="all", description="資料類型: all, crash, ticket"),
     severity: str = Query(default=None, description="嚴重度篩選: A1, A2, A3（逗號分隔可複選）"),
     topic: str = Query(default=None, description="主題篩選: DUI, RED_LIGHT, DANGEROUS_DRIVING"),
+    units: str = Query(default=None, description="派出所/單位篩選（逗號分隔可複選，如：新化分局新化派出所,新化分局知義派出所）"),
     db: Session = Depends(get_db)
 ):
     """
@@ -1010,6 +1020,8 @@ async def get_map_points(
         }
     }
     
+    unit_list = [u.strip() for u in units.split(",") if u.strip()] if units else None
+
     # 取得事故點位
     if point_type in ['all', 'crash']:
         crash_query = db.query(
@@ -1024,22 +1036,26 @@ async def get_map_points(
             Crash.shift_id,
             Crash.is_elderly,
             Crash.suspected_alcohol,
-            Crash.party_type
+            Crash.party_type,
+            Crash.sub_unit
         ).filter(
             Crash.occurred_date >= start_date,
             Crash.occurred_date <= end_date
         )
-        
+
         if severity:
             sev_list = [s.strip() for s in severity.split(",")]
             if len(sev_list) == 1:
                 crash_query = crash_query.filter(Crash.severity == sev_list[0])
             else:
                 crash_query = crash_query.filter(Crash.severity.in_(sev_list))
-        
+
+        if unit_list:
+            crash_query = crash_query.filter(Crash.sub_unit.in_(unit_list))
+
         crashes = crash_query.all()
         result['summary']['total_crashes'] = len(crashes)
-        
+
         for c in crashes:
             if c.latitude and c.longitude:
                 result['crash_points'].append({
@@ -1054,7 +1070,8 @@ async def get_map_points(
                     'shift': c.shift_id,
                     'is_elderly': c.is_elderly,
                     'is_dui': c.suspected_alcohol,
-                    'vehicle_type': c.party_type
+                    'vehicle_type': c.party_type,
+                    'unit': c.sub_unit
                 })
         result['summary']['crashes_with_coords'] = len(result['crash_points'])
     
@@ -1075,12 +1092,13 @@ async def get_map_points(
             Ticket.shift_id,
             Ticket.is_elderly,
             Ticket.vehicle_type,
-            Ticket.enforcement_subtype
+            Ticket.enforcement_subtype,
+            Ticket.unit_code
         ).filter(
             Ticket.violation_date >= start_date,
             Ticket.violation_date <= end_date
         )
-        
+
         if topic:
             if topic == 'DUI':
                 ticket_query = ticket_query.filter(Ticket.topic_dui == True)
@@ -1088,7 +1106,10 @@ async def get_map_points(
                 ticket_query = ticket_query.filter(Ticket.topic_red_light == True)
             elif topic == 'DANGEROUS_DRIVING':
                 ticket_query = ticket_query.filter(Ticket.topic_dangerous == True)
-        
+
+        if unit_list:
+            ticket_query = ticket_query.filter(Ticket.unit_code.in_(unit_list))
+
         tickets = ticket_query.all()
         result['summary']['total_tickets'] = len(tickets)
         
@@ -1116,7 +1137,8 @@ async def get_map_points(
                     'shift': t.shift_id,
                     'is_elderly': t.is_elderly,
                     'vehicle_type': t.vehicle_type,
-                    'enforcement_type': t.enforcement_subtype
+                    'enforcement_type': t.enforcement_subtype,
+                    'unit': t.unit_code
                 })
         result['summary']['tickets_with_coords'] = len(result['ticket_points'])
     

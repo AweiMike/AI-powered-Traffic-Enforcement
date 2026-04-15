@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Map as MapIcon, Filter, Layers, AlertTriangle, Circle, Eye, EyeOff, RefreshCw, Edit3, Save, X, Move } from 'lucide-react';
+import { Map as MapIcon, Filter, Layers, AlertTriangle, Circle, Eye, EyeOff, RefreshCw, Edit3, Save, X, Move, Building2, Target, Trash2 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import DateRangePicker, { type DateRange } from './DateRangePicker';
 
@@ -32,6 +32,13 @@ interface MapPoint {
     vehicle_type?: string;
     violation_name?: string;
     enforcement_type?: string;
+    unit?: string;
+}
+
+interface SelectionCircle {
+    lat: number;
+    lng: number;
+    radius: number; // 公尺
 }
 
 interface MapData {
@@ -79,12 +86,26 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
     const [showTickets, setShowTickets] = useState(true);
     const [severityFilter, setSeverityFilter] = useState<Set<string>>(new Set(['A1', 'A2', 'A3']));
     const [topicFilter, setTopicFilter] = useState<string>('all');
+    const [availableUnits, setAvailableUnits] = useState<string[]>([]);
+    const [unitFilter, setUnitFilter] = useState<Set<string>>(new Set());
 
     // 編輯模式狀態
     const [editMode, setEditMode] = useState(false);
     const [pendingUpdates, setPendingUpdates] = useState<globalThis.Map<number, PendingUpdate>>(new globalThis.Map());
     const [saving, setSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+    // 圈選工具狀態
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [selectionCircle, setSelectionCircle] = useState<SelectionCircle | null>(null);
+    const selectionLayerRef = useRef<L.Circle | null>(null);
+
+    // 載入可用派出所清單
+    useEffect(() => {
+        apiClient.getMapUnits()
+            .then(r => setAvailableUnits(r.units || []))
+            .catch(e => console.error('Failed to load units:', e));
+    }, []);
 
     // 初始化地圖
     useEffect(() => {
@@ -122,9 +143,11 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
+            const unitsParam = unitFilter.size > 0 ? Array.from(unitFilter).join(',') : undefined;
             const result = await apiClient.getMapPoints(
                 365, 'all', undefined, undefined,
-                dateRange.startDate, dateRange.endDate
+                dateRange.startDate, dateRange.endDate,
+                unitsParam
             );
             setData(result);
         } catch (e) {
@@ -132,11 +155,143 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
         } finally {
             setLoading(false);
         }
-    }, [dateRange]);
+    }, [dateRange, unitFilter]);
 
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    // 圈選模式：點擊地圖設定圈選範圍（點一下設中心，點第二下設半徑）
+    const clickStateRef = useRef<'idle' | 'awaiting_radius'>('idle');
+    const tempCenterRef = useRef<{ lat: number; lng: number } | null>(null);
+
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || !mapReady) return;
+
+        if (!selectionMode) {
+            map.getContainer().style.cursor = '';
+            return;
+        }
+
+        map.getContainer().style.cursor = 'crosshair';
+
+        const handleClick = (e: L.LeafletMouseEvent) => {
+            if (clickStateRef.current === 'idle') {
+                // 第一次點擊：設為中心
+                tempCenterRef.current = { lat: e.latlng.lat, lng: e.latlng.lng };
+                clickStateRef.current = 'awaiting_radius';
+            } else {
+                // 第二次點擊：計算半徑並完成圈選
+                const center = tempCenterRef.current!;
+                const radius = map.distance([center.lat, center.lng], [e.latlng.lat, e.latlng.lng]);
+                setSelectionCircle({ lat: center.lat, lng: center.lng, radius });
+                clickStateRef.current = 'idle';
+                tempCenterRef.current = null;
+                setSelectionMode(false);
+            }
+        };
+
+        const handleMouseMove = (e: L.LeafletMouseEvent) => {
+            if (clickStateRef.current === 'awaiting_radius' && tempCenterRef.current) {
+                // 即時預覽圓圈
+                const center = tempCenterRef.current;
+                const radius = map.distance([center.lat, center.lng], [e.latlng.lat, e.latlng.lng]);
+                if (selectionLayerRef.current) {
+                    selectionLayerRef.current.remove();
+                }
+                selectionLayerRef.current = L.circle([center.lat, center.lng], {
+                    radius,
+                    color: '#10b981',
+                    fillColor: '#10b981',
+                    fillOpacity: 0.1,
+                    weight: 2,
+                    dashArray: '5, 5',
+                }).addTo(map);
+            }
+        };
+
+        map.on('click', handleClick);
+        map.on('mousemove', handleMouseMove);
+
+        return () => {
+            map.off('click', handleClick);
+            map.off('mousemove', handleMouseMove);
+            map.getContainer().style.cursor = '';
+        };
+    }, [selectionMode, mapReady]);
+
+    // 繪製確定後的圈選範圍
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || !mapReady) return;
+
+        if (selectionLayerRef.current) {
+            selectionLayerRef.current.remove();
+            selectionLayerRef.current = null;
+        }
+
+        if (selectionCircle) {
+            selectionLayerRef.current = L.circle([selectionCircle.lat, selectionCircle.lng], {
+                radius: selectionCircle.radius,
+                color: '#10b981',
+                fillColor: '#10b981',
+                fillOpacity: 0.15,
+                weight: 3,
+            }).addTo(map);
+        }
+    }, [selectionCircle, mapReady]);
+
+    // 清除圈選
+    const handleClearSelection = () => {
+        setSelectionCircle(null);
+        setSelectionMode(false);
+        clickStateRef.current = 'idle';
+        tempCenterRef.current = null;
+        if (selectionLayerRef.current) {
+            selectionLayerRef.current.remove();
+            selectionLayerRef.current = null;
+        }
+    };
+
+    // 計算圈選範圍內的統計
+    const selectionStats = React.useMemo(() => {
+        if (!selectionCircle || !data || !mapRef.current) return null;
+        const map = mapRef.current;
+        const center: L.LatLngExpression = [selectionCircle.lat, selectionCircle.lng];
+
+        const inside = (lat: number, lng: number) =>
+            map.distance(center, [lat, lng]) <= selectionCircle.radius;
+
+        const crashesIn = data.crash_points.filter(p => inside(p.lat, p.lng));
+        const ticketsIn = data.ticket_points.filter(p => inside(p.lat, p.lng));
+
+        const severityCount = { A1: 0, A2: 0, A3: 0 };
+        crashesIn.forEach(c => {
+            if (c.severity && c.severity in severityCount) {
+                severityCount[c.severity as 'A1' | 'A2' | 'A3']++;
+            }
+        });
+
+        const topicCount: Record<string, number> = { DUI: 0, RED_LIGHT: 0, DANGEROUS_DRIVING: 0, OTHER: 0 };
+        ticketsIn.forEach(t => {
+            if (t.topic && t.topic in topicCount) topicCount[t.topic]++;
+            else topicCount.OTHER++;
+        });
+
+        const unitCount: Record<string, number> = {};
+        [...crashesIn, ...ticketsIn].forEach(p => {
+            if (p.unit) unitCount[p.unit] = (unitCount[p.unit] || 0) + 1;
+        });
+
+        return {
+            crashTotal: crashesIn.length,
+            ticketTotal: ticketsIn.length,
+            severity: severityCount,
+            topic: topicCount,
+            units: Object.entries(unitCount).sort((a, b) => b[1] - a[1]),
+        };
+    }, [selectionCircle, data]);
 
     // 處理標記拖曳
     const handleMarkerDrag = useCallback((pointId: number, pointType: 'crash' | 'ticket', originalLat: number, originalLng: number, newLat: number, newLng: number) => {
@@ -585,6 +740,169 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                             })}
                         </div>
                     </div>
+
+                    {/* 派出所篩選（可複選） */}
+                    {!editMode && availableUnits.length > 0 && (
+                        <div className="bg-white/80 rounded-2xl p-4 nook-shadow">
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="font-bold text-nook-text flex items-center gap-2">
+                                    <Building2 className="w-4 h-4 text-nook-leaf" />
+                                    派出所/單位（可複選）
+                                </h3>
+                                {unitFilter.size > 0 && (
+                                    <button
+                                        onClick={() => setUnitFilter(new Set())}
+                                        className="text-xs text-nook-text/60 hover:text-nook-leaf"
+                                    >
+                                        清除
+                                    </button>
+                                )}
+                            </div>
+                            <div className="space-y-1 max-h-48 overflow-y-auto">
+                                {availableUnits.map(unit => {
+                                    const active = unitFilter.has(unit);
+                                    const displayName = unit.replace(/^新化分局/, '');
+                                    return (
+                                        <button
+                                            key={unit}
+                                            onClick={() => {
+                                                const next = new Set(unitFilter);
+                                                if (next.has(unit)) next.delete(unit);
+                                                else next.add(unit);
+                                                setUnitFilter(next);
+                                            }}
+                                            className={`w-full text-left px-2 py-1.5 rounded-lg text-xs transition-all ${
+                                                active
+                                                    ? 'bg-nook-leaf/20 text-nook-leaf font-bold ring-1 ring-nook-leaf'
+                                                    : 'bg-gray-50 text-nook-text/70 hover:bg-nook-cream/50'
+                                            }`}
+                                        >
+                                            {active && '✓ '}{displayName}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <p className="text-[10px] text-nook-text/50 mt-2">
+                                {unitFilter.size === 0 ? '未選擇 = 顯示全部' : `已選 ${unitFilter.size} 個單位`}
+                            </p>
+                        </div>
+                    )}
+
+                    {/* 圈選工具 */}
+                    {!editMode && (
+                        <div className={`rounded-2xl p-4 nook-shadow ${selectionCircle || selectionMode ? 'bg-emerald-50 border-2 border-emerald-300' : 'bg-white/80'}`}>
+                            <h3 className="font-bold text-nook-text mb-3 flex items-center gap-2">
+                                <Target className="w-4 h-4 text-emerald-600" />
+                                範圍圈選統計
+                            </h3>
+                            {!selectionCircle && !selectionMode && (
+                                <button
+                                    onClick={() => setSelectionMode(true)}
+                                    className="w-full py-2 px-3 bg-emerald-500 text-white rounded-xl text-sm font-medium hover:bg-emerald-600 transition-colors"
+                                >
+                                    🎯 開始圈選
+                                </button>
+                            )}
+                            {selectionMode && !selectionCircle && (
+                                <div className="space-y-2">
+                                    <p className="text-xs text-emerald-700">
+                                        1. 點地圖設定中心<br />
+                                        2. 再點一次決定半徑
+                                    </p>
+                                    <button
+                                        onClick={() => { setSelectionMode(false); clickStateRef.current = 'idle'; tempCenterRef.current = null; if (selectionLayerRef.current) { selectionLayerRef.current.remove(); selectionLayerRef.current = null; } }}
+                                        className="w-full py-1.5 px-3 bg-gray-400 text-white rounded-lg text-xs"
+                                    >
+                                        取消
+                                    </button>
+                                </div>
+                            )}
+                            {selectionCircle && selectionStats && (
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-nook-text/60">半徑</span>
+                                        <span className="font-bold text-emerald-700">{Math.round(selectionCircle.radius)} 公尺</span>
+                                    </div>
+
+                                    <div className="bg-white rounded-lg p-2 space-y-1">
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-nook-text/60">事故總數</span>
+                                            <span className="font-bold text-red-600">{selectionStats.crashTotal}</span>
+                                        </div>
+                                        {selectionStats.severity.A1 > 0 && (
+                                            <div className="flex justify-between text-[11px] pl-2">
+                                                <span className="text-red-700">A1 死亡</span>
+                                                <span className="font-medium">{selectionStats.severity.A1}</span>
+                                            </div>
+                                        )}
+                                        {selectionStats.severity.A2 > 0 && (
+                                            <div className="flex justify-between text-[11px] pl-2">
+                                                <span className="text-orange-600">A2 受傷</span>
+                                                <span className="font-medium">{selectionStats.severity.A2}</span>
+                                            </div>
+                                        )}
+                                        {selectionStats.severity.A3 > 0 && (
+                                            <div className="flex justify-between text-[11px] pl-2">
+                                                <span className="text-yellow-600">A3 財損</span>
+                                                <span className="font-medium">{selectionStats.severity.A3}</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="bg-white rounded-lg p-2 space-y-1">
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-nook-text/60">違規總數</span>
+                                            <span className="font-bold text-blue-600">{selectionStats.ticketTotal}</span>
+                                        </div>
+                                        {selectionStats.topic.DUI > 0 && (
+                                            <div className="flex justify-between text-[11px] pl-2">
+                                                <span className="text-purple-600">🍺 酒駕</span>
+                                                <span className="font-medium">{selectionStats.topic.DUI}</span>
+                                            </div>
+                                        )}
+                                        {selectionStats.topic.RED_LIGHT > 0 && (
+                                            <div className="flex justify-between text-[11px] pl-2">
+                                                <span className="text-blue-600">🚦 闖紅燈</span>
+                                                <span className="font-medium">{selectionStats.topic.RED_LIGHT}</span>
+                                            </div>
+                                        )}
+                                        {selectionStats.topic.DANGEROUS_DRIVING > 0 && (
+                                            <div className="flex justify-between text-[11px] pl-2">
+                                                <span className="text-cyan-600">⚡ 危駕</span>
+                                                <span className="font-medium">{selectionStats.topic.DANGEROUS_DRIVING}</span>
+                                            </div>
+                                        )}
+                                        {selectionStats.topic.OTHER > 0 && (
+                                            <div className="flex justify-between text-[11px] pl-2">
+                                                <span className="text-gray-600">其他</span>
+                                                <span className="font-medium">{selectionStats.topic.OTHER}</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {selectionStats.units.length > 0 && (
+                                        <div className="bg-white rounded-lg p-2">
+                                            <p className="text-[10px] text-nook-text/50 mb-1">單位分布</p>
+                                            {selectionStats.units.slice(0, 3).map(([unit, cnt]) => (
+                                                <div key={unit} className="flex justify-between text-[10px]">
+                                                    <span className="text-nook-text/70 truncate">{unit.replace(/^新化分局/, '')}</span>
+                                                    <span className="font-medium">{cnt}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    <button
+                                        onClick={handleClearSelection}
+                                        className="w-full py-1.5 px-3 bg-gray-500 text-white rounded-lg text-xs flex items-center justify-center gap-1 hover:bg-gray-600"
+                                    >
+                                        <Trash2 className="w-3 h-3" />
+                                        清除圈選
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* 違規篩選 */}
                     {!editMode && (
