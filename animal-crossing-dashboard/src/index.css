@@ -1,15 +1,47 @@
-@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap');
+/*
+ * Typography 系統（Wave 5）
+ * - Inter: UI 工具字型業界標準（Linear/Vercel/GitHub/Stripe 使用）
+ *   數字、大小寫、可讀性均專為 dashboard 優化
+ * - Noto Sans TC: 繁體中文字型，與 Inter 視覺協調
+ * - 使用 variable font 版本（wght 100-900）
+ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+html {
+  /* Inter 要透過 font-feature-settings 啟用 OpenType feature 才能達到最佳效果 */
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11'; /* 更清晰的數字/字形 */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
 body {
-  font-family: 'Quicksand', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
-  /* Option B 專業深藍背景：冷白漸層，長時間低疲勞 */
+  /* Inter 為英數/符號主力；Noto Sans TC 為中文；system 字體為終極 fallback */
+  font-family: 'Inter', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;  /* Inter 預設 tracking 略寬，微縮更緊緻 */
   background: linear-gradient(135deg, #F8FAFC 0%, #FFFFFF 50%, #F1F5F9 100%);
   min-height: 100vh;
   color: #0F172A;
+}
+
+/* 標題 — tracking-tight 是 Inter 大字級的關鍵 */
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+/* 數字欄位預設使用 tabular-nums — 表格、統計、時間才不會跳動 */
+.tabular-nums,
+.font-tabular,
+table td,
+table th {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Animal Crossing Background Pattern */

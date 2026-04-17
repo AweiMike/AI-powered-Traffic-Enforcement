@@ -37,22 +37,22 @@ export const StatCard: React.FC<StatCardProps> = ({
   }
 
   return (
-    <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 nook-shadow hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-      <div className="flex items-start justify-between mb-4">
-        <div className={`w-14 h-14 ${color} rounded-2xl flex items-center justify-center text-2xl shadow-lg`}>
+    <div className="bg-white rounded-2xl p-5 nook-shadow hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between mb-3">
+        <div className={`w-10 h-10 ${color} rounded-xl flex items-center justify-center text-xl`}>
           {emoji}
         </div>
         {change !== undefined && (
-          <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-sm ${
-            isPositive ? 'bg-nook-leaf/10 text-nook-leaf' : 'bg-nook-red/10 text-nook-red'
+          <div className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium tabular-nums ${
+            isPositive ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
           }`}>
-            {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+            {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
             <span>{Math.abs(change)}%</span>
           </div>
         )}
       </div>
-      <p className="text-nook-text/60 text-sm mb-1">{title}</p>
-      <p className="text-3xl font-bold text-nook-text">
+      <p className="text-slate-500 text-xs mb-1 font-medium">{title}</p>
+      <p className="text-[28px] font-bold text-slate-900 tabular-nums tracking-tight leading-none">
         {typeof value === 'number' ? value.toLocaleString() : value}
       </p>
     </div>

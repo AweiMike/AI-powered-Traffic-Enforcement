@@ -52,7 +52,16 @@ export default {
         'nook-orange':    '#F97316',  // 警告橘
       },
       fontFamily: {
-        'round': ['"Varela Round"', '"Kosugi Maru"', 'sans-serif'],
+        // 主字型：Inter（UI 工具標準）+ Noto Sans TC（繁體中文）
+        'sans': ['Inter', 'Noto Sans TC', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        // 等寬 — 程式碼、偵錯用
+        'mono': ['"JetBrains Mono"', '"Fira Code"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        // 舊 round 別名保留（動森時代，未使用可忽略）
+        'round': ['Inter', 'Noto Sans TC', 'sans-serif'],
+      },
+      letterSpacing: {
+        'tightest': '-0.04em',
+        'tighter-ui': '-0.02em',  // 標題專用
       },
       borderRadius: {
         '4xl': '2rem',
