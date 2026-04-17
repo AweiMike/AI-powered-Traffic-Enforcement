@@ -87,6 +87,7 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
     const [severityFilter, setSeverityFilter] = useState<Set<string>>(new Set(['A1', 'A2', 'A3']));
     const [topicFilter, setTopicFilter] = useState<string>('all');
     const [availableUnits, setAvailableUnits] = useState<string[]>([]);
+    const [unitCounts, setUnitCounts] = useState<Record<string, { crash: number; ticket: number; total: number }>>({});
     const [unitFilter, setUnitFilter] = useState<Set<string>>(new Set());
 
     // 編輯模式狀態
@@ -100,12 +101,23 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
     const [selectionCircle, setSelectionCircle] = useState<SelectionCircle | null>(null);
     const selectionLayerRef = useRef<L.Circle | null>(null);
 
-    // 載入可用派出所清單
+    // 載入可用派出所清單 + 點位數（隨日期範圍重新查詢）
     useEffect(() => {
-        apiClient.getMapUnits()
-            .then(r => setAvailableUnits(r.units || []))
+        const params = new URLSearchParams();
+        if (dateRange.startDate) params.append('start_date', dateRange.startDate);
+        if (dateRange.endDate) params.append('end_date', dateRange.endDate);
+        const query = params.toString();
+        apiClient.getMapUnits(query ? `?${query}` : '')
+            .then((r: any) => {
+                setAvailableUnits(r.units || []);
+                const counts: Record<string, { crash: number; ticket: number; total: number }> = {};
+                (r.units_with_count || []).forEach((u: any) => {
+                    counts[u.unit] = { crash: u.crash_count, ticket: u.ticket_count, total: u.total };
+                });
+                setUnitCounts(counts);
+            })
             .catch(e => console.error('Failed to load units:', e));
-    }, []);
+    }, [dateRange.startDate, dateRange.endDate]);
 
     // 初始化地圖
     useEffect(() => {
@@ -741,54 +753,85 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                         </div>
                     </div>
 
-                    {/* 派出所篩選（可複選） */}
+                    {/* 派出所篩選（Checkbox 列表 + 點位計數） */}
                     {!editMode && availableUnits.length > 0 && (
-                        <div className="bg-white/80 rounded-2xl p-4 nook-shadow">
+                        <div className="bg-white rounded-2xl p-4 nook-shadow">
                             <div className="flex items-center justify-between mb-3">
-                                <h3 className="font-bold text-nook-text flex items-center gap-2">
-                                    <Building2 className="w-4 h-4 text-nook-leaf" />
-                                    派出所/單位（可複選）
+                                <h3 className="font-semibold text-sm text-slate-800 flex items-center gap-2">
+                                    <Building2 className="w-4 h-4 text-accent" />
+                                    派出所/單位
                                 </h3>
-                                {unitFilter.size > 0 && (
-                                    <button
-                                        onClick={() => setUnitFilter(new Set())}
-                                        className="text-xs text-nook-text/60 hover:text-nook-leaf"
-                                    >
-                                        清除
-                                    </button>
+                                <div className="flex items-center gap-2">
+                                    {unitFilter.size > 0 && (
+                                        <button
+                                            onClick={() => setUnitFilter(new Set())}
+                                            className="text-[11px] text-slate-500 hover:text-accent transition-colors underline-offset-2 hover:underline"
+                                        >
+                                            清除
+                                        </button>
+                                    )}
+                                    <span className="text-[11px] text-slate-400 tabular-nums">
+                                        {unitFilter.size}/{availableUnits.length}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="max-h-64 overflow-y-auto -mx-1">
+                                {[...availableUnits]
+                                    .sort((a, b) => (unitCounts[b]?.total || 0) - (unitCounts[a]?.total || 0))
+                                    .map(unit => {
+                                        const active = unitFilter.has(unit);
+                                        const displayName = unit.replace(/^新化分局/, '');
+                                        const counts = unitCounts[unit] || { crash: 0, ticket: 0, total: 0 };
+                                        return (
+                                            <label
+                                                key={unit}
+                                                className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${
+                                                    active ? 'bg-accent-soft' : 'hover:bg-slate-50'
+                                                }`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={active}
+                                                    onChange={() => {
+                                                        const next = new Set(unitFilter);
+                                                        if (next.has(unit)) next.delete(unit);
+                                                        else next.add(unit);
+                                                        setUnitFilter(next);
+                                                    }}
+                                                    className="w-3.5 h-3.5 rounded border-slate-300 text-accent focus:ring-accent focus:ring-1 cursor-pointer"
+                                                />
+                                                <span className={`flex-1 text-xs truncate ${active ? 'text-slate-900 font-medium' : 'text-slate-600'}`}>
+                                                    {displayName}
+                                                </span>
+                                                <span className="text-[10px] tabular-nums text-slate-400 flex items-center gap-1.5">
+                                                    {counts.crash > 0 && (
+                                                        <span className="text-danger/70" title={`事故 ${counts.crash}`}>
+                                                            {counts.crash}
+                                                        </span>
+                                                    )}
+                                                    {counts.ticket > 0 && (
+                                                        <span className="text-accent/70" title={`違規 ${counts.ticket}`}>
+                                                            {counts.ticket}
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </label>
+                                        );
+                                    })}
+                            </div>
+                            <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-3 text-[10px] text-slate-500">
+                                <span className="flex items-center gap-1">
+                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-danger/70"/>
+                                    事故
+                                </span>
+                                <span className="flex items-center gap-1">
+                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent/70"/>
+                                    違規
+                                </span>
+                                {unitFilter.size === 0 && (
+                                    <span className="ml-auto">未勾選=全部</span>
                                 )}
                             </div>
-                            <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
-                                {availableUnits.map(unit => {
-                                    const active = unitFilter.has(unit);
-                                    const displayName = unit.replace(/^新化分局/, '');
-                                    return (
-                                        <button
-                                            key={unit}
-                                            onClick={() => {
-                                                const next = new Set(unitFilter);
-                                                if (next.has(unit)) next.delete(unit);
-                                                else next.add(unit);
-                                                setUnitFilter(next);
-                                            }}
-                                            title={displayName}
-                                            className={`px-2 py-1.5 rounded-lg text-xs font-medium truncate transition-all ${
-                                                active
-                                                    ? 'bg-nook-leaf/15 text-nook-leaf ring-1 ring-nook-leaf/60'
-                                                    : 'bg-nook-cream/40 text-nook-text/60 hover:bg-nook-cream/70'
-                                            }`}
-                                        >
-                                            {displayName}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                            <p className="text-[10px] text-nook-text/50 mt-2">
-                                {unitFilter.size === 0 ? '未選擇 = 顯示全部' : `已選 ${unitFilter.size} 個單位`}
-                            </p>
-                            <p className="text-[10px] text-nook-text/50 mt-1 leading-tight">
-                                事故以「所轄單位名稱」為準；舊資料尚未回補者則以該派出所所屬行政區代替。
-                            </p>
                         </div>
                     )}
 

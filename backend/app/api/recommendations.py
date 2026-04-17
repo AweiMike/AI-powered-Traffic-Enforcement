@@ -998,12 +998,94 @@ STATION_TO_DISTRICTS: dict[str, list[str]] = {
 
 
 @router.get("/map/units")
-async def get_map_units(db: Session = Depends(get_db)):
-    """取得所有出現過的派出所/單位名稱（聯集自事故與違規資料）"""
-    crash_units = [r[0] for r in db.query(Crash.sub_unit).filter(Crash.sub_unit.isnot(None)).distinct().all() if r[0]]
-    ticket_units = [r[0] for r in db.query(Ticket.unit_code).filter(Ticket.unit_code.isnot(None)).distinct().all() if r[0]]
-    all_units = sorted(set(crash_units) | set(ticket_units))
-    return {"units": all_units}
+async def get_map_units(
+    days: int = Query(default=90, description="統計期間天數（計數用）"),
+    start_date: str = Query(default=None, description="起始日期 YYYY-MM-DD"),
+    end_date_param: str = Query(default=None, alias="end_date", description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """
+    取得所有派出所/單位名稱，並附上該期間內的事故與違規點位數。
+    前端 Checkbox 列表顯示用。
+    """
+    # 決定統計期間
+    if start_date and end_date_param:
+        from datetime import datetime as dt
+        end_date = dt.strptime(end_date_param, "%Y-%m-%d").date()
+        start_date = dt.strptime(start_date, "%Y-%m-%d").date()
+    else:
+        end_date = get_data_end_date(db)
+        start_date = end_date - timedelta(days=days)
+
+    # 事故計數（含 district fallback，與 /map/points 一致）
+    crash_counts_raw = dict(
+        db.query(Crash.sub_unit, func.count(Crash.id))
+        .filter(
+            Crash.sub_unit.isnot(None),
+            Crash.occurred_date >= start_date,
+            Crash.occurred_date <= end_date,
+        )
+        .group_by(Crash.sub_unit)
+        .all()
+    )
+
+    # district → 該 district 內的 crash 總數（供 fallback 計算用）
+    district_crash_counts = dict(
+        db.query(Crash.district, func.count(Crash.id))
+        .filter(
+            Crash.district.isnot(None),
+            Crash.sub_unit.like('%交通分隊%'),
+            Crash.occurred_date >= start_date,
+            Crash.occurred_date <= end_date,
+        )
+        .group_by(Crash.district)
+        .all()
+    )
+
+    # 違規計數
+    ticket_counts = dict(
+        db.query(Ticket.unit_code, func.count(Ticket.id))
+        .filter(
+            Ticket.unit_code.isnot(None),
+            Ticket.violation_date >= start_date,
+            Ticket.violation_date <= end_date,
+        )
+        .group_by(Ticket.unit_code)
+        .all()
+    )
+
+    # 聯集所有單位
+    crash_units = set(r[0] for r in db.query(Crash.sub_unit).filter(Crash.sub_unit.isnot(None)).distinct().all() if r[0])
+    ticket_units = set(ticket_counts.keys())
+    all_units = sorted(crash_units | ticket_units)
+
+    units_with_count = []
+    for unit in all_units:
+        if "交通分隊" in unit or "交通組" in unit or "警備隊" in unit:
+            # 催化型單位：事故數 = 其涵蓋的所有 district 內屬於交通分隊的事故總和
+            crash_count = sum(
+                district_crash_counts.get(d, 0)
+                for d in STATION_TO_DISTRICTS.get(unit, [])
+            )
+        else:
+            # 一般派出所：直接 match + 舊資料 fallback（所在行政區內的交通分隊案件）
+            crash_count = crash_counts_raw.get(unit, 0)
+            for district in STATION_TO_DISTRICTS.get(unit, []):
+                crash_count += district_crash_counts.get(district, 0)
+
+        ticket_count = ticket_counts.get(unit, 0)
+        units_with_count.append({
+            "unit": unit,
+            "crash_count": crash_count,
+            "ticket_count": ticket_count,
+            "total": crash_count + ticket_count,
+        })
+
+    # 保留舊格式相容
+    return {
+        "units": all_units,
+        "units_with_count": units_with_count,
+    }
 
 
 @router.get("/map/points")

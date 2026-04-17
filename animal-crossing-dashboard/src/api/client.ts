@@ -641,8 +641,11 @@ class APIClient {
     return this.request(`/recommendations/map/points?${params}`);
   }
 
-  async getMapUnits(): Promise<{ units: string[] }> {
-    return this.request('/recommendations/map/units');
+  async getMapUnits(querySuffix: string = ''): Promise<{
+    units: string[];
+    units_with_count?: Array<{ unit: string; crash_count: number; ticket_count: number; total: number }>;
+  }> {
+    return this.request(`/recommendations/map/units${querySuffix}`);
   }
 
   async getPreciseHeatmapData(days: number = 90, dataType: string = 'crash'): Promise<any> {
