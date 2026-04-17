@@ -24,7 +24,9 @@ import {
   Lock,
   LogOut,
   Wine,
-  Truck
+  Truck,
+  Target,
+  Bot
 } from 'lucide-react';
 
 // Import custom components
@@ -89,77 +91,113 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, readOnly, onLogout }) => {
-  const allMenuItems = [
-    { id: 'dashboard', icon: Home, label: '總覽', emoji: '🏠', description: '整體統計概覽' },
-    { id: 'accidents', icon: MapPin, label: '執法缺口分析', emoji: '🎯', description: '事故與違規綜合分析' },
-    { id: 'map', icon: MapPin, label: '地圖視覺化', emoji: '🗺️', description: '精準座標點位分布' },
-    { id: 'elderly', icon: Users, label: '高齡者事故防制專區', emoji: '👴', description: '高齡者事故防治' },
-    { id: 'evehicle', icon: Zap, label: '青少年慢車與微電車專區', emoji: '🚵', description: '青少年微電車/電輔車事故分析' },
-    { id: 'dui', icon: Wine, label: '酒駕防制成效', emoji: '🍺', description: '各派出所酒駕取締與事故統計' },
-    { id: 'heavy-vehicle', icon: Truck, label: '大型車防制成效', emoji: '🚛', description: '各派出所大型車取締與事故統計' },
-    { id: 'monthly', icon: Calendar, label: '綜合執法成效', emoji: '📊', description: '數據總覽·趨勢·A1清單' },
-    { id: 'ai-report', icon: BarChart3, label: 'AI 智慧報告', emoji: '🤖', description: 'AI 自動生成分析報告' },
-    { id: 'import', icon: FileText, label: '資料匯入', emoji: '📥', description: '匯入 Excel 資料' },
+  // 菜單分組：資料分析 / 防制專區 / 工具
+  const menuGroups: { section?: string; items: Array<{ id: string; icon: any; label: string; description: string }> }[] = [
+    {
+      section: undefined,  // 首組不顯示 section label
+      items: [
+        { id: 'dashboard', icon: Home, label: '總覽', description: '整體統計概覽' },
+      ],
+    },
+    {
+      section: '分析',
+      items: [
+        { id: 'accidents', icon: Target, label: '執法缺口', description: '事故與違規綜合分析' },
+        { id: 'map', icon: MapPin, label: '地圖視覺化', description: '精準座標點位分布' },
+        { id: 'monthly', icon: BarChart3, label: '綜合執法成效', description: '數據總覽·趨勢·A1清單' },
+      ],
+    },
+    {
+      section: '專區',
+      items: [
+        { id: 'elderly', icon: Users, label: '高齡者專區', description: '高齡者事故防治' },
+        { id: 'evehicle', icon: Zap, label: '青少年微電車', description: '青少年微電車/電輔車事故分析' },
+        { id: 'dui', icon: Wine, label: '酒駕成效', description: '各派出所酒駕取締與事故統計' },
+        { id: 'heavy-vehicle', icon: Truck, label: '大型車成效', description: '各派出所大型車取締與事故統計' },
+      ],
+    },
+    {
+      section: '工具',
+      items: [
+        { id: 'ai-report', icon: Bot, label: 'AI 智慧報告', description: 'AI 自動生成分析報告' },
+        { id: 'import', icon: FileText, label: '資料匯入', description: '匯入 Excel 資料' },
+      ],
+    },
   ];
 
-  const menuItems = readOnly
-    ? allMenuItems.filter(item => !ADMIN_ONLY_VIEWS.has(item.id))
-    : allMenuItems;
+  // 過濾唯讀模式隱藏的項目
+  const visibleGroups = menuGroups
+    .map(g => ({ ...g, items: readOnly ? g.items.filter(i => !ADMIN_ONLY_VIEWS.has(i.id)) : g.items }))
+    .filter(g => g.items.length > 0);
 
   return (
-    <aside className="w-72 bg-white/80 backdrop-blur-sm h-screen fixed left-0 top-0 nook-shadow z-50 flex flex-col">
-      <div className="p-6 border-b border-nook-leaf/20 shrink-0">
+    <aside className="w-64 bg-white h-screen fixed left-0 top-0 border-r border-slate-200 z-50 flex flex-col">
+      {/* Brand Lockup */}
+      <div className="p-5 border-b border-slate-100 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-nook-leaf rounded-2xl flex items-center justify-center">
-            <Shield className="w-7 h-7 text-white" />
+          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shrink-0">
+            <Shield className="w-5 h-5 text-white" strokeWidth={2.25} />
           </div>
-          <div>
-            <h1 className="font-bold text-nook-text text-lg">精準執法儀表板</h1>
-            <p className="text-sm text-nook-text/60">事故與違規分析</p>
+          <div className="min-w-0">
+            <h1 className="font-semibold text-slate-800 text-[15px] leading-tight tracking-tight">精準執法儀表板</h1>
+            <p className="text-[11px] text-slate-500 mt-0.5">新化分局</p>
             {readOnly && (
-              <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
-                <Eye className="w-3 h-3" />
-                唯讀模式
+              <span className="inline-flex items-center gap-1 mt-1.5 px-1.5 py-0.5 bg-sky-50 text-sky-700 text-[10px] font-medium rounded">
+                <Eye className="w-2.5 h-2.5" />
+                唯讀
               </span>
             )}
           </div>
         </div>
       </div>
 
-      <nav className="p-4 space-y-2 flex-1 overflow-y-auto min-h-0">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeView === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => onViewChange(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 ${isActive
-                ? 'bg-nook-leaf text-white shadow-lg shadow-nook-leaf/30'
-                : 'text-nook-text hover:bg-nook-leaf/10'
-                }`}
-              title={item.description}
-            >
-              <span className="text-xl">{item.emoji}</span>
-              <span className="font-medium">{item.label}</span>
-              {isActive && <ChevronRight className="w-4 h-4 ml-auto" />}
-            </button>
-          );
-        })}
+      {/* Navigation — grouped */}
+      <nav className="px-3 py-4 flex-1 overflow-y-auto min-h-0">
+        {visibleGroups.map((group, gIdx) => (
+          <div key={gIdx} className={gIdx > 0 ? 'mt-5' : ''}>
+            {group.section && (
+              <div className="px-3 mb-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                {group.section}
+              </div>
+            )}
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeView === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => onViewChange(item.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                      isActive
+                        ? 'bg-primary text-white'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                    }`}
+                    title={item.description}
+                  >
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} strokeWidth={2} />
+                    <span className="font-medium truncate">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
-      <div className="shrink-0 p-4 space-y-3 border-t border-nook-leaf/10">
+      {/* Footer — data info + system status + logout */}
+      <div className="shrink-0 border-t border-slate-100">
+        <DataInfo />
+        <SystemStatus />
         {onLogout && (
           <button
             onClick={onLogout}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-nook-text/60 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-xs text-slate-500 hover:text-danger hover:bg-red-50 transition-colors border-t border-slate-100"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-3.5 h-3.5" />
             登出
           </button>
         )}
-        <DataInfo />
-        <SystemStatus />
       </div>
     </aside>
   );
@@ -172,32 +210,32 @@ const SystemStatus: React.FC = () => {
   const { data: health, loading, error } = useHealthCheck();
 
   const getStatusColor = () => {
-    if (loading) return 'bg-yellow-500';
-    if (error) return 'bg-red-500';
-    if (health?.status === 'ok') return 'bg-green-500';
-    return 'bg-gray-500';
+    if (loading) return 'bg-amber-400';
+    if (error) return 'bg-danger';
+    if (health?.status === 'ok') return 'bg-success';
+    return 'bg-slate-400';
   };
 
   const getStatusText = () => {
-    if (loading) return '檢查中...';
-    if (error) return '⚠ 連線異常';
-    if (health?.mode === 'simple') return '⚠ 模擬模式';
-    if (health?.status === 'ok') return '✓ 正常運作';
-    return '未知狀態';
+    if (loading) return '檢查中';
+    if (error) return '連線異常';
+    if (health?.mode === 'simple') return '模擬模式';
+    if (health?.status === 'ok') return '正常';
+    return '未知';
   };
 
+  // 正常狀態一行就好；異常才展開
+  const isAbnormal = error || health?.mode === 'simple';
+
   return (
-    <div className="bg-nook-sky/20 rounded-2xl p-4">
-      <div className="flex items-center gap-3">
-        <div className={`w-3 h-3 rounded-full ${getStatusColor()} animate-pulse`} />
-        <div className="flex-1">
-          <p className="text-sm font-medium text-nook-text">後端狀態</p>
-          <p className="text-xs text-nook-text/60">{getStatusText()}</p>
-        </div>
+    <div className="px-4 py-2 border-t border-slate-100">
+      <div className="flex items-center gap-2">
+        <div className={`w-1.5 h-1.5 rounded-full ${getStatusColor()}`} />
+        <span className="text-[11px] text-slate-500">後端 {getStatusText()}</span>
       </div>
-      {health?.mode === 'simple' && (
-        <div className="mt-2 text-xs text-nook-orange bg-nook-orange/10 rounded-lg p-2">
-          ⚠️ 目前使用模擬數據。請安裝 PostgreSQL 以使用真實資料。
+      {isAbnormal && health?.mode === 'simple' && (
+        <div className="mt-1.5 text-[10px] text-warning bg-amber-50 rounded px-2 py-1">
+          使用模擬數據
         </div>
       )}
     </div>
@@ -228,23 +266,27 @@ const DataInfo: React.FC = () => {
   };
 
   return (
-    <div className="bg-nook-sky/20 rounded-2xl p-3 text-xs text-nook-text/70 space-y-1.5">
-      <p className="font-medium text-nook-text text-xs">資料涵蓋範圍</p>
-      <div>
-        <span className="font-medium">事故</span>{' '}
-        {formatDate(info.crash.earliest)}~{formatDate(info.crash.latest)}{' '}
-        <span className="text-nook-text/50">({info.crash.count}筆)</span>
+    <div className="px-4 py-3 text-[11px] text-slate-500 space-y-1">
+      <div className="flex items-center justify-between">
+        <span className="text-slate-400 uppercase tracking-wider text-[9px] font-semibold">資料範圍</span>
+        {info.last_upload && (
+          <span className="text-[10px] text-slate-400 tabular-nums">
+            更新 {formatUpload(info.last_upload)}
+          </span>
+        )}
       </div>
-      <div>
-        <span className="font-medium">違規</span>{' '}
-        {formatDate(info.ticket.earliest)}~{formatDate(info.ticket.latest)}{' '}
-        <span className="text-nook-text/50">({info.ticket.count}筆)</span>
+      <div className="flex items-baseline justify-between">
+        <span className="text-slate-600">事故</span>
+        <span className="tabular-nums text-slate-500">
+          {formatDate(info.crash.latest)} · {info.crash.count.toLocaleString()} 筆
+        </span>
       </div>
-      {info.last_upload && (
-        <div className="text-nook-text/50 pt-0.5 border-t border-nook-leaf/10">
-          最後上傳: {formatUpload(info.last_upload)}
-        </div>
-      )}
+      <div className="flex items-baseline justify-between">
+        <span className="text-slate-600">違規</span>
+        <span className="tabular-nums text-slate-500">
+          {formatDate(info.ticket.latest)} · {info.ticket.count.toLocaleString()} 筆
+        </span>
+      </div>
     </div>
   );
 };
@@ -262,40 +304,33 @@ const Header: React.FC = () => {
   });
 
   return (
-    <header className="h-20 bg-white/60 backdrop-blur-sm border-b border-nook-leaf/10 flex items-center justify-between px-8">
-      <div className="flex items-center gap-4">
-        <div className="relative">
-          <Search className="w-5 h-5 text-nook-text/40 absolute left-4 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="搜尋點位、地區或條款..."
-            className="w-96 pl-12 pr-4 py-3 bg-nook-cream/50 border border-nook-leaf/20 rounded-2xl text-nook-text placeholder:text-nook-text/40 focus:outline-none focus:ring-2 focus:ring-nook-leaf/30"
-          />
-        </div>
+    <header className="h-14 bg-white/80 backdrop-blur-sm border-b border-slate-200 flex items-center justify-end gap-3 px-6">
+      {/* 今天日期 — 低調呈現 */}
+      <div className="flex items-center gap-1.5 text-xs text-slate-500">
+        <Calendar className="w-3.5 h-3.5" />
+        <span className="tabular-nums">{dateStr}</span>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2 px-4 py-2 bg-nook-sky/10 rounded-2xl">
-          <Calendar className="w-4 h-4 text-nook-sky" />
-          <span className="text-sm text-nook-text font-medium">{dateStr}</span>
-        </div>
+      {/* 分隔線 */}
+      <div className="w-px h-5 bg-slate-200" />
 
-        <button className="relative p-3 bg-nook-cream rounded-2xl hover:bg-nook-bell/20 transition-colors">
-          <Bell className="w-5 h-5 text-nook-text" />
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-nook-red rounded-full text-white text-xs flex items-center justify-center">
-            0
-          </span>
-        </button>
+      {/* 通知鈴 — 僅在有未讀時顯示紅點 */}
+      <button
+        className="relative w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors"
+        aria-label="通知"
+        title="通知"
+      >
+        <Bell className="w-4 h-4 text-slate-500" strokeWidth={2} />
+        {/* 未讀通知才顯示 — 目前為 0 隱藏 */}
+        {/* <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-danger rounded-full" /> */}
+      </button>
 
-        <div className="flex items-center gap-3 pl-4 border-l border-nook-leaf/20">
-          <div className="w-10 h-10 bg-nook-leaf rounded-full flex items-center justify-center text-xl">
-            👮
-          </div>
-          <div>
-            <p className="text-sm font-medium text-nook-text">執法人員</p>
-            <p className="text-xs text-nook-text/60">新化分局</p>
-          </div>
+      {/* 使用者 chip — 只顯示真實資訊 */}
+      <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
+        <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold">
+          新
         </div>
+        <span className="text-sm text-slate-700 font-medium">新化分局</span>
       </div>
     </header>
   );
@@ -1017,7 +1052,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-nook-cream via-white to-nook-sky/10">
       <Sidebar activeView={activeView} onViewChange={safeSetView} readOnly={readOnly} onLogout={!readOnly ? logout : undefined} />
-      <main className="ml-72 min-h-screen">
+      <main className="ml-64 min-h-screen">
         <Header />
         {renderView()}
       </main>
