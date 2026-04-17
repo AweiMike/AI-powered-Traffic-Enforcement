@@ -68,10 +68,14 @@ function useAPI<T>(
 /**
  * 取得總覽統計
  */
-export function useOverview(days: number = 30): UseAPIState<OverviewStats> {
+export function useOverview(
+  days: number = 30,
+  startDate?: string,
+  endDate?: string,
+): UseAPIState<OverviewStats> {
   return useAPI(
-    () => apiClient.getOverview(days),
-    [days]
+    () => apiClient.getOverview(days, startDate, endDate),
+    [days, startDate, endDate]
   );
 }
 
@@ -81,11 +85,13 @@ export function useOverview(days: number = 30): UseAPIState<OverviewStats> {
 export function useTopicStats(
   topicCode: TopicCode,
   shiftId?: string,
-  days: number = 30
+  days: number = 30,
+  startDate?: string,
+  endDate?: string,
 ): UseAPIState<TopicStats> {
   return useAPI(
-    () => apiClient.getTopicStats(topicCode, shiftId, days),
-    [topicCode, shiftId, days]
+    () => apiClient.getTopicStats(topicCode, shiftId, days, startDate, endDate),
+    [topicCode, shiftId, days, startDate, endDate]
   );
 }
 

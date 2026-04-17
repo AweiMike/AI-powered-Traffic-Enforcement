@@ -14,13 +14,54 @@ from app.models.core import Ticket, Crash
 router = APIRouter()
 
 
+def _resolve_range(
+    days: int,
+    start_date: Optional[str],
+    end_date: Optional[str],
+    fallback_end=None,
+):
+    """
+    統一處理 (days vs start_date/end_date) 兩種輸入方式。
+    - 若 start_date + end_date 均提供 → 直接解析
+    - 否則 → 用 days 從「資料最新日期」往回推（而非 datetime.now()，
+      避免今天日期超出資料範圍時出現空結果）
+    回傳 (start, end) 皆為 date 物件。
+    """
+    from datetime import datetime as _dt
+    if start_date and end_date:
+        try:
+            sd = _dt.strptime(start_date, "%Y-%m-%d").date()
+            ed = _dt.strptime(end_date, "%Y-%m-%d").date()
+            return sd, ed
+        except ValueError:
+            pass  # 格式錯誤，退回 days 邏輯
+
+    ed = fallback_end or _dt.now().date()
+    sd = ed - timedelta(days=days)
+    return sd, ed
+
+
+def _data_end_date(db: Session):
+    """取資料庫內最新的事故/違規日期；未有資料則返回今天"""
+    max_crash = db.query(func.max(Crash.occurred_date)).scalar()
+    max_ticket = db.query(func.max(Ticket.violation_date)).scalar()
+    dates = [d for d in [max_crash, max_ticket] if d is not None]
+    return max(dates) if dates else datetime.now().date()
+
+
 @router.get("/overview")
-async def get_overview(days: int = 30, db: Session = Depends(get_db)):
+async def get_overview(
+    days: int = 30,
+    start_date: Optional[str] = Query(default=None, description="起始日期 YYYY-MM-DD"),
+    end_date: Optional[str] = Query(default=None, description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
     """
     總覽統計（無個資，僅統計數據）
 
     參數：
-    - days: 統計天數，預設30天
+    - days: 統計天數（當未指定 start_date/end_date 時使用）
+    - start_date / end_date: 自訂日期區間（優先）
 
     返回：
     - 違規總數
@@ -28,8 +69,7 @@ async def get_overview(days: int = 30, db: Session = Depends(get_db)):
     - 主題分布
     - 高齡者統計
     """
-    end_date = datetime.now().date()
-    start_date = end_date - timedelta(days=days)
+    start_date, end_date = _resolve_range(days, start_date, end_date, fallback_end=_data_end_date(db))
 
     # 違規統計
     total_tickets = (
@@ -122,7 +162,7 @@ async def get_overview(days: int = 30, db: Session = Depends(get_db)):
         "period": {
             "start_date": start_date.isoformat(),
             "end_date": end_date.isoformat(),
-            "days": days,
+            "days": (end_date - start_date).days,
         },
         "tickets": {
             "total": total_tickets,
@@ -302,21 +342,20 @@ async def get_monthly_stats(
 
 
 @router.get("/elderly")
-async def get_elderly_stats(days: int = 30, db: Session = Depends(get_db)):
+async def get_elderly_stats(
+    days: int = 30,
+    start_date: Optional[str] = Query(default=None, description="起始日期 YYYY-MM-DD"),
+    end_date: Optional[str] = Query(default=None, description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
     """
     高齡者事故防治統計（無個資，僅統計）
 
     參數：
-    - days: 統計天數，預設30天
-
-    返回：
-    - 高齡者違規統計
-    - 高齡者事故統計
-    - 時段分布
-    - 地區分布
+    - days: 統計天數（備援）
+    - start_date / end_date: 自訂日期區間（優先）
     """
-    end_date = datetime.now().date()
-    start_date = end_date - timedelta(days=days)
+    start_date, end_date = _resolve_range(days, start_date, end_date, fallback_end=_data_end_date(db))
 
     # 高齡者違規統計
     elderly_tickets = db.query(Ticket).filter(
@@ -446,19 +485,24 @@ async def get_elderly_stats(days: int = 30, db: Session = Depends(get_db)):
 
 
 @router.get("/shifts")
-async def get_shift_analysis(days: int = 30, db: Session = Depends(get_db)):
+async def get_shift_analysis(
+    days: int = 30,
+    start_date: Optional[str] = Query(default=None, description="起始日期 YYYY-MM-DD"),
+    end_date: Optional[str] = Query(default=None, description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
     """
     班別分析（12班制）
 
     參數：
-    - days: 統計天數，預設30天
+    - days: 統計天數（備援）
+    - start_date / end_date: 自訂日期區間（優先）
 
     返回：
     - 各班別違規/事故統計
     - 各班別主題分布
     """
-    end_date = datetime.now().date()
-    start_date = end_date - timedelta(days=days)
+    start_date, end_date = _resolve_range(days, start_date, end_date, fallback_end=_data_end_date(db))
 
     shift_analysis = []
 
@@ -584,20 +628,20 @@ async def get_shift_analysis(days: int = 30, db: Session = Depends(get_db)):
 
 
 @router.get("/violations")
-async def get_violation_stats(days: int = 30, db: Session = Depends(get_db)):
+async def get_violation_stats(
+    days: int = 30,
+    start_date: Optional[str] = Query(default=None, description="起始日期 YYYY-MM-DD"),
+    end_date: Optional[str] = Query(default=None, description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
     """
     違規分析統計（無個資）
 
     參數：
-    - days: 統計天數，預設30天
-
-    返回：
-    - 各行政區違規統計
-    - 前十大違規項目
-    - 主題分佈
+    - days: 統計天數（備援）
+    - start_date / end_date: 自訂日期區間（優先）
     """
-    end_date = datetime.now().date()
-    start_date = end_date - timedelta(days=days)
+    start_date, end_date = _resolve_range(days, start_date, end_date, fallback_end=_data_end_date(db))
 
     # 1. 各行政區統計
     district_stats = (

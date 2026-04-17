@@ -137,14 +137,14 @@ const HotspotRankingCard: React.FC<HotspotRankingCardProps> = ({
     }
 
     return (
-        <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 nook-shadow">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-nook-text flex items-center gap-2">
-                    {type === 'accident' ? <AlertTriangle className="w-5 h-5 text-red-500" /> : <Award className="w-5 h-5 text-blue-500" />}
+        <div className="bg-white rounded-2xl p-4 nook-shadow">
+            <div className="flex items-center justify-between mb-2">
+                <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                    {type === 'accident' ? <AlertTriangle className="w-4 h-4 text-danger" /> : <Award className="w-4 h-4 text-accent" />}
                     {title || defaultTitle}
                 </h3>
                 {type === 'accident' && totalInPeriod > 0 && (
-                    <span className="text-sm text-nook-text/60 bg-nook-cream/50 px-3 py-1 rounded-full">
+                    <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full tabular-nums">
                         總計 {totalInPeriod} 件
                     </span>
                 )}
@@ -156,54 +156,59 @@ const HotspotRankingCard: React.FC<HotspotRankingCardProps> = ({
                     <p>此期間無熱點資料</p>
                 </div>
             ) : (
-                <div className="space-y-2">
+                <div className="divide-y divide-slate-100">
                     {hotspots.map((item) => (
                         <div
                             key={item.rank}
-                            className={`flex items-center gap-3 p-3 rounded-xl transition-all ${onHotspotClick
-                                ? 'hover:bg-nook-leaf/10 cursor-pointer'
-                                : 'bg-nook-cream/30'
+                            className={`flex items-center gap-3 py-2 px-2 transition-colors ${onHotspotClick
+                                ? 'hover:bg-slate-50 cursor-pointer rounded-lg'
+                                : ''
                                 }`}
                             onClick={() => onHotspotClick?.(item)}
                         >
                             {/* 排名徽章 */}
                             {getRankBadge(item.rank)}
 
-                            {/* 地點資訊 */}
-                            <div className="flex-1 min-w-0">
-                                <p className="font-bold text-nook-text truncate" title={item.location}>
+                            {/* 地點資訊 — 1 行合併，district 做為次要 */}
+                            <div className="flex-1 min-w-0 flex items-baseline gap-2">
+                                <span className="font-semibold text-slate-800 truncate" title={item.location}>
                                     {item.location}
-                                </p>
-                                <p className="text-xs text-nook-text/60">{item.district}</p>
+                                </span>
+                                <span className="text-[11px] text-slate-400 shrink-0">{item.district}</span>
                             </div>
 
-                            {/* 數量 */}
-                            <div className="text-right">
-                                <p className="font-bold text-nook-text text-lg">
+                            {/* 嚴重度細分 — 緊湊 inline */}
+                            {type === 'accident' && item.a1_count !== undefined && (
+                                <div className="hidden md:flex items-center gap-2 text-[11px] tabular-nums">
+                                    <span className={item.a1_count > 0 ? 'text-danger font-semibold' : 'text-slate-400'}>
+                                        A1 {item.a1_count}
+                                    </span>
+                                    <span className={item.a2_count! > 0 ? 'text-warning font-semibold' : 'text-slate-400'}>
+                                        A2 {item.a2_count}
+                                    </span>
+                                    <span className="text-slate-400">
+                                        A3 {item.a3_count}
+                                    </span>
+                                </div>
+                            )}
+
+                            {/* 主數字 + 佔比 */}
+                            <div className="text-right shrink-0 min-w-[60px]">
+                                <div className="font-bold text-slate-800 tabular-nums leading-tight">
                                     {type === 'accident' ? item.total : (item.count || item.total)}
-                                </p>
+                                </div>
                                 {type === 'accident' && showPercentage && totalInPeriod > 0 && (
-                                    <p className="text-xs font-medium text-nook-leaf">
-                                        佔 {((item.total / totalInPeriod) * 100).toFixed(1)}%
-                                    </p>
-                                )}
-                                {type === 'accident' && !showPercentage && item.a1_count !== undefined && (
-                                    <p className="text-xs text-nook-text/60">
-                                        A1:{item.a1_count} A2:{item.a2_count}
-                                    </p>
-                                )}
-                                {type === 'accident' && showPercentage && item.a1_count !== undefined && (
-                                    <p className="text-xs text-nook-text/60">
-                                        A1:{item.a1_count} A2:{item.a2_count} A3:{item.a3_count}
-                                    </p>
+                                    <div className="text-[10px] text-accent tabular-nums">
+                                        {((item.total / totalInPeriod) * 100).toFixed(1)}%
+                                    </div>
                                 )}
                             </div>
 
                             {/* 趨勢 */}
                             {item.trend_pct !== undefined && item.trend_pct !== null && (
-                                <div className={`flex items-center gap-1 min-w-[60px] justify-end ${getTrendColor(item.trend_pct)}`}>
+                                <div className={`flex items-center gap-0.5 min-w-[52px] justify-end shrink-0 tabular-nums ${getTrendColor(item.trend_pct)}`}>
                                     {getTrendIcon(item.trend_pct)}
-                                    <span className="text-sm font-medium">
+                                    <span className="text-xs font-medium">
                                         {item.trend_pct > 0 ? '+' : ''}{item.trend_pct}%
                                     </span>
                                 </div>
@@ -214,11 +219,11 @@ const HotspotRankingCard: React.FC<HotspotRankingCardProps> = ({
             )}
 
             {/* 說明 */}
-            <div className="mt-4 pt-3 border-t border-nook-cream/50 text-xs text-nook-text/50 text-center">
+            <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-400 text-center">
                 {type === 'accident' ? (
-                    <span>📊 依事故總數排名 · 趨勢為去年同期比較</span>
+                    <span>依事故總數排名 · 趨勢為去年同期比較</span>
                 ) : (
-                    <span>📋 依違規件數排名</span>
+                    <span>依違規件數排名</span>
                 )}
             </div>
         </div>

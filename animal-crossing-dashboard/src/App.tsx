@@ -44,6 +44,7 @@ import AIReportPage from './components/AIReportPage';
 import EVehicleAnalysisPage from './components/EVehicleAnalysisPage';
 import DuiPerformancePage from './components/DuiPerformancePage';
 import HeavyVehiclePerformancePage from './components/HeavyVehiclePerformancePage';
+import DateRangePicker, { type DateRange } from './components/DateRangePicker';
 
 // Import hooks
 import {
@@ -304,7 +305,22 @@ const Header: React.FC = () => {
 // Dashboard View (總覽)
 // ============================================
 const DashboardView: React.FC = () => {
-  const { data: overview, loading, error } = useOverview(30);
+  // 預設近 30 天，可由 DateRangePicker 覆寫
+  const today = new Date();
+  const thirtyDaysAgo = new Date(today);
+  thirtyDaysAgo.setDate(today.getDate() - 30);
+  const fmt = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  };
+  const [dateRange, setDateRange] = useState<DateRange>({
+    startDate: fmt(thirtyDaysAgo),
+    endDate: fmt(today),
+  });
+
+  const { data: overview, loading, error } = useOverview(30, dateRange.startDate, dateRange.endDate);
   const now = new Date();
   const { data: monthly } = useMonthlyStats(now.getFullYear(), now.getMonth() + 1);
 
@@ -335,17 +351,22 @@ const DashboardView: React.FC = () => {
         </div>
       </div>
 
+      {/* 日期範圍選擇器 */}
+      <div className="mb-6 bg-white rounded-2xl p-4 nook-shadow">
+        <DateRangePicker value={dateRange} onChange={setDateRange} showCompare={false} />
+      </div>
+
       {/* Stats Grid */}
       <div className="grid grid-cols-4 gap-6 mb-8">
         <StatCard
-          title="違規案件（30天）"
+          title="違規案件"
           value={overview?.tickets.total || 0}
           emoji="📋"
           color="bg-nook-orange"
           loading={loading}
         />
         <StatCard
-          title="交通事故（30天）"
+          title="交通事故"
           value={overview?.crashes.total || 0}
           emoji="⚠️"
           color="bg-nook-red"

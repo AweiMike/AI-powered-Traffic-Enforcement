@@ -1,7 +1,7 @@
 """
 主題管理 API
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from typing import Optional, List
@@ -72,6 +72,8 @@ async def get_topic_stats(
     topic_code: str,
     shift_id: Optional[str] = None,
     days: int = 30,
+    start_date: Optional[str] = Query(default=None, description="起始日期 YYYY-MM-DD"),
+    end_date: Optional[str] = Query(default=None, description="結束日期 YYYY-MM-DD"),
     db: Session = Depends(get_db)
 ):
     """
@@ -92,9 +94,21 @@ async def get_topic_stats(
     if topic_code not in TOPICS:
         raise HTTPException(status_code=404, detail="主題不存在")
 
-    # 計算日期範圍
-    end_date = datetime.now().date()
-    start_date = end_date - timedelta(days=days)
+    # 計算日期範圍（優先 start_date/end_date，否則用 days 從資料最新日期往回推）
+    if start_date and end_date:
+        try:
+            start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+        except ValueError:
+            end_date = datetime.now().date()
+            start_date = end_date - timedelta(days=days)
+    else:
+        # 取資料最新日期作為基準，避免今天超出資料範圍時結果為空
+        max_crash = db.query(func.max(Crash.occurred_date)).scalar()
+        max_ticket = db.query(func.max(Ticket.violation_date)).scalar()
+        dates = [d for d in [max_crash, max_ticket] if d is not None]
+        end_date = max(dates) if dates else datetime.now().date()
+        start_date = end_date - timedelta(days=days)
 
     # 基礎查詢條件
     base_conditions = [

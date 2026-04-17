@@ -437,10 +437,14 @@ class APIClient {
   async getTopicStats(
     topicCode: TopicCode,
     shiftId?: string,
-    days: number = 30
+    days: number = 30,
+    startDate?: string,
+    endDate?: string,
   ): Promise<TopicStats> {
     const params = new URLSearchParams({ days: days.toString() });
     if (shiftId) params.append('shift_id', shiftId);
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
 
     return this.request(`/topics/${topicCode}/stats?${params}`);
   }
@@ -456,8 +460,11 @@ class APIClient {
   // Stats API
   // ============================================
 
-  async getOverview(days: number = 30): Promise<OverviewStats> {
-    return this.request(`/stats/overview?days=${days}`);
+  async getOverview(days: number = 30, startDate?: string, endDate?: string): Promise<OverviewStats> {
+    const params = new URLSearchParams({ days: days.toString() });
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    return this.request(`/stats/overview?${params}`);
   }
 
   async getMonthlyStats(year: number, month: number): Promise<MonthlyStats> {
@@ -500,20 +507,29 @@ class APIClient {
     return this.request(`/hotspots/a1-accident-list?${params}`);
   }
 
-  async getElderlyStats(days: number = 30): Promise<any> {
-    return this.request(`/stats/elderly?days=${days}`);
+  async getElderlyStats(days: number = 30, startDate?: string, endDate?: string): Promise<any> {
+    const params = new URLSearchParams({ days: days.toString() });
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    return this.request(`/stats/elderly?${params}`);
   }
 
-  async getShiftAnalysis(days: number = 30): Promise<{
+  async getShiftAnalysis(days: number = 30, startDate?: string, endDate?: string): Promise<{
     period: any;
     shifts: ShiftStats[];
     note: string;
   }> {
-    return this.request(`/stats/shifts?days=${days}`);
+    const params = new URLSearchParams({ days: days.toString() });
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    return this.request(`/stats/shifts?${params}`);
   }
 
-  async getViolationStats(days: number = 30): Promise<ViolationStats> {
-    return this.request(`/stats/violations?days=${days}`);
+  async getViolationStats(days: number = 30, startDate?: string, endDate?: string): Promise<ViolationStats> {
+    const params = new URLSearchParams({ days: days.toString() });
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    return this.request(`/stats/violations?${params}`);
   }
 
   // ============================================
