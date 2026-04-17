@@ -153,10 +153,10 @@ const SimpleTrendChart: React.FC<SimpleTrendChartProps> = ({ data, dataKey, colo
                     const value = d[dataKey] as number;
                     const height = Math.max((value / max) * 100, 4); // At least 4% height
 
-                    // Fallback colors if custom colors fail
+                    // 主題色：違規=專業藍 accent、事故=警告琥珀 warning
                     let barColor = color;
-                    if (title.includes('違規')) barColor = 'bg-blue-500';
-                    if (title.includes('事故')) barColor = 'bg-orange-500';
+                    if (title.includes('違規')) barColor = 'bg-accent';
+                    if (title.includes('事故')) barColor = 'bg-warning';
 
                     return (
                         <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative h-full justify-end">
@@ -254,7 +254,7 @@ const CrossAnalysisChart: React.FC<{ data: TrendDataPoint[] }> = ({ data }) => {
                                 x={getX(i)}
                                 y={height - 10}
                                 textAnchor="middle"
-                                fill="#6b7280"
+                                fill="#64748B"
                                 fontWeight="bold"
                             >
                                 {d.month.split('/')[1]}月
@@ -262,34 +262,34 @@ const CrossAnalysisChart: React.FC<{ data: TrendDataPoint[] }> = ({ data }) => {
                         ))}
 
                         {/* 左 Y 軸 (違規) */}
-                        <text x={30} y={padding.top - 15} fill="#3b82f6" fontWeight="bold" fontSize="14" textAnchor="middle">違規數</text>
+                        <text x={30} y={padding.top - 15} fill="#0369A1" fontWeight="bold" fontSize="14" textAnchor="middle">違規數</text>
                         {[0, 0.5, 1].map((ratio, i) => {
                             const y = height - padding.bottom - chartHeight * ratio;
                             const val = Math.round(maxTickets * ratio);
                             return (
-                                <text key={i} x={padding.left - 10} y={y + 4} textAnchor="end" fill="#3b82f6" fontWeight="bold">
+                                <text key={i} x={padding.left - 10} y={y + 4} textAnchor="end" fill="#0369A1" fontWeight="bold">
                                     {val}
                                 </text>
                             );
                         })}
 
                         {/* 右 Y 軸 (事故) */}
-                        <text x={width - 30} y={padding.top - 15} fill="#f97316" fontWeight="bold" fontSize="14" textAnchor="middle">事故數</text>
+                        <text x={width - 30} y={padding.top - 15} fill="#D97706" fontWeight="bold" fontSize="14" textAnchor="middle">事故數</text>
                         {[0, 0.5, 1].map((ratio, i) => {
                             const y = height - padding.bottom - chartHeight * ratio;
                             const val = Math.round(maxCrashes * ratio);
                             return (
-                                <text key={i} x={width - padding.right + 10} y={y + 4} textAnchor="start" fill="#f97316" fontWeight="bold">
+                                <text key={i} x={width - padding.right + 10} y={y + 4} textAnchor="start" fill="#D97706" fontWeight="bold">
                                     {val}
                                 </text>
                             );
                         })}
 
                         {/* 數據線 - 違規 (藍色) */}
-                        <path d={ticketPath} fill="none" stroke="#3b82f6" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-md" />
+                        <path d={ticketPath} fill="none" stroke="#0369A1" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-md" />
 
                         {/* 數據線 - 事故 (橘色) */}
-                        <path d={crashPath} fill="none" stroke="#f97316" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-md" />
+                        <path d={crashPath} fill="none" stroke="#D97706" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-md" />
 
                         {/* 數據點與 Tooltip 互動區 */}
                         {data.map((d, i) => (
@@ -305,29 +305,29 @@ const CrossAnalysisChart: React.FC<{ data: TrendDataPoint[] }> = ({ data }) => {
                                 {/* 垂直指示線 (Hover 顯示) */}
                                 <line
                                     x1={getX(i)} y1={padding.top} x2={getX(i)} y2={height - padding.bottom}
-                                    stroke="#9ca3af" strokeDasharray="4 4"
+                                    stroke="#CBD5E1" strokeDasharray="4 4"
                                     className="opacity-0 group-hover:opacity-100 transition-opacity"
                                 />
 
                                 {/* 違規點 */}
-                                <circle cx={getX(i)} cy={getY_Tickets(d.tickets)} r="6" fill="#eff6ff" stroke="#3b82f6" strokeWidth="3" className="group-hover:r-8 transition-all" />
+                                <circle cx={getX(i)} cy={getY_Tickets(d.tickets)} r="6" fill="#E0F2FE" stroke="#0369A1" strokeWidth="3" className="group-hover:r-8 transition-all" />
 
                                 {/* 事故點 */}
-                                <circle cx={getX(i)} cy={getY_Crashes(d.crashes)} r="6" fill="#fff7ed" stroke="#f97316" strokeWidth="3" className="group-hover:r-8 transition-all" />
+                                <circle cx={getX(i)} cy={getY_Crashes(d.crashes)} r="6" fill="#FEF3C7" stroke="#D97706" strokeWidth="3" className="group-hover:r-8 transition-all" />
 
                                 {/* Tooltip */}
                                 <g className="opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none transform -translate-y-2">
                                     {/* Tooltip Background */}
-                                    <rect x={getX(i) - 60} y={padding.top - 10} width="120" height="70" rx="8" fill="rgba(255, 255, 255, 0.95)" stroke="#e5e7eb" strokeWidth="1" className="shadow-xl" />
+                                    <rect x={getX(i) - 60} y={padding.top - 10} width="120" height="70" rx="8" fill="rgba(255, 255, 255, 0.95)" stroke="#E2E8F0" strokeWidth="1" className="shadow-xl" />
 
                                     {/* Tooltip Content */}
-                                    <text x={getX(i)} y={padding.top + 10} textAnchor="middle" fill="#374151" fontWeight="bold" fontSize="14">{d.month}</text>
+                                    <text x={getX(i)} y={padding.top + 10} textAnchor="middle" fill="#0F172A" fontWeight="bold" fontSize="14">{d.month}</text>
 
-                                    <circle cx={getX(i) - 30} cy={padding.top + 30} r="4" fill="#3b82f6" />
-                                    <text x={getX(i) - 20} y={padding.top + 34} textAnchor="start" fill="#3b82f6" fontSize="12" fontWeight="bold">違規: {d.tickets}</text>
+                                    <circle cx={getX(i) - 30} cy={padding.top + 30} r="4" fill="#0369A1" />
+                                    <text x={getX(i) - 20} y={padding.top + 34} textAnchor="start" fill="#0369A1" fontSize="12" fontWeight="bold">違規: {d.tickets}</text>
 
-                                    <circle cx={getX(i) - 30} cy={padding.top + 50} r="4" fill="#f97316" />
-                                    <text x={getX(i) - 20} y={padding.top + 54} textAnchor="start" fill="#f97316" fontSize="12" fontWeight="bold">事故: {d.crashes}</text>
+                                    <circle cx={getX(i) - 30} cy={padding.top + 50} r="4" fill="#D97706" />
+                                    <text x={getX(i) - 20} y={padding.top + 54} textAnchor="start" fill="#D97706" fontSize="12" fontWeight="bold">事故: {d.crashes}</text>
                                 </g>
                             </g>
                         ))}
@@ -338,11 +338,11 @@ const CrossAnalysisChart: React.FC<{ data: TrendDataPoint[] }> = ({ data }) => {
             {/* 圖例 */}
             <div className="flex justify-center gap-8 mt-4">
                 <div className="flex items-center gap-2">
-                    <span className="w-8 h-1 bg-blue-500 rounded-full h-1.5"></span>
+                    <span className="w-8 h-1 bg-accent rounded-full h-1.5"></span>
                     <span className="text-sm font-bold text-nook-text">違規案件數 (左軸)</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className="w-8 h-1 bg-orange-500 rounded-full h-1.5"></span>
+                    <span className="w-8 h-1 bg-warning rounded-full h-1.5"></span>
                     <span className="text-sm font-bold text-nook-text">交通事故數 (右軸)</span>
                 </div>
             </div>

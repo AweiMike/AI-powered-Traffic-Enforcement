@@ -102,7 +102,7 @@ const HeavyVehiclePerformancePage: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-amber-50 text-nook-text/80">
+                <tr className="bg-slate-50 text-nook-text/80">
                   <th className="px-4 py-3 text-left font-medium">單位</th>
                   <th className="px-4 py-3 text-right font-medium">取締件數</th>
                   <th className="px-4 py-3 text-right font-medium">去年同期</th>
@@ -115,9 +115,9 @@ const HeavyVehiclePerformancePage: React.FC = () => {
               </thead>
               <tbody>
                 {data.rows.map((row: any, i: number) => (
-                  <tr key={row.unit} className={i % 2 === 0 ? 'bg-white' : 'bg-amber-50/30'}>
+                  <tr key={row.unit} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}>
                     <td className="px-4 py-2.5 font-medium text-nook-text">{row.unit}</td>
-                    <td className="px-4 py-2.5 text-right font-bold text-amber-700">{row.tickets}</td>
+                    <td className="px-4 py-2.5 text-right font-bold text-slate-800">{row.tickets}</td>
                     <td className="px-4 py-2.5 text-right text-nook-text/60">{row.tickets_prev}</td>
                     <td className="px-4 py-2.5 text-right"><DiffBadge value={row.tickets_diff} /></td>
                     <td className="px-4 py-2.5 text-right font-bold text-red-600">{row.a1_crashes}</td>
@@ -127,9 +127,9 @@ const HeavyVehiclePerformancePage: React.FC = () => {
                   </tr>
                 ))}
                 {/* 合計列 */}
-                <tr className="bg-amber-100 font-bold border-t-2 border-amber-300">
+                <tr className="bg-slate-100 font-bold border-t-2 border-slate-300">
                   <td className="px-4 py-3 text-nook-text">合計</td>
-                  <td className="px-4 py-3 text-right text-amber-700">{data.total.tickets}</td>
+                  <td className="px-4 py-3 text-right text-slate-800">{data.total.tickets}</td>
                   <td className="px-4 py-3 text-right text-nook-text/60">{data.total.tickets_prev}</td>
                   <td className="px-4 py-3 text-right"><DiffBadge value={data.total.tickets_diff} /></td>
                   <td className="px-4 py-3 text-right text-red-600">{data.total.a1_crashes}</td>
@@ -155,8 +155,8 @@ const HeavyVehiclePerformancePage: React.FC = () => {
           <div className="p-4">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {Object.entries(data.code_labels).map(([code, label]) => (
-                <div key={code} className="flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-lg">
-                  <span className="text-xs font-mono font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">{code}</span>
+                <div key={code} className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg">
+                  <span className="text-xs font-mono font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded">{code}</span>
                   <span className="text-xs text-nook-text/70">{label as string}</span>
                 </div>
               ))}
@@ -187,7 +187,7 @@ function SummaryCard({ title, current, prev, icon, color, invertDiff }: {
 }) {
   const diff = prev !== undefined ? current - prev : undefined;
   const colorMap: Record<string, string> = {
-    amber: 'from-amber-50 to-amber-100/50 border-amber-200',
+    amber: 'from-slate-50 to-slate-100/50 border-slate-200',
     red: 'from-red-50 to-red-100/50 border-red-200',
     orange: 'from-orange-50 to-orange-100/50 border-orange-200',
     gray: 'from-gray-50 to-gray-100/50 border-gray-200',

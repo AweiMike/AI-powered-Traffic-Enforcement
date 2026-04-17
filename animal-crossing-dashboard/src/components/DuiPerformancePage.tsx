@@ -45,7 +45,7 @@ const DuiPerformancePage: React.FC = () => {
       {/* 頁面標題 */}
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-nook-text flex items-center gap-2">
-          <Wine className="w-6 h-6 text-purple-600" />
+          <Wine className="w-6 h-6 text-sky-700" />
           酒後駕車防制成效
         </h2>
         <p className="text-nook-text/60 mt-1">各派出所取締件數與事故數統計，含去年同期比較</p>
@@ -63,7 +63,7 @@ const DuiPerformancePage: React.FC = () => {
             title="取締件數"
             current={data.total.tickets}
             prev={data.total.tickets_prev}
-            icon={<Shield className="w-5 h-5 text-purple-600" />}
+            icon={<Shield className="w-5 h-5 text-sky-700" />}
             color="purple"
           />
           <SummaryCard
@@ -102,7 +102,7 @@ const DuiPerformancePage: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-purple-50 text-nook-text/80">
+                <tr className="bg-sky-50 text-nook-text/80">
                   <th className="px-4 py-3 text-left font-medium">單位</th>
                   <th className="px-4 py-3 text-right font-medium">取締件數</th>
                   <th className="px-4 py-3 text-right font-medium">去年同期</th>
@@ -115,9 +115,9 @@ const DuiPerformancePage: React.FC = () => {
               </thead>
               <tbody>
                 {data.rows.map((row: any, i: number) => (
-                  <tr key={row.unit} className={i % 2 === 0 ? 'bg-white' : 'bg-purple-50/30'}>
+                  <tr key={row.unit} className={i % 2 === 0 ? 'bg-white' : 'bg-sky-50/30'}>
                     <td className="px-4 py-2.5 font-medium text-nook-text">{row.unit}</td>
-                    <td className="px-4 py-2.5 text-right font-bold text-purple-700">{row.tickets}</td>
+                    <td className="px-4 py-2.5 text-right font-bold text-sky-800">{row.tickets}</td>
                     <td className="px-4 py-2.5 text-right text-nook-text/60">{row.tickets_prev}</td>
                     <td className="px-4 py-2.5 text-right"><DiffBadge value={row.tickets_diff} /></td>
                     <td className="px-4 py-2.5 text-right font-bold text-red-600">{row.a1_crashes}</td>
@@ -127,9 +127,9 @@ const DuiPerformancePage: React.FC = () => {
                   </tr>
                 ))}
                 {/* 合計列 */}
-                <tr className="bg-purple-100 font-bold border-t-2 border-purple-300">
+                <tr className="bg-sky-100 font-bold border-t-2 border-sky-300">
                   <td className="px-4 py-3 text-nook-text">合計</td>
-                  <td className="px-4 py-3 text-right text-purple-700">{data.total.tickets}</td>
+                  <td className="px-4 py-3 text-right text-sky-800">{data.total.tickets}</td>
                   <td className="px-4 py-3 text-right text-nook-text/60">{data.total.tickets_prev}</td>
                   <td className="px-4 py-3 text-right"><DiffBadge value={data.total.tickets_diff} /></td>
                   <td className="px-4 py-3 text-right text-red-600">{data.total.a1_crashes}</td>
@@ -168,7 +168,7 @@ function SummaryCard({ title, current, prev, icon, color, invertDiff }: {
 }) {
   const diff = prev !== undefined ? current - prev : undefined;
   const colorMap: Record<string, string> = {
-    purple: 'from-purple-50 to-purple-100/50 border-purple-200',
+    purple: 'from-sky-50 to-sky-100/50 border-sky-200',
     red: 'from-red-50 to-red-100/50 border-red-200',
     orange: 'from-orange-50 to-orange-100/50 border-orange-200',
     gray: 'from-gray-50 to-gray-100/50 border-gray-200',

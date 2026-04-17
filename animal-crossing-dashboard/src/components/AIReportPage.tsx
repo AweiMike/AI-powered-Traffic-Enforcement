@@ -72,9 +72,9 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, curr
     return (
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div className="p-6 bg-gradient-to-r from-stone-800 to-stone-700 text-white flex justify-between items-center">
+                <div className="p-6 bg-gradient-to-r from-slate-800 to-slate-700 text-white flex justify-between items-center">
                     <h3 className="text-lg font-bold flex items-center gap-2">
-                        <Key className="w-5 h-5 text-emerald-400" />
+                        <Key className="w-5 h-5 text-sky-400" />
                         設定 AI 模型金鑰
                     </h3>
                     <button onClick={onClose} className="text-white/70 hover:text-white transition-colors">
@@ -93,13 +93,13 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, curr
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-stone-700 mb-2">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
                                 供應商
                             </label>
                             <select
                                 value={provider}
                                 onChange={(e) => handleProviderChange(e.target.value)}
-                                className="w-full px-4 py-2 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                                className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white"
                             >
                                 <option value="openai">OpenAI</option>
                                 <option value="anthropic">Anthropic</option>
@@ -108,13 +108,13 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, curr
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-stone-700 mb-2">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
                                 模型
                             </label>
                             <select
                                 value={model}
                                 onChange={(e) => setModel(e.target.value)}
-                                className="w-full px-4 py-2 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                                className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white"
                             >
                                 {PROVIDER_MODELS[provider]?.map(m => (
                                     <option key={m.value} value={m.value}>{m.name}</option>
@@ -126,7 +126,7 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, curr
                     {/* Custom Model Input for Ollama */}
                     {isLocal && model === 'custom' && (
                         <div>
-                            <label className="block text-sm font-medium text-stone-700 mb-2">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
                                 自訂模型名稱 (需已下載)
                             </label>
                             <input
@@ -134,7 +134,7 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, curr
                                 value={customModel}
                                 onChange={(e) => setCustomModel(e.target.value)}
                                 placeholder="例如: llama3:latest"
-                                className="w-full px-4 py-2 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                                className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white"
                                 required
                             />
                         </div>
@@ -142,7 +142,7 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, curr
 
                     {!isLocal && (
                         <div>
-                            <label className="block text-sm font-medium text-stone-700 mb-2">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
                                 API Key
                             </label>
                             <input
@@ -150,7 +150,7 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, curr
                                 value={key}
                                 onChange={(e) => setKey(e.target.value)}
                                 placeholder={`Enter ${provider} API Key...`}
-                                className="w-full px-4 py-2 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white font-mono"
+                                className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white font-mono"
                                 required
                             />
                         </div>
@@ -171,13 +171,13 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, curr
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 rounded-xl text-stone-500 hover:bg-stone-100 transition-colors"
+                            className="px-4 py-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-colors"
                         >
                             取消
                         </button>
                         <button
                             type="submit"
-                            className="px-6 py-2 bg-stone-800 text-white rounded-xl hover:bg-stone-900 transition-colors font-medium shadow-lg shadow-stone-200"
+                            className="px-6 py-2 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-colors font-medium shadow-lg shadow-slate-200"
                         >
                             確認使用
                         </button>
@@ -248,33 +248,33 @@ const AIReportPage: React.FC = () => {
             />
 
             {/* Header - Print Hidden */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-3xl shadow-sm border border-stone-100 print:hidden">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100 print:hidden">
                 <div>
-                    <h1 className="text-2xl font-bold flex items-center gap-2 text-stone-800">
-                        <Bot className="w-8 h-8 text-emerald-600" />
+                    <h1 className="text-2xl font-bold flex items-center gap-2 text-slate-800">
+                        <Bot className="w-8 h-8 text-sky-700" />
                         AI 智慧執法報告
                     </h1>
-                    <p className="text-stone-500 mt-1">基於數據驅動的執法成效分析與建議</p>
+                    <p className="text-slate-500 mt-1">基於數據驅動的執法成效分析與建議</p>
                 </div>
 
-                <div className="flex gap-3 bg-stone-50 p-2 rounded-2xl">
+                <div className="flex gap-3 bg-slate-50 p-2 rounded-2xl">
                     <button
                         onClick={() => setShowKeyModal(true)}
                         className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all border ${apiKey
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-100'}`}
+                            ? 'bg-sky-50 text-sky-700 border-sky-200'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'}`}
                         title="設定 API Key"
                     >
                         <Settings className="w-4 h-4" />
                         {apiKey ? 'API 已設定' : 'API 設定'}
                     </button>
 
-                    <div className="w-px bg-stone-200 mx-1"></div>
+                    <div className="w-px bg-slate-200 mx-1"></div>
 
                     <select
                         value={year}
                         onChange={(e) => setYear(Number(e.target.value))}
-                        className="px-4 py-2 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                        className="px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white"
                     >
                         {[2024, 2025, 2026].map(y => (
                             <option key={y} value={y}>{y}年</option>
@@ -283,7 +283,7 @@ const AIReportPage: React.FC = () => {
                     <select
                         value={month}
                         onChange={(e) => setMonth(Number(e.target.value))}
-                        className="px-4 py-2 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                        className="px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white"
                     >
                         {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
                             <option key={m} value={m}>{m}月</option>
@@ -293,7 +293,7 @@ const AIReportPage: React.FC = () => {
                         onClick={handleGenerate}
                         disabled={loading}
                         className={`px-6 py-2 text-white rounded-xl hover:shadow-lg transition-all font-medium flex items-center gap-2
-                            ${apiKey ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200' : 'bg-stone-400 hover:bg-stone-500'}
+                            ${apiKey ? 'bg-sky-700 hover:bg-sky-700 shadow-sky-200' : 'bg-slate-400 hover:bg-slate-500'}
                         `}
                     >
                         {loading ? (
@@ -321,7 +321,7 @@ const AIReportPage: React.FC = () => {
 
             {/* Report Content */}
             {report && (
-                <div className="report-container bg-white rounded-3xl shadow-lg border border-stone-100 overflow-hidden print:shadow-none print:border-none print:w-full">
+                <div className="report-container bg-white rounded-3xl shadow-lg border border-slate-100 overflow-hidden print:shadow-none print:border-none print:w-full">
                     <style>{`
                         @media print {
                             body * {
@@ -344,11 +344,11 @@ const AIReportPage: React.FC = () => {
                     `}</style>
 
                     {/* Report Header for Print */}
-                    <div className="bg-emerald-600 text-white p-8 print:bg-white print:text-black print:p-0 print:mb-8">
+                    <div className="bg-sky-700 text-white p-8 print:bg-white print:text-black print:p-0 print:mb-8">
                         <div className="flex justify-between items-start">
                             <div>
                                 <h2 className="text-3xl font-bold mb-2">交通執法成效與事故防制分析報告</h2>
-                                <p className="text-emerald-100 print:text-stone-500">
+                                <p className="text-sky-100 print:text-slate-500">
                                     分析期間：{report.period.year}年{report.period.month}月
                                 </p>
                             </div>
@@ -362,8 +362,8 @@ const AIReportPage: React.FC = () => {
                                 </button>
                             </div>
                             <div className="hidden print:block text-right">
-                                <p className="text-sm text-stone-400">生成時間：{new Date().toLocaleDateString()}</p>
-                                <p className="text-sm text-stone-400">機密等級：內部限閱</p>
+                                <p className="text-sm text-slate-400">生成時間：{new Date().toLocaleDateString()}</p>
+                                <p className="text-sm text-slate-400">機密等級：內部限閱</p>
                             </div>
                         </div>
                     </div>
@@ -372,13 +372,13 @@ const AIReportPage: React.FC = () => {
                     <div className="p-8 md:p-12 max-w-4xl mx-auto prose prose-emerald prose-lg print:max-w-none print:p-0">
                         <ReactMarkdown
                             components={{
-                                h1: ({ node, ...props }: any) => <h1 className="text-3xl font-bold text-stone-800 mb-6 pb-4 border-b-2 border-emerald-500" {...props} />,
-                                h2: ({ node, ...props }: any) => <h2 className="text-2xl font-bold text-stone-800 mt-8 mb-4 flex items-center gap-2" {...props} />,
-                                h3: ({ node, ...props }: any) => <h3 className="text-xl font-bold text-emerald-800 mt-6 mb-3" {...props} />,
-                                p: ({ node, ...props }: any) => <p className="text-stone-600 leading-relaxed mb-4" {...props} />,
+                                h1: ({ node, ...props }: any) => <h1 className="text-3xl font-bold text-slate-800 mb-6 pb-4 border-b-2 border-sky-600" {...props} />,
+                                h2: ({ node, ...props }: any) => <h2 className="text-2xl font-bold text-slate-800 mt-8 mb-4 flex items-center gap-2" {...props} />,
+                                h3: ({ node, ...props }: any) => <h3 className="text-xl font-bold text-sky-800 mt-6 mb-3" {...props} />,
+                                p: ({ node, ...props }: any) => <p className="text-slate-600 leading-relaxed mb-4" {...props} />,
                                 ul: ({ node, ...props }: any) => <ul className="list-disc list-outside ml-6 space-y-2 mb-6" {...props} />,
-                                li: ({ node, ...props }: any) => <li className="text-stone-600" {...props} />,
-                                strong: ({ node, ...props }: any) => <strong className="font-bold text-stone-800 bg-yellow-50 px-1 rounded" {...props} />,
+                                li: ({ node, ...props }: any) => <li className="text-slate-600" {...props} />,
+                                strong: ({ node, ...props }: any) => <strong className="font-bold text-slate-800 bg-sky-50 px-1 rounded" {...props} />,
                             }}
                         >
                             {report.ai_analysis.content}
@@ -386,7 +386,7 @@ const AIReportPage: React.FC = () => {
                     </div>
 
                     {/* Footer */}
-                    <div className="bg-stone-50 p-6 text-center text-sm text-stone-400 border-t border-stone-100 print:hidden">
+                    <div className="bg-slate-50 p-6 text-center text-sm text-slate-400 border-t border-slate-100 print:hidden">
                         報告由 {report.ai_analysis.provider} ({report.ai_analysis.model}) 生成 • 僅供參考，決策請以實際情況為準
                     </div>
                 </div>
@@ -394,10 +394,10 @@ const AIReportPage: React.FC = () => {
 
             {/* Empty State */}
             {!report && !loading && !error && (
-                <div className="text-center py-20 bg-stone-50 rounded-3xl border border-dashed border-stone-200 print:hidden">
-                    <Bot className="w-16 h-16 text-stone-300 mx-auto mb-4" />
-                    <h3 className="text-xl font-bold text-stone-400 mb-2">AI 智慧分析助手</h3>
-                    <p className="text-stone-400 max-w-md mx-auto mb-6">
+                <div className="text-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200 print:hidden">
+                    <Bot className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-slate-400 mb-2">AI 智慧分析助手</h3>
+                    <p className="text-slate-400 max-w-md mx-auto mb-6">
                         請先點擊上方「API 設定」輸入您的 OpenAI/Gemini 金鑰，<br />
                         系統將根據本月數據自動撰寫專業分析報告。
                     </p>
@@ -405,7 +405,7 @@ const AIReportPage: React.FC = () => {
                     {!apiKey && (
                         <button
                             onClick={() => setShowKeyModal(true)}
-                            className="px-6 py-2 bg-stone-800 text-white rounded-xl hover:bg-stone-900 transition-colors font-medium shadow-lg shadow-stone-200 inline-flex items-center gap-2"
+                            className="px-6 py-2 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-colors font-medium shadow-lg shadow-slate-200 inline-flex items-center gap-2"
                         >
                             <Key className="w-4 h-4" />
                             輸入 API Key

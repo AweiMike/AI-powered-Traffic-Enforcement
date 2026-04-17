@@ -177,9 +177,9 @@ const ElderlyPreventionPage: React.FC = () => {
             <div className="grid grid-cols-12 gap-6">
                 {/* 左欄：高齡事故熱區 */}
                 <div className="col-span-4 space-y-4">
-                    <div className="bg-orange-100 rounded-2xl p-4">
-                        <h4 className="font-bold text-orange-800 mb-1">📍 高齡事故熱區</h4>
-                        <p className="text-xs text-orange-600">依長者事故數量排序</p>
+                    <div className="bg-slate-100 rounded-2xl p-4 border-l-4 border-warning">
+                        <h4 className="font-bold text-slate-800 mb-1">📍 高齡事故熱區</h4>
+                        <p className="text-xs text-slate-600">依長者事故數量排序</p>
                     </div>
                     {hotspotsLoading ? (
                         <div className="text-center py-10 text-gray-400">載入中...</div>
@@ -200,9 +200,9 @@ const ElderlyPreventionPage: React.FC = () => {
 
                 {/* 中欄：時段分析 */}
                 <div className="col-span-5 space-y-4">
-                    <div className="bg-blue-100 rounded-2xl p-4">
-                        <h4 className="font-bold text-blue-800 mb-1">⏰ 事故時段分析</h4>
-                        <p className="text-xs text-blue-600">
+                    <div className="bg-slate-100 rounded-2xl p-4 border-l-4 border-accent">
+                        <h4 className="font-bold text-slate-800 mb-1">⏰ 事故時段分析</h4>
+                        <p className="text-xs text-slate-600">
                             {selectedDistrict ? `${selectedDistrict} 高齡事故分布` : '請選擇區域查看'}
                         </p>
                     </div>
@@ -267,33 +267,39 @@ const ElderlyPreventionPage: React.FC = () => {
                     )}
 
                     {/* 宣導建議 */}
-                    <div className="bg-green-100 rounded-2xl p-4">
-                        <h4 className="font-bold text-green-800 mb-1">📢 防治宣導建議</h4>
-                        <p className="text-xs text-green-600">針對長者特性之策略</p>
+                    <div className="bg-slate-100 rounded-2xl p-4 border-l-4 border-accent">
+                        <h4 className="font-bold text-slate-800 mb-1">📢 防治宣導建議</h4>
+                        <p className="text-xs text-slate-600">針對長者特性之策略</p>
                     </div>
 
-                    <div className="bg-white/80 rounded-2xl p-4 nook-shadow space-y-3">
-                        <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                            <span className="text-xl mb-1 block">🦺</span>
-                            <h5 className="font-bold text-yellow-800 mb-1 text-sm">亮衣與反光配件</h5>
-                            <p className="text-xs text-gray-600">晨昏外出時應穿著鮮豔衣物。</p>
+                    <div className="bg-white rounded-2xl p-4 nook-shadow space-y-2.5">
+                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex gap-3">
+                            <span className="text-xl shrink-0">🦺</span>
+                            <div className="min-w-0">
+                                <h5 className="font-semibold text-slate-800 mb-0.5 text-sm">亮衣與反光配件</h5>
+                                <p className="text-xs text-slate-500">晨昏外出時應穿著鮮豔衣物。</p>
+                            </div>
                         </div>
 
-                        <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                            <span className="text-xl mb-1 block">🛵</span>
-                            <h5 className="font-bold text-blue-800 mb-1 text-sm">兩段式左轉</h5>
-                            <p className="text-xs text-gray-600">騎乘機車應落實兩段式左轉。</p>
+                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex gap-3">
+                            <span className="text-xl shrink-0">🛵</span>
+                            <div className="min-w-0">
+                                <h5 className="font-semibold text-slate-800 mb-0.5 text-sm">兩段式左轉</h5>
+                                <p className="text-xs text-slate-500">騎乘機車應落實兩段式左轉。</p>
+                            </div>
                         </div>
 
-                        <div className="bg-red-50 p-3 rounded-lg border border-red-200">
-                            <span className="text-xl mb-1 block">🚌</span>
-                            <h5 className="font-bold text-red-800 mb-1 text-sm">大型車視線死角</h5>
-                            <p className="text-xs text-gray-600">遠離大型車輛視線死角範圍。</p>
+                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex gap-3">
+                            <span className="text-xl shrink-0">🚌</span>
+                            <div className="min-w-0">
+                                <h5 className="font-semibold text-slate-800 mb-0.5 text-sm">大型車視線死角</h5>
+                                <p className="text-xs text-slate-500">遠離大型車輛視線死角範圍。</p>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="bg-nook-leaf/10 rounded-2xl p-4 text-center">
-                        <p className="text-sm text-nook-leaf-dark font-medium">✨ 「長者平安，全家心安」</p>
+                    <div className="bg-accent-soft rounded-2xl p-4 text-center">
+                        <p className="text-sm text-accent-hover font-medium">✨ 「長者平安，全家心安」</p>
                     </div>
                 </div>
             </div>
