@@ -49,6 +49,13 @@ const getTrendColor = (trend: string, isGoodWhenDown = true) => {
 // ============================================
 // 比較卡片組件
 // ============================================
+interface SeverityBreakdown {
+    a1: number;
+    a2: number;
+    a1_last_year?: number;
+    a2_last_year?: number;
+}
+
 interface ComparisonCardProps {
     title: string;
     emoji: string;
@@ -57,10 +64,11 @@ interface ComparisonCardProps {
     change: number;
     trend: string;
     color: string;
+    severity?: SeverityBreakdown;
 }
 
 const ComparisonCard: React.FC<ComparisonCardProps> = ({
-    title, emoji, current, lastYear, change, trend, color
+    title, emoji, current, lastYear, change, trend, color, severity
 }) => {
     const diff = current - lastYear;
     const isImproved = trend === '下降';
@@ -87,6 +95,56 @@ const ComparisonCard: React.FC<ComparisonCardProps> = ({
                     <span className="font-bold text-lg">{Math.abs(change)}%</span>
                 </div>
             </div>
+
+            {/* 嚴重度拆分（僅交通事故卡顯示） */}
+            {severity && (
+                <div className="mb-4 grid grid-cols-2 gap-3">
+                    {/* A1 死亡 */}
+                    <div className="bg-red-50 rounded-xl p-3 border-l-4 border-red-500">
+                        <div className="flex items-center gap-1.5 mb-1">
+                            <Skull className="w-3.5 h-3.5 text-red-600" />
+                            <span className="text-xs font-bold text-red-700">A1 死亡</span>
+                        </div>
+                        <div className="flex items-baseline gap-1.5">
+                            <span className="text-2xl font-bold text-red-600 tabular-nums">{severity.a1}</span>
+                            <span className="text-[10px] text-slate-500 tabular-nums">
+                                去年 {severity.a1_last_year ?? 0}
+                            </span>
+                        </div>
+                        {(() => {
+                            const d = severity.a1 - (severity.a1_last_year ?? 0);
+                            if (d === 0) return <div className="text-[10px] text-slate-500 mt-0.5">持平</div>;
+                            return (
+                                <div className={`text-[10px] mt-0.5 ${d < 0 ? 'text-nook-leaf' : 'text-nook-red'}`}>
+                                    {d < 0 ? '✓ 減少 ' : '↑ 增加 '}{Math.abs(d)} 件
+                                </div>
+                            );
+                        })()}
+                    </div>
+                    {/* A2 受傷 */}
+                    <div className="bg-orange-50 rounded-xl p-3 border-l-4 border-orange-500">
+                        <div className="flex items-center gap-1.5 mb-1">
+                            <AlertTriangle className="w-3.5 h-3.5 text-orange-600" />
+                            <span className="text-xs font-bold text-orange-700">A2 受傷</span>
+                        </div>
+                        <div className="flex items-baseline gap-1.5">
+                            <span className="text-2xl font-bold text-orange-600 tabular-nums">{severity.a2}</span>
+                            <span className="text-[10px] text-slate-500 tabular-nums">
+                                去年 {severity.a2_last_year ?? 0}
+                            </span>
+                        </div>
+                        {(() => {
+                            const d = severity.a2 - (severity.a2_last_year ?? 0);
+                            if (d === 0) return <div className="text-[10px] text-slate-500 mt-0.5">持平</div>;
+                            return (
+                                <div className={`text-[10px] mt-0.5 ${d < 0 ? 'text-nook-leaf' : 'text-nook-red'}`}>
+                                    {d < 0 ? '✓ 減少 ' : '↑ 增加 '}{Math.abs(d)} 件
+                                </div>
+                            );
+                        })()}
+                    </div>
+                </div>
+            )}
 
             <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
@@ -700,79 +758,14 @@ const PerformanceComparisonPage: React.FC = () => {
                     change={data.comparison.crashes_change}
                     trend={data.comparison.crashes_trend}
                     color="bg-nook-orange/20"
+                    severity={data.current.severity ? {
+                        a1: data.current.severity.a1,
+                        a2: data.current.severity.a2,
+                        a1_last_year: data.last_year.severity?.a1,
+                        a2_last_year: data.last_year.severity?.a2,
+                    } : undefined}
                 />
             </div>
-
-            {/* 事故嚴重度比較 */}
-            {data.current.severity && (
-                <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 nook-shadow mb-8">
-                    <h3 className="text-lg font-bold text-nook-text mb-6 flex items-center gap-2">
-                        <AlertTriangle className="w-5 h-5 text-nook-red" />
-                        事故嚴重度比較
-                    </h3>
-                    <div className="grid grid-cols-2 gap-6">
-                        {/* A1 死亡事故 */}
-                        <div className="bg-red-50 rounded-2xl p-5 border-l-4 border-red-500">
-                            <div className="flex items-center gap-3 mb-4">
-                                <span className="text-3xl">💀</span>
-                                <div>
-                                    <span className="font-bold text-nook-text text-lg">A1 死亡事故</span>
-                                    <p className="text-xs text-nook-text/50">最高嚴重等級</p>
-                                </div>
-                            </div>
-                            <div className="flex items-end justify-between">
-                                <div>
-                                    <p className="text-4xl font-bold text-red-600">{data.current.severity.a1}</p>
-                                    <p className="text-sm text-nook-text/60">本期</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-2xl font-medium text-nook-text/60">{data.last_year.severity?.a1 || 0}</p>
-                                    <p className="text-sm text-nook-text/40">去年同期</p>
-                                </div>
-                            </div>
-                            <div className="mt-3 pt-3 border-t border-red-200">
-                                <div className={`text-sm font-medium ${data.current.severity.a1 < (data.last_year.severity?.a1 || 0) ? 'text-nook-leaf' :
-                                    data.current.severity.a1 > (data.last_year.severity?.a1 || 0) ? 'text-nook-red' : 'text-nook-text/60'
-                                    }`}>
-                                    {data.current.severity.a1 < (data.last_year.severity?.a1 || 0) ? '✓ 減少 ' :
-                                        data.current.severity.a1 > (data.last_year.severity?.a1 || 0) ? '↑ 增加 ' : '持平 '}
-                                    {Math.abs(data.current.severity.a1 - (data.last_year.severity?.a1 || 0))} 件
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* A2 受傷事故 */}
-                        <div className="bg-orange-50 rounded-2xl p-5 border-l-4 border-orange-500">
-                            <div className="flex items-center gap-3 mb-4">
-                                <span className="text-3xl">🏥</span>
-                                <div>
-                                    <span className="font-bold text-nook-text text-lg">A2 受傷事故</span>
-                                    <p className="text-xs text-nook-text/50">需送醫救護</p>
-                                </div>
-                            </div>
-                            <div className="flex items-end justify-between">
-                                <div>
-                                    <p className="text-4xl font-bold text-orange-600">{data.current.severity.a2}</p>
-                                    <p className="text-sm text-nook-text/60">本期</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-2xl font-medium text-nook-text/60">{data.last_year.severity?.a2 || 0}</p>
-                                    <p className="text-sm text-nook-text/40">去年同期</p>
-                                </div>
-                            </div>
-                            <div className="mt-3 pt-3 border-t border-orange-200">
-                                <div className={`text-sm font-medium ${data.current.severity.a2 < (data.last_year.severity?.a2 || 0) ? 'text-nook-leaf' :
-                                    data.current.severity.a2 > (data.last_year.severity?.a2 || 0) ? 'text-nook-red' : 'text-nook-text/60'
-                                    }`}>
-                                    {data.current.severity.a2 < (data.last_year.severity?.a2 || 0) ? '✓ 減少 ' :
-                                        data.current.severity.a2 > (data.last_year.severity?.a2 || 0) ? '↑ 增加 ' : '持平 '}
-                                    {Math.abs(data.current.severity.a2 - (data.last_year.severity?.a2 || 0))} 件
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* A1 死亡事故清單 */}
             <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 nook-shadow mb-8">

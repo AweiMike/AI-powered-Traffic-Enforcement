@@ -45,8 +45,8 @@ const ShiftChart: React.FC<{ shifts: ShiftData[]; peakShifts: string[] }> = ({ s
                             </div>
                         </div>
                         <div className="flex gap-1 h-3">
-                            <div className="bg-red-400 rounded-sm transition-all" style={{ width: `${accidentWidth}%` }} />
-                            <div className="bg-blue-400 rounded-sm transition-all" style={{ width: `${violationWidth}%` }} />
+                            <div className="bg-warning rounded-sm transition-all" style={{ width: `${accidentWidth}%` }} />
+                            <div className="bg-accent rounded-sm transition-all" style={{ width: `${violationWidth}%` }} />
                         </div>
                     </div>
                 );
@@ -222,10 +222,10 @@ const AccidentAnalysisPage: React.FC = () => {
                                     <h5 className="font-bold text-nook-text">{peakTimes.district}</h5>
                                     <div className="flex gap-2 text-xs">
                                         <span className="flex items-center gap-1">
-                                            <span className="w-3 h-3 bg-red-400 rounded-sm"></span> 事故
+                                            <span className="w-3 h-3 bg-warning rounded-sm"></span> 事故
                                         </span>
                                         <span className="flex items-center gap-1">
-                                            <span className="w-3 h-3 bg-blue-400 rounded-sm"></span> 違規
+                                            <span className="w-3 h-3 bg-accent rounded-sm"></span> 違規
                                         </span>
                                     </div>
                                 </div>
@@ -339,9 +339,9 @@ const AccidentAnalysisPage: React.FC = () => {
                     <div className="grid grid-cols-3 gap-6">
                         {/* 左欄：酒駕高發區域排名 */}
                         <div className="space-y-4">
-                            <div className="bg-amber-100 rounded-2xl p-4">
-                                <h4 className="font-bold text-amber-800 mb-1">🍺 酒駕高發區域</h4>
-                                <p className="text-xs text-amber-600">依酒駕告發數量排序</p>
+                            <div className="bg-slate-100 rounded-2xl p-4 border-l-4 border-warning">
+                                <h4 className="font-bold text-slate-800 mb-1">🍺 酒駕高發區域</h4>
+                                <p className="text-xs text-slate-600">依酒駕告發數量排序</p>
                             </div>
                             <div className="space-y-3 max-h-96 overflow-y-auto">
                                 {hotspots?.hotspots
@@ -390,9 +390,9 @@ const AccidentAnalysisPage: React.FC = () => {
 
                         {/* 中欄：時段分析 */}
                         <div className="space-y-4">
-                            <div className="bg-purple-100 rounded-2xl p-4">
-                                <h4 className="font-bold text-purple-800 mb-1">⏰ 酒駕高發時段</h4>
-                                <p className="text-xs text-purple-600">
+                            <div className="bg-slate-100 rounded-2xl p-4 border-l-4 border-accent">
+                                <h4 className="font-bold text-slate-800 mb-1">⏰ 酒駕高發時段</h4>
+                                <p className="text-xs text-slate-600">
                                     {selectedDistrict ? `${selectedDistrict} 的時段分布` : '請選擇區域查看'}
                                 </p>
                             </div>
@@ -451,9 +451,9 @@ const AccidentAnalysisPage: React.FC = () => {
 
                         {/* 右欄：酒駕執法建議 */}
                         <div className="space-y-4">
-                            <div className="bg-red-100 rounded-2xl p-4">
-                                <h4 className="font-bold text-red-800 mb-1">🚨 酒駕防治建議</h4>
-                                <p className="text-xs text-red-600">重點取締時段與地點</p>
+                            <div className="bg-slate-100 rounded-2xl p-4 border-l-4 border-danger">
+                                <h4 className="font-bold text-slate-800 mb-1">🚨 酒駕防治建議</h4>
+                                <p className="text-xs text-slate-600">重點取締時段與地點</p>
                             </div>
                             <div className="bg-white/80 rounded-2xl p-4 nook-shadow">
                                 <h5 className="font-bold text-nook-text mb-3">📍 建議攔檢點位</h5>

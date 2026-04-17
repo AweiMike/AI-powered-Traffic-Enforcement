@@ -129,14 +129,14 @@ const HotspotCard: React.FC<{ hotspot: YouthHotspot; rank: number }> = ({ hotspo
                 {rank}
             </span>
             <h4 className="font-bold text-nook-text">{hotspot.district}</h4>
-            <span className="ml-auto text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+            <span className="ml-auto text-xs bg-sky-100 text-sky-800 px-2 py-1 rounded-full">
                 權重 {hotspot.weighted_score}
             </span>
         </div>
         <div className="grid grid-cols-5 gap-2 text-center text-xs">
-            <div className="bg-purple-50 rounded-lg p-2">
-                <p className="font-bold text-lg text-purple-600">{hotspot.ticket_count || 0}</p>
-                <p className="text-purple-500">違規</p>
+            <div className="bg-sky-50 rounded-lg p-2">
+                <p className="font-bold text-lg text-sky-700">{hotspot.ticket_count || 0}</p>
+                <p className="text-sky-500">違規</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-2">
                 <p className="font-bold text-lg text-nook-text">{hotspot.crash_count || 0}</p>
@@ -312,8 +312,8 @@ const EVehicleAnalysisPage: React.FC = () => {
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
                         className={`px-6 py-3 rounded-2xl font-medium transition-all ${activeTab === tab.id
-                            ? 'bg-purple-500 text-white shadow-lg'
-                            : 'bg-white/60 text-nook-text hover:bg-purple-100'
+                            ? 'bg-accent text-white shadow-lg'
+                            : 'bg-white/60 text-nook-text hover:bg-sky-100'
                             }`}
                     >
                         {tab.label}
@@ -323,7 +323,7 @@ const EVehicleAnalysisPage: React.FC = () => {
 
             {loading ? (
                 <div className="bg-white/80 rounded-2xl p-12 text-center">
-                    <div className="animate-spin w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+                    <div className="animate-spin w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full mx-auto mb-4"></div>
                     <p className="text-nook-text/60">載入資料中...</p>
                 </div>
             ) : (
@@ -337,7 +337,7 @@ const EVehicleAnalysisPage: React.FC = () => {
                                     title="慢車事故總數"
                                     value={overview.crashes.total}
                                     emoji="🛵"
-                                    color="border-purple-500"
+                                    color="border-sky-500"
                                 />
                                 <StatCard
                                     title="青少年事故"
@@ -435,16 +435,16 @@ const EVehicleAnalysisPage: React.FC = () => {
                                         </div>
 
                                         {/* 青少年總計 */}
-                                        <div className="bg-purple-100 rounded-xl p-3 border border-purple-300">
+                                        <div className="bg-sky-100 rounded-xl p-3 border border-sky-300">
                                             <div className="flex items-center justify-between">
-                                                <span className="font-bold text-purple-700">📊 青少年違規總計 (&lt;18歲)</span>
+                                                <span className="font-bold text-sky-800">📊 青少年違規總計 (&lt;18歲)</span>
                                                 <div className="text-sm">
-                                                    <span className="font-bold text-purple-700">{youthAgeBreakdown?.youth_total || 0}</span>
-                                                    <span className="text-purple-500 mx-1">件</span>
+                                                    <span className="font-bold text-sky-800">{youthAgeBreakdown?.youth_total || 0}</span>
+                                                    <span className="text-sky-500 mx-1">件</span>
                                                 </div>
                                             </div>
                                             {!youthAgeBreakdown?.data_available && (
-                                                <p className="text-xs text-purple-500 mt-2">💡 重新匯入資料後即可顯示個別年齡統計</p>
+                                                <p className="text-xs text-sky-500 mt-2">💡 重新匯入資料後即可顯示個別年齡統計</p>
                                             )}
                                         </div>
                                     </div>
@@ -452,11 +452,11 @@ const EVehicleAnalysisPage: React.FC = () => {
                             </div>
 
                             {/* 法規重點 */}
-                            <div className="bg-gradient-to-r from-purple-100 to-blue-100 rounded-2xl p-6">
+                            <div className="bg-gradient-to-r from-sky-100 to-blue-100 rounded-2xl p-6">
                                 <h4 className="font-bold text-nook-text mb-4">⚖️ 法規重點提醒</h4>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-white/80 rounded-xl p-4">
-                                        <h5 className="font-bold text-purple-700 mb-2">🔋 微型電動二輪車</h5>
+                                        <h5 className="font-bold text-sky-800 mb-2">🔋 微型電動二輪車</h5>
                                         <ul className="text-sm text-nook-text/70 space-y-1">
                                             <li>✅ 強制掛牌（白底綠字）</li>
                                             <li>✅ 強制戴安全帽</li>
@@ -533,9 +533,9 @@ const EVehicleAnalysisPage: React.FC = () => {
                                             放學後青少年聚集，常見雙載、競速、蛇行等危險行為。
                                         </p>
                                     </div>
-                                    <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
-                                        <h5 className="font-bold text-purple-700 mb-2">💡 執法建議</h5>
-                                        <ul className="text-sm text-purple-600 space-y-1">
+                                    <div className="bg-sky-50 rounded-xl p-4 border border-sky-200">
+                                        <h5 className="font-bold text-sky-800 mb-2">💡 執法建議</h5>
+                                        <ul className="text-sm text-sky-700 space-y-1">
                                             <li>• 通學時段於校園周邊 500m 加強巡邏</li>
                                             <li>• 優先攔查未掛牌微電車</li>
                                             <li>• 違規雙載從嚴取締</li>
@@ -593,9 +593,9 @@ const EVehicleAnalysisPage: React.FC = () => {
                                                 <p className="font-bold text-yellow-700">未戴安全帽</p>
                                                 <p className="text-yellow-600">微電車強制規定，電輔車建議</p>
                                             </div>
-                                            <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
-                                                <p className="font-bold text-purple-700">違規雙載</p>
-                                                <p className="text-purple-600">微電車與電輔車皆禁止載人</p>
+                                            <div className="p-3 bg-sky-50 rounded-lg border border-sky-200">
+                                                <p className="font-bold text-sky-800">違規雙載</p>
+                                                <p className="text-sky-700">微電車與電輔車皆禁止載人</p>
                                             </div>
                                         </div>
                                     </div>
@@ -607,7 +607,7 @@ const EVehicleAnalysisPage: React.FC = () => {
                     {/* 趨勢分頁 */}
                     {activeTab === 'trend' && (
                         <div className="space-y-4">
-                            <div className="bg-gradient-to-r from-indigo-100 to-purple-100 rounded-2xl p-4">
+                            <div className="bg-gradient-to-r from-indigo-100 to-sky-100 rounded-2xl p-4">
                                 <h4 className="font-bold text-indigo-800 mb-1">📈 年度同期趨勢比較</h4>
                                 <p className="text-xs text-indigo-600">近 4 年同月份青少年慢車違規數量比較</p>
                             </div>
@@ -649,7 +649,7 @@ const EVehicleAnalysisPage: React.FC = () => {
 
                                         {(() => {
                                             const years = [yearlyTrend.current_year - 3, yearlyTrend.current_year - 2, yearlyTrend.current_year - 1, yearlyTrend.current_year];
-                                            const colors = ['#9ca3af', '#60a5fa', '#a78bfa', '#6366f1'];  // gray, blue, purple, indigo
+                                            const colors = ['#94A3B8', '#0284C7', '#0369A1', '#0F172A'];  // slate, info, accent, primary — 冷色系階層
                                             const months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
                                             // 找出最大值
@@ -690,7 +690,7 @@ const EVehicleAnalysisPage: React.FC = () => {
                                                                 y1={padding.top + graphHeight * (1 - ratio)}
                                                                 x2={padding.left + graphWidth}
                                                                 y2={padding.top + graphHeight * (1 - ratio)}
-                                                                stroke="#e5e7eb"
+                                                                stroke="#E2E8F0"
                                                                 strokeWidth="1"
                                                             />
                                                         ))}
@@ -705,7 +705,7 @@ const EVehicleAnalysisPage: React.FC = () => {
                                                                     y1={padding.top}
                                                                     x2={x}
                                                                     y2={padding.top + graphHeight}
-                                                                    stroke="#f3f4f6"
+                                                                    stroke="#F1F5F9"
                                                                     strokeWidth="1"
                                                                 />
                                                             );
@@ -777,7 +777,7 @@ const EVehicleAnalysisPage: React.FC = () => {
                                         {/* 年份圖例 */}
                                         <div className="flex gap-6 mt-4 justify-center text-sm">
                                             {[yearlyTrend.current_year - 3, yearlyTrend.current_year - 2, yearlyTrend.current_year - 1, yearlyTrend.current_year].map((year, idx) => {
-                                                const colors = ['bg-gray-400', 'bg-blue-400', 'bg-purple-400', 'bg-indigo-500'];
+                                                const colors = ['bg-slate-400', 'bg-sky-500', 'bg-accent', 'bg-primary'];
                                                 return (
                                                     <div key={year} className="flex items-center gap-2">
                                                         <div className={`w-4 h-1 rounded ${colors[idx]}`}></div>
