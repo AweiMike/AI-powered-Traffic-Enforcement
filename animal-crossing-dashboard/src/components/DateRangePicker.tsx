@@ -54,12 +54,26 @@ function thisMonth(): DateRange {
   return { startDate: fmt(start), endDate: fmt(now) };
 }
 
-/** 本季第一天到今天 */
-function thisQuarter(): DateRange {
+/**
+ * 上一個完整季度（Q1/Q2/Q3/Q4 皆為 3 個月）
+ *
+ * 為何不用「本季」：季初（如 4/2）「本季」只會涵蓋 1-2 天，
+ * 與「本月」幾乎重複；改用上季永遠有完整 3 個月資料，適合 QoQ 分析。
+ */
+function lastQuarter(): DateRange {
   const now = today();
-  const qStart = Math.floor(now.getMonth() / 3) * 3;
-  const start = new Date(now.getFullYear(), qStart, 1);
-  return { startDate: fmt(start), endDate: fmt(now) };
+  const currentQStartMonth = Math.floor(now.getMonth() / 3) * 3; // 0/3/6/9
+  // 上一季的開始月 = 當前季開始月 - 3
+  let lastQStartMonth = currentQStartMonth - 3;
+  let year = now.getFullYear();
+  if (lastQStartMonth < 0) {
+    lastQStartMonth += 12;
+    year -= 1;
+  }
+  const start = new Date(year, lastQStartMonth, 1);
+  // 上季結束日 = 當前季開始日 - 1 天
+  const end = new Date(now.getFullYear(), currentQStartMonth, 0);
+  return { startDate: fmt(start), endDate: fmt(end) };
 }
 
 /** 今年1/1到今天 */
@@ -96,7 +110,7 @@ type PresetKey = 'week' | 'month' | 'quarter' | 'year' | '30d' | '90d' | '180d' 
 const presets: { key: PresetKey; label: string; fn?: () => DateRange }[] = [
   { key: 'week', label: '本週', fn: thisWeek },
   { key: 'month', label: '本月', fn: thisMonth },
-  { key: 'quarter', label: '本季', fn: thisQuarter },
+  { key: 'quarter', label: '上季', fn: lastQuarter },
   { key: 'year', label: '本年', fn: thisYear },
   { key: '30d', label: '近30天', fn: () => lastNDays(30) },
   { key: '90d', label: '近90天', fn: () => lastNDays(90) },
