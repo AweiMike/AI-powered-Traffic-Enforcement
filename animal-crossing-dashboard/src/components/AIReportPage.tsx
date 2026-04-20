@@ -7,20 +7,24 @@ import { Leaf, Printer, BarChart3, Bot, Settings, Key, AlertTriangle, X, Chevron
 // 若將來出現新版，只需在此加入即可，無需改其他檔案
 const PROVIDER_MODELS: Record<string, { name: string; value: string; hint?: string }[]> = {
     openai: [
-        { name: 'GPT-4o（推薦，穩定）', value: 'gpt-4o', hint: '平衡品質與速度，最適合長報告' },
-        { name: 'GPT-4o mini（快速便宜）', value: 'gpt-4o-mini', hint: '便宜 10 倍，適合測試' },
-        { name: 'GPT-4 Turbo', value: 'gpt-4-turbo', hint: '較舊但穩定' },
-        { name: 'o1-mini（推理型）', value: 'o1-mini', hint: '擅長邏輯分析，較慢' },
+        { name: 'GPT-5（最新旗艦）', value: 'gpt-5', hint: '2025/08 發布，最強分析能力，推理模式' },
+        { name: 'GPT-5 mini（便宜旗艦）', value: 'gpt-5-mini', hint: '便宜、快速，適合測試' },
+        { name: 'GPT-4.1（高性價比）', value: 'gpt-4.1', hint: '2025/04 穩定版，支援溫度調整' },
+        { name: 'GPT-4o（舊版穩定）', value: 'gpt-4o', hint: '上一代旗艦，完全穩定' },
+        { name: 'o3（深度推理）', value: 'o3', hint: '擅長複雜邏輯，但較慢較貴' },
+        { name: 'o4-mini（快速推理）', value: 'o4-mini', hint: '經濟型推理模型' },
     ],
     anthropic: [
-        { name: 'Claude 3.5 Sonnet（推薦）', value: 'claude-3-5-sonnet-20241022', hint: '品質最均衡，寫作能力優' },
-        { name: 'Claude 3.5 Haiku（便宜快速）', value: 'claude-3-5-haiku-20241022', hint: '適合測試' },
-        { name: 'Claude 3 Opus', value: 'claude-3-opus-20240229', hint: '最強但較貴較慢' },
+        { name: 'Claude Opus 4.5（最新旗艦）', value: 'claude-opus-4-5', hint: '2025/11 發布，分析與寫作最強' },
+        { name: 'Claude Sonnet 4.5（推薦）', value: 'claude-sonnet-4-5', hint: '高性價比、速度快、品質優' },
+        { name: 'Claude Opus 4.1', value: 'claude-opus-4-1', hint: '上一代旗艦' },
+        { name: 'Claude 3.5 Haiku（最便宜）', value: 'claude-3-5-haiku-20241022', hint: '便宜快速，適合測試' },
     ],
     gemini: [
-        { name: 'Gemini 1.5 Pro（推薦）', value: 'gemini-1.5-pro-latest', hint: '免費 tier 可用，長文能力強' },
-        { name: 'Gemini 1.5 Flash（快）', value: 'gemini-1.5-flash-latest', hint: '快速、免費額度高' },
-        { name: 'Gemini 2.0 Flash（Experimental）', value: 'gemini-2.0-flash-exp', hint: '最新實驗版' },
+        { name: 'Gemini 2.5 Pro（推薦）', value: 'gemini-2.5-pro', hint: '品質最佳，長文分析能力強' },
+        { name: 'Gemini 2.5 Flash（快速）', value: 'gemini-2.5-flash', hint: '快速便宜，免費額度高' },
+        { name: 'Gemini 2.5 Flash Lite', value: 'gemini-2.5-flash-lite', hint: '最經濟，適合大量測試' },
+        { name: 'Gemini 2.0 Flash', value: 'gemini-2.0-flash', hint: '上一代穩定版' },
     ],
     ollama: [
         { name: 'Llama 3.1 (8B)', value: 'llama3.1', hint: '需先 ollama pull llama3.1' },

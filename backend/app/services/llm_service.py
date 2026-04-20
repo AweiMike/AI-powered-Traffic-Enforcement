@@ -113,9 +113,21 @@ class LLMService:
             return {"error": "Failed to parse JSON", "raw_content": response_text}
 
     async def _call_openai(self, system_prompt: str, user_prompt: str, temperature: float, api_key: str, model: str) -> str:
-        """OpenAI Chat Completions API。支援 gpt-4o, gpt-4o-mini, gpt-4-turbo, o1 系列。"""
-        # o1 系列不支援 temperature + system message
-        is_reasoning = model.startswith("o1") or model.startswith("o3")
+        """
+        OpenAI Chat Completions API。
+
+        支援家族：
+        - GPT-5 系列（reasoning）：gpt-5, gpt-5-mini, gpt-5-nano
+        - GPT-4.x 系列（chat）：gpt-4.1, gpt-4o, gpt-4-turbo, gpt-4o-mini
+        - o-series reasoning：o1, o1-mini, o3, o3-mini, o4-mini
+        """
+        # Reasoning 模型不支援 system message 與 temperature 參數
+        is_reasoning = (
+            model.startswith("o1")
+            or model.startswith("o3")
+            or model.startswith("o4")
+            or model.startswith("gpt-5")  # GPT-5 系列也是 reasoning model
+        )
 
         timeout = aiohttp.ClientTimeout(total=180)  # 給 reasoning 模型更多時間
         try:
@@ -268,7 +280,11 @@ class LLMService:
         if status == 403:
             return f"Gemini 無權呼叫 {model}。可能需要升級方案或此 Key 未啟用該模型。"
         if status == 404:
-            return f"Gemini 查無此模型：{model}。可能已下架或名稱有誤（目前推薦 gemini-1.5-pro-latest）。"
+            return (
+                f"Gemini 查無此模型：{model}。可能已下架或名稱有誤。"
+                f"目前可用 model：gemini-2.5-pro / gemini-2.5-flash / gemini-2.5-flash-lite / gemini-2.0-flash。"
+                f"（Gemini 1.5 系列已於 2025 年下架）"
+            )
         if status == 429:
             return "Gemini 觸發速率限制（免費 tier 限制較嚴）。請稍後再試或升級付費方案。"
         if status >= 500:
