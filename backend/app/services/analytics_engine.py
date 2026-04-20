@@ -78,9 +78,9 @@ class AnalyticsEngine:
         accident_hotspots = self._get_accident_hotspots(start_date, end_date, top_n=5)
         violation_hotspots = self._get_violation_hotspots(start_date, end_date, top_n=5)
 
-        # 11. 自動偵測重點關注
+        # 11. 自動偵測重點關注（Wave 8.1：補上整體指標）
         focus_districts = self._detect_focus_districts(start_date, end_date, last_start_date, last_end_date)
-        focus_causes = self._detect_focus_causes(topics, severity)
+        focus_causes = self._detect_focus_causes(topics, severity, overall_stats)
 
         return ReportSummary(
             period=ReportPeriod(
@@ -336,9 +336,50 @@ class AnalyticsEngine:
         result.sort(key=lambda x: abs(x[1]), reverse=True)
         return [label for _, _, label in result[:3]]
 
-    def _detect_focus_causes(self, topics: dict, severity: dict) -> list:
-        """根據 topics/severity 的變化自動挑出重點關注項"""
+    def _detect_focus_causes(self, topics: dict, severity: dict, overall: dict | None = None) -> list:
+        """
+        自動挑出 AI 應優先關注的重點項（給 prompt 當 focus hint）
+        優先級（由高到低）：
+          1. A1 死亡事故 — 任何一件都需關注
+          2. 整體事故變化（±10% 以上）— 最關鍵的管理指標
+          3. 整體傷亡變化（±15% 以上）— 人命關天
+          4. 整體違規取締變化（±20% 以上）— 反映執法力度
+          5. 主題分類變化（±20% 以上）— DUI / 紅燈 / 危駕
+        """
         focus = []
+
+        # 1. A1 死亡 — 最高優先
+        a1 = severity.get("A1", 0) if severity else 0
+        if a1 > 0:
+            focus.append(f"🔴 本期有 {a1} 件 A1 死亡事故，需專案檢討")
+
+        # 2-4. 整體指標（新增 — overall 若存在則檢查）
+        if overall:
+            def describe(label: str, stat: StatComparison | dict, inc_threshold: int, dec_threshold: int) -> str | None:
+                pct = stat.change_pct if hasattr(stat, "change_pct") else stat.get("change_pct", 0)
+                curr = stat.current if hasattr(stat, "current") else stat.get("current", 0)
+                last = stat.last_year if hasattr(stat, "last_year") else stat.get("last_year", 0)
+                if pct >= inc_threshold and curr > 0:
+                    return f"⚠ {label}上升（{pct:+.1f}%，{last}→{curr}）"
+                if pct <= -inc_threshold and last > 0:
+                    # 對違規取締「大幅下降」視為警訊（執法萎縮）
+                    if label == "違規取締總量":
+                        return f"⚠ {label}大幅下降（{pct:+.1f}%，{last}→{curr}）— 執法力度可能萎縮"
+                    return f"✓ {label}下降（{pct:+.1f}%，{last}→{curr}）"
+                return None
+
+            for key, label, inc, dec in [
+                ("accidents", "事故總量", 10, 10),
+                ("injuries", "傷亡人數", 15, 15),
+                ("tickets", "違規取締總量", 20, 20),
+            ]:
+                stat = overall.get(key)
+                if stat:
+                    msg = describe(label, stat, inc, dec)
+                    if msg:
+                        focus.append(msg)
+
+        # 5. 主題變化
         for topic, stat in topics.items():
             if stat.change_pct >= 20 and stat.current > 10:
                 display = {"dui": "酒駕", "red_light": "闖紅燈", "dangerous": "危險駕駛"}[topic]
@@ -347,11 +388,7 @@ class AnalyticsEngine:
                 display = {"dui": "酒駕", "red_light": "闖紅燈", "dangerous": "危險駕駛"}[topic]
                 focus.append(f"{display}顯著下降（{stat.change_pct:+.0f}%）")
 
-        # A1 死亡事故是特別關注項
-        if severity.get("A1", 0) > 0:
-            focus.append(f"本月有 {severity['A1']} 件 A1 死亡事故")
-
-        return focus[:5]
+        return focus[:6]  # 上限 6 項避免資訊過載
 
     def _get_overall_stats(self, year: int, month: int, last_year: int) -> dict:
         """計算當月與去年同期的總體指標"""
