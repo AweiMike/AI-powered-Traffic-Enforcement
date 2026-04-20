@@ -222,6 +222,7 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, curr
 const RawDataView: React.FC<{ data: any }> = ({ data }) => {
     if (!data) return <div className="text-slate-400 text-sm">無資料</div>;
 
+    const period = data.period || {};
     const overall = data.overall_stats || {};
     const topics = data.topics || {};
     const severity = data.severity || {};
@@ -246,7 +247,21 @@ const RawDataView: React.FC<{ data: any }> = ({ data }) => {
     );
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+        <div className="space-y-4 text-sm">
+            {/* 區間完整性警示（若不完整）*/}
+            {period.is_partial && (
+                <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 text-xs text-amber-900">
+                    <div className="font-semibold mb-1">⚠ 資料涵蓋警示</div>
+                    <div>
+                        本期 <span className="font-mono tabular-nums">{period.start_date} ~ {period.actual_end_date}</span>
+                        （共 <strong className="tabular-nums">{period.days_covered}</strong> 天）。
+                        下方所有「本期 vs 去年」的比較，去年同期已自動對齊為相同天數，
+                        避免「半個月 vs 完整月」的假象。
+                    </div>
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* 總體 + 主題 */}
             <div className="bg-slate-50 rounded-xl p-4 space-y-2">
                 <h4 className="font-semibold text-slate-700 text-xs uppercase tracking-wider mb-2">📊 總體與主題</h4>
@@ -323,11 +338,12 @@ const RawDataView: React.FC<{ data: any }> = ({ data }) => {
                     {focusCauses.map((c: string, i: number) => (
                         <div key={i} className="text-xs text-amber-700">• {c}</div>
                     ))}
-                    {focusDistricts.length > 0 && (
-                        <div className="text-xs text-amber-700">• 事故增加較明顯區域：{focusDistricts.join('、')}</div>
-                    )}
+                    {focusDistricts.map((d: string, i: number) => (
+                        <div key={`d-${i}`} className="text-xs text-amber-700">• {d}</div>
+                    ))}
                 </div>
             )}
+            </div>
         </div>
     );
 };

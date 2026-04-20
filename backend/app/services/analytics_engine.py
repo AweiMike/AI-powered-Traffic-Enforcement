@@ -18,46 +18,63 @@ class AnalyticsEngine:
 
     def generate_report_summary(self, year: int, month: int) -> ReportSummary:
         """
-        生成指定年月的報告摘要數據（Wave 7：擴充資料集）
+        生成指定年月的報告摘要數據（Wave 7：擴充資料集 + Wave 8：對稱比較）
         """
-        # 1. 決定日期範圍
+        # 1. 決定完整月份的日期範圍
         _, last_day = calendar.monthrange(year, month)
-        start_date = date(year, month, 1)
-        end_date = date(year, month, last_day)
+        full_start_date = date(year, month, 1)
+        full_end_date = date(year, month, last_day)
 
+        # 2. 偵測資料實際涵蓋範圍（避免拿「半個月資料」與「完整 30 天去年同期」比較 → 假象下降）
+        data_end = self._get_actual_data_end(full_start_date, full_end_date)
+        is_partial = data_end < full_end_date
+        # 本期實際使用的結束日期
+        start_date = full_start_date
+        end_date = data_end if is_partial else full_end_date
+        days_covered = (end_date - start_date).days + 1
+
+        # 3. 去年同期調整：若本期是部分資料，去年同期也裁切到相同天數
         last_year = year - 1
-        _, last_yr_last_day = calendar.monthrange(last_year, month)
         last_start_date = date(last_year, month, 1)
-        last_end_date = date(last_year, month, last_yr_last_day)
+        last_end_date = date(last_year, month, min(days_covered, calendar.monthrange(last_year, month)[1]))
 
-        # 2. 總體指標
-        overall_stats = self._get_overall_stats(year, month, last_year)
+        comparison_note = None
+        if is_partial:
+            comparison_note = (
+                f"⚠ 本期資料僅涵蓋 {start_date} ~ {end_date}（共 {days_covered} 天），"
+                f"月份尚未結束或資料尚未匯入到月底。"
+                f"為了公平比較，去年同期已自動對齊為 {last_start_date} ~ {last_end_date}（同樣 {days_covered} 天）。"
+                f"請在報告中明確提及「本期資料截至 X 日」避免誤導讀者。"
+            )
 
-        # 3. 主題分類（酒駕/紅燈/危駕）
-        topics = self._get_topic_stats(year, month, last_year)
+        # 2. 總體指標（含對稱比較）
+        overall_stats = self._get_overall_stats_range(start_date, end_date, last_start_date, last_end_date)
+
+        # 3. 主題分類（酒駕/紅燈/危駕，含對稱比較）
+        topics = self._get_topic_stats_range(start_date, end_date, last_start_date, last_end_date)
 
         # 4. 舉發子類型（8 種）
         enforcement_subtypes = self._get_enforcement_subtypes(start_date, end_date)
 
-        # 5. 嚴重度細分
-        severity = self._get_severity_breakdown(year, month)
+        # 5. 嚴重度細分（改為 range 版避免資料跨月問題）
+        severity = self._get_severity_breakdown_range(start_date, end_date)
 
         # 6. 派出所統計（Top 5 by 事故+違規總數）
         unit_stats = self._get_unit_stats(start_date, end_date, top_n=5)
 
-        # 7. 班別分析
+        # 7. 班別分析（含 0 值，完整 12 班）
         shift_stats = self._get_shift_stats(start_date, end_date)
 
-        # 8. 專區指標
-        elderly_crashes = self._count_filtered(Crash, year, month, Crash.is_elderly == True)
-        elderly_tickets = self._count_filtered(Ticket, year, month, Ticket.is_elderly == True)
-        youth_crashes = self._count_filtered(Crash, year, month, Crash.is_youth == True)
+        # 8. 專區指標（range 版）
+        elderly_crashes = self._count_crash_range(start_date, end_date, Crash.is_elderly == True)
+        elderly_tickets = self._count_ticket_range(start_date, end_date, Ticket.is_elderly == True)
+        youth_crashes = self._count_crash_range(start_date, end_date, Crash.is_youth == True)
         heavy_vehicle_crashes = self._count_heavy_vehicle_crashes(start_date, end_date)
 
         # 9. 趨勢
         trends = self._get_monthly_trends(year, month, months=6)
 
-        # 10. 熱點
+        # 10. 熱點（過濾未知地點）
         accident_hotspots = self._get_accident_hotspots(start_date, end_date, top_n=5)
         violation_hotspots = self._get_violation_hotspots(start_date, end_date, top_n=5)
 
@@ -66,7 +83,14 @@ class AnalyticsEngine:
         focus_causes = self._detect_focus_causes(topics, severity)
 
         return ReportSummary(
-            period=ReportPeriod(year=year, month=month, start_date=start_date, end_date=end_date),
+            period=ReportPeriod(
+                year=year, month=month,
+                start_date=start_date, end_date=end_date,
+                is_partial=is_partial,
+                actual_end_date=data_end if is_partial else None,
+                days_covered=days_covered,
+                comparison_note=comparison_note,
+            ),
             overall_stats=overall_stats,
             topics=topics,
             enforcement_subtypes=enforcement_subtypes,
@@ -84,47 +108,103 @@ class AnalyticsEngine:
             focus_causes=focus_causes,
         )
 
+    def _get_actual_data_end(self, start_date: date, end_date: date) -> date:
+        """
+        取得指定區間內「兩種資料都完整涵蓋」的最後一天（Crash 與 Ticket 取較早者）。
+
+        為何用 MIN 而非 MAX：
+        - 若 crash 到 4/15、ticket 到 4/9，使用 MAX=4/15 會讓 4/10~15 沒 ticket 資料
+          → tickets 在這幾天算 0，造成跟去年同期對比時 tickets 被低估
+        - 用 MIN=4/9 確保此區間內兩種資料都有完整紀錄 → 比較最公平
+        """
+        max_crash = self.db.query(func.max(Crash.occurred_date)).filter(
+            Crash.occurred_date >= start_date, Crash.occurred_date <= end_date
+        ).scalar()
+        max_ticket = self.db.query(func.max(Ticket.violation_date)).filter(
+            Ticket.violation_date >= start_date, Ticket.violation_date <= end_date
+        ).scalar()
+        dates = [d for d in [max_crash, max_ticket] if d is not None]
+        if not dates:
+            return end_date  # 本期完全沒資料，至少不縮小
+        return min(dates)
+
     # ========================================
     # Helper queries（新增）
     # ========================================
 
-    def _count_filtered(self, model, year: int, month: int, extra_filter) -> int:
-        """通用：特定模型 + 年月 + 額外條件的計數"""
-        return (
-            self.db.query(func.count(model.id))
-            .filter(and_(model.year == year, model.month == month))
-            .filter(extra_filter)
-            .scalar() or 0
-        )
+    # ========================================
+    # Range-based 計數（Wave 8：對稱比較）
+    # ========================================
 
-    def _get_topic_stats(self, year: int, month: int, last_year: int) -> dict:
-        """酒駕 / 闖紅燈 / 危駕 分類含去年同期比較"""
+    def _count_crash_range(self, start: date, end: date, extra_filter=None) -> int:
+        q = self.db.query(func.count(Crash.id)).filter(
+            Crash.occurred_date >= start, Crash.occurred_date <= end
+        )
+        if extra_filter is not None:
+            q = q.filter(extra_filter)
+        return q.scalar() or 0
+
+    def _count_ticket_range(self, start: date, end: date, extra_filter=None) -> int:
+        q = self.db.query(func.count(Ticket.id)).filter(
+            Ticket.violation_date >= start, Ticket.violation_date <= end
+        )
+        if extra_filter is not None:
+            q = q.filter(extra_filter)
+        return q.scalar() or 0
+
+    def _get_overall_stats_range(self, start: date, end: date, last_start: date, last_end: date) -> dict:
+        """總體指標（事故/違規/A1+A2/A1）以 date range 做對稱比較"""
         def calc(curr: int, last: int) -> dict:
             change = curr - last
             pct = round((change / last * 100), 1) if last > 0 else 0
             return {"current": curr, "last_year": last, "change": change, "change_pct": pct}
 
-        def topic_count(yr: int, m: int, filter_expr) -> int:
-            return (
-                self.db.query(func.count(Ticket.id))
-                .filter(and_(Ticket.year == yr, Ticket.month == m))
-                .filter(filter_expr)
-                .scalar() or 0
-            )
+        return {
+            "accidents": StatComparison(**calc(
+                self._count_crash_range(start, end),
+                self._count_crash_range(last_start, last_end),
+            )),
+            "tickets": StatComparison(**calc(
+                self._count_ticket_range(start, end),
+                self._count_ticket_range(last_start, last_end),
+            )),
+            "injuries": StatComparison(**calc(
+                self._count_crash_range(start, end, Crash.severity.in_(['A1', 'A2'])),
+                self._count_crash_range(last_start, last_end, Crash.severity.in_(['A1', 'A2'])),
+            )),
+            "deaths": StatComparison(**calc(
+                self._count_crash_range(start, end, Crash.severity == 'A1'),
+                self._count_crash_range(last_start, last_end, Crash.severity == 'A1'),
+            )),
+        }
+
+    def _get_topic_stats_range(self, start: date, end: date, last_start: date, last_end: date) -> dict:
+        """酒駕 / 闖紅燈 / 危駕 的對稱比較"""
+        def calc(curr: int, last: int) -> dict:
+            change = curr - last
+            pct = round((change / last * 100), 1) if last > 0 else 0
+            return {"current": curr, "last_year": last, "change": change, "change_pct": pct}
 
         return {
             "dui": StatComparison(**calc(
-                topic_count(year, month, Ticket.topic_dui == True),
-                topic_count(last_year, month, Ticket.topic_dui == True),
+                self._count_ticket_range(start, end, Ticket.topic_dui == True),
+                self._count_ticket_range(last_start, last_end, Ticket.topic_dui == True),
             )),
             "red_light": StatComparison(**calc(
-                topic_count(year, month, Ticket.topic_red_light == True),
-                topic_count(last_year, month, Ticket.topic_red_light == True),
+                self._count_ticket_range(start, end, Ticket.topic_red_light == True),
+                self._count_ticket_range(last_start, last_end, Ticket.topic_red_light == True),
             )),
             "dangerous": StatComparison(**calc(
-                topic_count(year, month, Ticket.topic_dangerous == True),
-                topic_count(last_year, month, Ticket.topic_dangerous == True),
+                self._count_ticket_range(start, end, Ticket.topic_dangerous == True),
+                self._count_ticket_range(last_start, last_end, Ticket.topic_dangerous == True),
             )),
+        }
+
+    def _get_severity_breakdown_range(self, start: date, end: date) -> dict:
+        """A1/A2/A3 事故數（range 版）"""
+        return {
+            sev: self._count_crash_range(start, end, Crash.severity == sev)
+            for sev in ["A1", "A2", "A3"]
         }
 
     def _get_enforcement_subtypes(self, start_date: date, end_date: date) -> dict:
@@ -195,30 +275,17 @@ class AnalyticsEngine:
         return items[:top_n]
 
     def _get_shift_stats(self, start_date: date, end_date: date) -> list:
-        """12 班制統計"""
+        """
+        12 班制統計（全列 0 值也呈現）。
+        為何保留 0 值：讓 LLM 看到「某班完全沒事故/違規」也是重要資訊
+        （可能代表該時段人力已足、或該時段巡邏空窗）。
+        """
         result = []
         for shift_num in range(1, 13):
             sid = f"{shift_num:02d}"
-            accidents = (
-                self.db.query(func.count(Crash.id))
-                .filter(
-                    Crash.occurred_date >= start_date,
-                    Crash.occurred_date <= end_date,
-                    Crash.shift_id == sid,
-                )
-                .scalar() or 0
-            )
-            tickets = (
-                self.db.query(func.count(Ticket.id))
-                .filter(
-                    Ticket.violation_date >= start_date,
-                    Ticket.violation_date <= end_date,
-                    Ticket.shift_id == sid,
-                )
-                .scalar() or 0
-            )
-            if accidents or tickets:
-                result.append(ShiftStat(shift_id=sid, accidents=accidents, tickets=tickets))
+            accidents = self._count_crash_range(start_date, end_date, Crash.shift_id == sid)
+            tickets = self._count_ticket_range(start_date, end_date, Ticket.shift_id == sid)
+            result.append(ShiftStat(shift_id=sid, accidents=accidents, tickets=tickets))
         return result
 
     def _count_heavy_vehicle_crashes(self, start_date: date, end_date: date) -> int:
@@ -235,7 +302,12 @@ class AnalyticsEngine:
         )
 
     def _detect_focus_districts(self, start_date, end_date, last_start, last_end) -> list:
-        """找出事故增加最多的前 3 個行政區"""
+        """
+        找出事故變化最劇烈的前 3 個行政區（不限增加方向）。
+        - 增加 → 需關注（可能是新熱點）
+        - 大幅減少 → 也值得注意（改善原因 / 資料缺失？）
+        只過濾變化絕對值 ≤ 1 的微幅變化（避免噪音）。
+        """
         curr = dict(
             self.db.query(Crash.district, func.count(Crash.id))
             .filter(Crash.occurred_date >= start_date, Crash.occurred_date <= end_date, Crash.district.isnot(None))
@@ -248,10 +320,21 @@ class AnalyticsEngine:
             .group_by(Crash.district)
             .all()
         )
-        diffs = [(d, curr.get(d, 0) - last.get(d, 0)) for d in set(curr.keys()) | set(last.keys())]
-        diffs.sort(key=lambda x: x[1], reverse=True)
-        # 只回傳增加（change > 0）的前 3 個
-        return [d for d, change in diffs[:3] if change > 0]
+
+        result = []
+        for d in set(curr.keys()) | set(last.keys()):
+            c = curr.get(d, 0)
+            l = last.get(d, 0)
+            change = c - l
+            if abs(change) <= 1:
+                continue  # 忽略微幅變化
+            # 組合有方向性的標籤
+            direction = "+" if change > 0 else ""
+            result.append((d, change, f"{d}（事故 {c} 件，去年 {l} 件，{direction}{change} 件）"))
+
+        # 依變化絕對值降序
+        result.sort(key=lambda x: abs(x[1]), reverse=True)
+        return [label for _, _, label in result[:3]]
 
     def _detect_focus_causes(self, topics: dict, severity: dict) -> list:
         """根據 topics/severity 的變化自動挑出重點關注項"""
@@ -362,8 +445,18 @@ class AnalyticsEngine:
                     return location[1:]
         return location
 
+    # 無意義地點字樣（過濾掉避免熱點排名包含）
+    _UNKNOWN_LOCATION_TOKENS = ["未知", "不詳", "其他", ""]
+
+    def _is_meaningful_location(self, loc: str | None) -> bool:
+        if not loc or not loc.strip():
+            return False
+        stripped = loc.strip()
+        return not any(tok in stripped for tok in self._UNKNOWN_LOCATION_TOKENS if tok)
+
     def _get_accident_hotspots(self, start_date: date, end_date: date, top_n: int) -> list:
-        # 使用與 API 相同的邏輯
+        """事故熱點（過濾未知/空白地點，僅 A1/A2）"""
+        # 多撈幾筆後再過濾（避免過濾後數量不足 top_n）
         query = self.db.query(
             Crash.district,
             Crash.location_desc,
@@ -373,32 +466,33 @@ class AnalyticsEngine:
                 Crash.occurred_date >= start_date,
                 Crash.occurred_date <= end_date,
                 Crash.location_desc.isnot(None),
-                Crash.severity.in_(['A1', 'A2']) # 僅針對 A1/A2 熱點
+                Crash.location_desc != "",
+                Crash.severity.in_(['A1', 'A2'])
             )
         ).group_by(
             Crash.district, Crash.location_desc
-        ).order_by(
-            desc('total')
-        ).limit(top_n)
-        
+        ).order_by(desc('total')).limit(top_n * 3)
+
         results = query.all()
-        
-        # 簡單計算去年同期變化 (Optional optimization: if slow, can remove)
-        # 這裡簡化為不計算趨勢以加快速度，或者之後再加
-        
+
         hotspots = []
-        for i, row in enumerate(results, 1):
+        for row in results:
+            if not self._is_meaningful_location(row.location_desc):
+                continue
             hotspots.append(HotspotItem(
-                rank=i,
+                rank=len(hotspots) + 1,
                 location=self._clean_location(row.location_desc, row.district),
                 district=self._clean_district(row.district),
                 count=row.total,
-                trend_pct=None, # 若需要趨勢需額外查詢
-                major_cause="A1+A2"
+                trend_pct=None,
+                major_cause="A1+A2",
             ))
+            if len(hotspots) >= top_n:
+                break
         return hotspots
 
     def _get_violation_hotspots(self, start_date: date, end_date: date, top_n: int) -> list:
+        """違規熱點（過濾未知/空白地點）"""
         query = self.db.query(
             Ticket.district,
             Ticket.location_desc,
@@ -408,24 +502,25 @@ class AnalyticsEngine:
                 Ticket.violation_date >= start_date,
                 Ticket.violation_date <= end_date,
                 Ticket.location_desc.isnot(None),
-                # Ticket.topic_dui == True # 預設取酒駕熱點？還是全部？
-                # 報告中可能需要最嚴重的違規熱點，這裡先取整體的
+                Ticket.location_desc != "",
             )
         ).group_by(
             Ticket.district, Ticket.location_desc
-        ).order_by(
-            desc('count')
-        ).limit(top_n)
-        
+        ).order_by(desc('count')).limit(top_n * 3)
+
         results = query.all()
-        
+
         hotspots = []
-        for i, row in enumerate(results, 1):
+        for row in results:
+            if not self._is_meaningful_location(row.location_desc):
+                continue
             hotspots.append(HotspotItem(
-                rank=i,
+                rank=len(hotspots) + 1,
                 location=self._clean_location(row.location_desc, row.district),
                 district=self._clean_district(row.district),
                 count=row.count,
-                major_cause="全部違規"
+                major_cause="全部違規",
             ))
+            if len(hotspots) >= top_n:
+                break
         return hotspots

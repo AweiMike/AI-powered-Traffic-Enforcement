@@ -24,13 +24,25 @@ class ReportPrompts:
     @staticmethod
     def get_analysis_prompt(data: ReportSummary) -> str:
         """
-        生成綜合分析報告的 Prompt（Wave 7 改版：具體可行動）
+        生成綜合分析報告的 Prompt（Wave 7 改版：具體可行動 + Wave 8 對稱比較）
         """
         data_json = data.model_dump_json(indent=2)
 
+        # 若本期資料不完整，在 prompt 最前加警示，避免 LLM 誤判變化趨勢
+        partial_warning = ""
+        if data.period.is_partial and data.period.comparison_note:
+            partial_warning = f"""
+## ⚠ 重要：資料涵蓋警示
+{data.period.comparison_note}
+
+**嚴格要求**：在報告第一段就明確寫出資料涵蓋範圍，例如：
+「本期資料截至 {data.period.actual_end_date}（共 {data.period.days_covered} 天），與去年同期相同天數對齊比較。」
+避免使用「本月大幅下降」等未說明涵蓋範圍的話術，讀者會誤以為業務量真的減少一大半。
+"""
+
         return f"""
 請根據以下新化分局當月統計資料，撰寫一份月度交通執法分析報告。
-
+{partial_warning}
 ## 分析資料（JSON）
 ```json
 {data_json}

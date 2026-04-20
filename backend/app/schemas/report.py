@@ -41,6 +41,11 @@ class ReportPeriod(BaseModel):
     month: int
     start_date: date
     end_date: date
+    # === 資料涵蓋狀態 ===
+    is_partial: bool = False           # True 表示本期資料不完整（月份尚未結束或資料尚未匯入到月底）
+    actual_end_date: Optional[date] = None   # 實際有資料的最後日期（若 is_partial）
+    days_covered: int = 30             # 本期實際涵蓋天數
+    comparison_note: Optional[str] = None  # 給 AI 看的比較說明文字
 
 
 class ReportSummary(BaseModel):

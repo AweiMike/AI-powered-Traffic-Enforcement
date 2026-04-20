@@ -350,6 +350,9 @@ class LLMService:
         period = d.get("period", {})
         year = period.get("year", "?")
         month = period.get("month", "?")
+        is_partial = period.get("is_partial", False)
+        actual_end = period.get("actual_end_date")
+        days_covered = period.get("days_covered", 30)
 
         overall = d.get("overall_stats", {})
         topics = d.get("topics", {})
@@ -377,8 +380,16 @@ class LLMService:
         # === 組裝報告 ===
         lines = []
 
+        # 開頭：資料涵蓋說明（若本期不完整）
+        if is_partial:
+            lines.append(f"> **⚠ 資料涵蓋說明**：本期資料僅涵蓋 {period.get('start_date')} ~ {actual_end}（共 {days_covered} 天）。")
+            lines.append(f"> 去年同期已自動對齊為相同天數比較，避免「半個月 vs 完整月」的假象落差。")
+            lines.append("")
+
         # 一、速覽
         lines.append("## 一、月度成效速覽")
+        if is_partial:
+            lines.append(f"（資料截至 {actual_end}，共 {days_covered} 天）")
         lines.append(fmt_stat("tickets", "總違規"))
         lines.append(fmt_stat("accidents", "總事故"))
         lines.append(f"- A1 死亡事故：{severity.get('A1', 0)} 件｜A2 受傷：{severity.get('A2', 0)} 件｜A3 財損：{severity.get('A3', 0)} 件")
