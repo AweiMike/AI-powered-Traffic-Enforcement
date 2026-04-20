@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>BrandLogo — 深色模式驗證</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', 'Noto Sans TC', sans-serif;
+      background: #F8FAFC;
+      color: #0F172A;
+      padding: 32px 48px 80px;
+      letter-spacing: -0.01em;
+    }
+    h1 {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+    .subtitle { color: #64748B; margin-bottom: 32px; font-size: 13px; max-width: 700px; line-height: 1.6; }
+
+    .section {
+      background: white;
+      border: 1px solid #E2E8F0;
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 20px;
+    }
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #0F172A;
+    }
+    .section-desc {
+      font-size: 12px;
+      color: #64748B;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .test-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 12px;
+    }
+    .test {
+      border-radius: 10px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      min-height: 140px;
+      justify-content: center;
+      position: relative;
+    }
+    .test-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 600;
+      opacity: 0.7;
+    }
+    .test-bg-info {
+      font-size: 9px;
+      opacity: 0.5;
+      font-family: 'Fira Code', monospace;
+      margin-top: 2px;
+    }
+
+    /* 背景色板 */
+    .bg-white     { background: #FFFFFF; border: 1px solid #E2E8F0; color: #0F172A; }
+    .bg-surface-2 { background: #F8FAFC; border: 1px solid #E2E8F0; color: #0F172A; }
+    .bg-slate-100 { background: #F1F5F9; color: #0F172A; }
+    .bg-slate-200 { background: #E2E8F0; color: #0F172A; }
+    .bg-primary   { background: #0F172A; color: white; }
+    .bg-slate-900 { background: #0A0F1A; color: white; }  /* 未來 dark mode 主背景 */
+    .bg-slate-800 { background: #1E293B; color: white; }
+    .bg-accent    { background: #0369A1; color: white; }
+    .bg-accent-hover { background: #075985; color: white; }
+    .bg-danger    { background: #DC2626; color: white; }
+    .bg-warning   { background: #D97706; color: white; }
+    .bg-success   { background: #059669; color: white; }
+
+    /* 驗證結果標記 */
+    .verdict {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .verdict-pass { background: #DCFCE7; color: #166534; }
+    .verdict-warn { background: #FEF3C7; color: #854D0E; }
+    .verdict-fail { background: #FECACA; color: #991B1B; }
+
+    /* 頭部資訊區 */
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .legend-item {
+      padding: 16px;
+      border-radius: 10px;
+      border: 1px solid #E2E8F0;
+      background: #F8FAFC;
+    }
+    .legend-item h4 {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #0F172A;
+    }
+    .legend-item p {
+      font-size: 11px;
+      color: #64748B;
+      line-height: 1.5;
+    }
+
+    /* 情境模擬 — 整頁深色模式 */
+    .dark-mode-sim {
+      background: #0A0F1A;
+      border-radius: 16px;
+      padding: 24px;
+      color: white;
+      margin-top: 12px;
+    }
+    .dark-sidebar {
+      display: inline-flex;
+      gap: 12px;
+      align-items: center;
+      padding: 16px;
+      background: #0F172A;
+      border: 1px solid #1E293B;
+      border-radius: 12px;
+      margin-right: 16px;
+    }
+    .dark-sidebar-icon {
+      width: 40px; height: 40px;
+      background: #1E293B;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      padding: 6px;
+    }
+    .dark-sidebar-text h3 {
+      font-size: 14px;
+      color: white;
+    }
+    .dark-sidebar-text p {
+      font-size: 11px;
+      color: #94A3B8;
+      margin-top: 2px;
+    }
+    code {
+      background: #F1F5F9;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 11px;
+      color: #0369A1;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🌓 BrandLogo 深色模式驗證</h1>
+  <p class="subtitle">
+    驗證 BrandLogo 4 種 variant 在各種背景下的表現，確保未來實作 dark mode 時所有場景都能正常顯示。
+    <br>此頁純靜態 HTML，不依賴 React，可以直接用瀏覽器開啟檢視。
+  </p>
+
+  <!-- 4 種 variant 說明 -->
+  <div class="legend">
+    <div class="legend-item">
+      <h4>variant="dark"</h4>
+      <p>深色線條。用於<strong>淺色背景</strong>（白、米、淺灰、surface-2）</p>
+    </div>
+    <div class="legend-item">
+      <h4>variant="light"</h4>
+      <p>白色線條。用於<strong>深色/彩色背景</strong>（深藍、黑、accent 藍）</p>
+    </div>
+    <div class="legend-item">
+      <h4>variant="mono-dark"</h4>
+      <p>單色深（全部同色）。用於<strong>印刷、favicon</strong> 等無法彩色場景</p>
+    </div>
+    <div class="legend-item">
+      <h4>variant="mono-light"</h4>
+      <p>單色白（全部同色）。用於<strong>極深背景 + 極簡設計</strong></p>
+    </div>
+  </div>
+
+  <!-- ============================================= -->
+  <!-- Test 1: variant="dark" 在各種淺色背景 -->
+  <!-- ============================================= -->
+  <div class="section">
+    <div class="section-title">Test 1 · <code>variant="dark"</code> — 淺色背景場景</div>
+    <div class="section-desc">
+      這個變體目前用在 Sidebar 深藍容器內（容器是深色，但 logo 外層是淺色母背景），以及未來可能放在卡片背景上。
+      理想是在 Surface-2 / white / slate-100 上對比足夠。
+    </div>
+    <div class="test-grid">
+      <div class="test bg-white">
+        <span class="verdict verdict-pass">PASS</span>
+        <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+          <rect x="28" y="8" width="8" height="48" rx="1.5" fill="#0F172A"/>
+          <rect x="8" y="28" width="48" height="8" rx="1.5" fill="#0F172A"/>
+          <circle cx="14" cy="14" r="5" fill="#0369A1"/>
+          <path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#0F172A"/>
+          <circle cx="14" cy="50" r="5" fill="#0369A1"/>
+          <circle cx="50" cy="50" r="5" fill="#0369A1"/>
+          <circle cx="32" cy="32" r="4" fill="#FFFFFF" stroke="#0F172A" stroke-width="2"/>
+        </svg>
+        <div class="test-label">白底</div>
+        <div class="test-bg-info">#FFFFFF</div>
+      </div>
+      <div class="test bg-surface-2">
+        <span class="verdict verdict-pass">PASS</span>
+        <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+          <rect x="28" y="8" width="8" height="48" rx="1.5" fill="#0F172A"/>
+          <rect x="8" y="28" width="48" height="8" rx="1.5" fill="#0F172A"/>
+          <circle cx="14" cy="14" r="5" fill="#0369A1"/>
+          <path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#0F172A"/>
+          <circle cx="14" cy="50" r="5" fill="#0369A1"/>
+          <circle cx="50" cy="50" r="5" fill="#0369A1"/>
+          <circle cx="32" cy="32" r="4" fill="#FFFFFF" stroke="#0F172A" stroke-width="2"/>
+        </svg>
+        <div class="test-label">Surface-2（頁面底）</div>
+        <div class="test-bg-info">#F8FAFC</div>
+      </div>
+      <div class="test bg-slate-100">
+        <span class="verdict verdict-pass">PASS</span>
+        <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+          <rect x="28" y="8" width="8" height="48" rx="1.5" fill="#0F172A"/>
+          <rect x="8" y="28" width="48" height="8" rx="1.5" fill="#0F172A"/>
+          <circle cx="14" cy="14" r="5" fill="#0369A1"/>
+          <path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#0F172A"/>
+          <circle cx="14" cy="50" r="5" fill="#0369A1"/>
+          <circle cx="50" cy="50" r="5" fill="#0369A1"/>
+          <circle cx="32" cy="32" r="4" fill="#FFFFFF" stroke="#0F172A" stroke-width="2"/>
+        </svg>
+        <div class="test-label">Slate-100（淺面板）</div>
+        <div class="test-bg-info">#F1F5F9</div>
+      </div>
+      <div class="test bg-slate-200">
+        <span class="verdict verdict-pass">PASS</span>
+        <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+          <rect x="28" y="8" width="8" height="48" rx="1.5" fill="#0F172A"/>
+          <rect x="8" y="28" width="48" height="8" rx="1.5" fill="#0F172A"/>
+          <circle cx="14" cy="14" r="5" fill="#0369A1"/>
+          <path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#0F172A"/>
+          <circle cx="14" cy="50" r="5" fill="#0369A1"/>
+          <circle cx="50" cy="50" r="5" fill="#0369A1"/>
+          <circle cx="32" cy="32" r="4" fill="#FFFFFF" stroke="#0F172A" stroke-width="2"/>
+        </svg>
+        <div class="test-label">Slate-200（邊界色）</div>
+        <div class="test-bg-info">#E2E8F0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================= -->
+  <!-- Test 2: variant="light" 在各種深色/彩色背景 -->
+  <!-- ============================================= -->
+  <div class="section">
+    <div class="section-title">Test 2 · <code>variant="light"</code> — 深色/品牌色背景場景</div>
+    <div class="section-desc">
+      這是深色模式的主要變體。驗證在各種深色層（未來 dark mode）和品牌彩色背景上的顯示正確性。
+      Taiwan 節點必須清楚可見，且要與其他藍色節點有區別。
+    </div>
+    <div class="test-grid">
+      <div class="test bg-primary">
+        <span class="verdict verdict-pass">PASS</span>
+        <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+          <rect x="28" y="8" width="8" height="48" rx="1.5" fill="#FFFFFF"/>
+          <rect x="8" y="28" width="48" height="8" rx="1.5" fill="#FFFFFF"/>
+          <circle cx="14" cy="14" r="5" fill="#0EA5E9"/>
+          <path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#FFFFFF"/>
+          <circle cx="14" cy="50" r="5" fill="#0EA5E9"/>
+          <circle cx="50" cy="50" r="5" fill="#0EA5E9"/>
+          <circle cx="32" cy="32" r="4" fill="#0F172A" stroke="#FFFFFF" stroke-width="2"/>
+        </svg>
+        <div class="test-label">Primary（主深藍）</div>
+        <div class="test-bg-info">#0F172A · 目前 sidebar/login logo 容器用</div>
+      </div>
+
+      <div class="test bg-slate-900">
+        <span class="verdict verdict-pass">PASS</span>
+        <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+          <rect x="28" y="8" width="8" height="48" rx="1.5" fill="#FFFFFF"/>
+          <rect x="8" y="28" width="48" height="8" rx="1.5" fill="#FFFFFF"/>
+          <circle cx="14" cy="14" r="5" fill="#0EA5E9"/>
+          <path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#FFFFFF"/>
+          <circle cx="14" cy="50" r="5" fill="#0EA5E9"/>
+          <circle cx="50" cy="50" r="5" fill="#0EA5E9"/>
+          <circle cx="32" cy="32" r="4" fill="#0F172A" stroke="#FFFFFF" stroke-width="2"/>
+        </svg>
+        <div class="test-label">未來 Dark Mode 主背景</div>
+        <div class="test-bg-info">#0A0F1A · 建議採用</div>
+      </div>
+
+      <div class="test bg-slate-800">
+        <span class="verdict verdict-pass">PASS</span>
+        <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+          <rect x="28" y="8" width="8" height="48" rx="1.5" fill="#FFFFFF"/>
+          <rect x="8" y="28" width="48" height="8" rx="1.5" fill="#FFFFFF"/>
+          <circle cx="14" cy="14" r="5" fill="#0EA5E9"/>
+          <path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#FFFFFF"/>
+          <circle cx="14" cy="50" r="5" fill="#0EA5E9"/>
+          <circle cx="50" cy="50" r="5" fill="#0EA5E9"/>
+          <circle cx="32" cy="32" r="4" fill="#0F172A" stroke="#FFFFFF" stroke-width="2"/>
+        </svg>
+        <div class="test-label">Dark Mode 卡片</div>
+        <div class="test-bg-info">#1E293B · 建議卡片色</div>
+      </div>
+
+      <div class="test bg-accent">
+        <span class="verdict verdict-pass">PASS</span>
+        <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+          <rect x="28" y="8" width="8" height="48" rx="1.5" fill="#FFFFFF"/>
+          <rect x="8" y="28" width="48" height="8" rx="1.5" fill="#FFFFFF"/>
+          <circle cx="14" cy="14" r="5" fill="#0EA5E9"/>
+          <path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#FFFFFF"/>
+          <circle cx="14" cy="50" r="5" fill="#0EA5E9"/>
+          <circle cx="50" cy="50" r="5" fill="#0EA5E9"/>
+          <circle cx="32" cy="32" r="4" fill="#0F172A" stroke="#FFFFFF" stroke-width="2"/>
+        </svg>
+        <div class="test-label">Accent（品牌藍）</div>
+        <div class="test-bg-info">#0369A1 · 節點與底色相近，但仍可辨</div>
+      </div>
+
+      <div class="test bg-accent-hover">
+        <span class="verdict verdict-pass">PASS</span>
+        <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+          <rect x="28" y="8" width="8" height="48" rx="1.5" fill="#FFFFFF"/>
+          <rect x="8" y="28" width="48" height="8" rx="1.5" fill="#FFFFFF"/>
+          <circle cx="14" cy="14" r="5" fill="#0EA5E9"/>
+          <path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#FFFFFF"/>
+          <circle cx="14" cy="50" r="5" fill="#0EA5E9"/>
+          <circle cx="50" cy="50" r="5" fill="#0EA5E9"/>
+          <circle cx="32" cy="32" r="4" fill="#0F172A" stroke="#FFFFFF" stroke-width="2"/>
+        </svg>
+        <div class="test-label">Accent Hover</div>
+        <div class="test-bg-info">#075985</div>
+      </div>
+
+      <div class="test bg-danger">
+        <span class="verdict verdict-warn">WARN</span>
+        <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+          <rect x="28" y="8" width="8" height="48" rx="1.5" fill="#FFFFFF"/>
+          <rect x="8" y="28" width="48" height="8" rx="1.5" fill="#FFFFFF"/>
+          <circle cx="14" cy="14" r="5" fill="#0EA5E9"/>
+          <path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#FFFFFF"/>
+          <circle cx="14" cy="50" r="5" fill="#0EA5E9"/>
+          <circle cx="50" cy="50" r="5" fill="#0EA5E9"/>
+          <circle cx="32" cy="32" r="4" fill="#0F172A" stroke="#FFFFFF" stroke-width="2"/>
+        </svg>
+        <div class="test-label">Danger（危險）</div>
+        <div class="test-bg-info">#DC2626 · 色彩衝突 — 不建議</div>
+      </div>
+
+      <div class="test bg-warning">
+        <span class="verdict verdict-warn">WARN</span>
+        <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+          <rect x="28" y="8" width="8" height="48" rx="1.5" fill="#FFFFFF"/>
+          <rect x="8" y="28" width="48" height="8" rx="1.5" fill="#FFFFFF"/>
+          <circle cx="14" cy="14" r="5" fill="#0EA5E9"/>
+          <path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#FFFFFF"/>
+          <circle cx="14" cy="50" r="5" fill="#0EA5E9"/>
+          <circle cx="50" cy="50" r="5" fill="#0EA5E9"/>
+          <circle cx="32" cy="32" r="4" fill="#0F172A" stroke="#FFFFFF" stroke-width="2"/>
+        </svg>
+        <div class="test-label">Warning（警告）</div>
+        <div class="test-bg-info">#D97706 · 色彩衝突 — 不建議</div>
+      </div>
+
+      <div class="test bg-success">
+        <span class="verdict verdict-warn">WARN</span>
+        <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+          <rect x="28" y="8" width="8" height="48" rx="1.5" fill="#FFFFFF"/>
+          <rect x="8" y="28" width="48" height="8" rx="1.5" fill="#FFFFFF"/>
+          <circle cx="14" cy="14" r="5" fill="#0EA5E9"/>
+          <path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#FFFFFF"/>
+          <circle cx="14" cy="50" r="5" fill="#0EA5E9"/>
+          <circle cx="50" cy="50" r="5" fill="#0EA5E9"/>
+          <circle cx="32" cy="32" r="4" fill="#0F172A" stroke="#FFFFFF" stroke-width="2"/>
+        </svg>
+        <div class="test-label">Success（成功）</div>
+        <div class="test-bg-info">#059669 · 語意衝突 — 不建議</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================= -->
+  <!-- Test 3: Mono variants -->
+  <!-- ============================================= -->
+  <div class="section">
+    <div class="section-title">Test 3 · <code>mono-dark</code> / <code>mono-light</code> — 單色場景</div>
+    <div class="section-desc">
+      給 favicon（16px 彩色太雜）、印刷（省成本）、超極簡場景使用。
+      Taiwan 節點與其他節點會同色，僅靠形狀區分。
+    </div>
+    <div class="test-grid">
+      <div class="test bg-white">
+        <span class="verdict verdict-pass">PASS</span>
+        <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+          <rect x="28" y="8" width="8" height="48" rx="1.5" fill="#0F172A"/>
+          <rect x="8" y="28" width="48" height="8" rx="1.5" fill="#0F172A"/>
+          <circle cx="14" cy="14" r="5" fill="#0F172A"/>
+          <path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#0F172A"/>
+          <circle cx="14" cy="50" r="5" fill="#0F172A"/>
+          <circle cx="50" cy="50" r="5" fill="#0F172A"/>
+          <circle cx="32" cy="32" r="4" fill="#FFFFFF" stroke="#0F172A" stroke-width="2"/>
+        </svg>
+        <div class="test-label">mono-dark 白底</div>
+        <div class="test-bg-info">印刷黑白 · 極簡</div>
+      </div>
+
+      <div class="test bg-primary">
+        <span class="verdict verdict-pass">PASS</span>
+        <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+          <rect x="28" y="8" width="8" height="48" rx="1.5" fill="#FFFFFF"/>
+          <rect x="8" y="28" width="48" height="8" rx="1.5" fill="#FFFFFF"/>
+          <circle cx="14" cy="14" r="5" fill="#FFFFFF"/>
+          <path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#FFFFFF"/>
+          <circle cx="14" cy="50" r="5" fill="#FFFFFF"/>
+          <circle cx="50" cy="50" r="5" fill="#FFFFFF"/>
+          <circle cx="32" cy="32" r="4" fill="#0F172A" stroke="#FFFFFF" stroke-width="2"/>
+        </svg>
+        <div class="test-label">mono-light 深底</div>
+        <div class="test-bg-info">浮水印場合</div>
+      </div>
+
+      <div class="test bg-slate-900">
+        <span class="verdict verdict-pass">PASS</span>
+        <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+          <rect x="28" y="8" width="8" height="48" rx="1.5" fill="#FFFFFF"/>
+          <rect x="8" y="28" width="48" height="8" rx="1.5" fill="#FFFFFF"/>
+          <circle cx="14" cy="14" r="5" fill="#FFFFFF"/>
+          <path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#FFFFFF"/>
+          <circle cx="14" cy="50" r="5" fill="#FFFFFF"/>
+          <circle cx="50" cy="50" r="5" fill="#FFFFFF"/>
+          <circle cx="32" cy="32" r="4" fill="#0F172A" stroke="#FFFFFF" stroke-width="2"/>
+        </svg>
+        <div class="test-label">mono-light dark mode</div>
+        <div class="test-bg-info">未來 dark 主背景極簡</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================= -->
+  <!-- Test 4: Size variations -->
+  <!-- ============================================= -->
+  <div class="section">
+    <div class="section-title">Test 4 · 各尺寸可讀性</div>
+    <div class="section-desc">
+      從 favicon 16px 到大型標題 128px。重點：小尺寸台灣節點不能跟一般圓點混淆、大尺寸時細節要銳利。
+    </div>
+    <div class="test-grid" style="grid-template-columns: repeat(5, 1fr);">
+      <div class="test bg-white" style="min-height: 100px;">
+        <svg width="16" height="16" viewBox="0 0 64 64"><rect x="28" y="8" width="8" height="48" rx="1.5" fill="#0F172A"/><rect x="8" y="28" width="48" height="8" rx="1.5" fill="#0F172A"/><circle cx="14" cy="14" r="5" fill="#0369A1"/><path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#0F172A"/><circle cx="14" cy="50" r="5" fill="#0369A1"/><circle cx="50" cy="50" r="5" fill="#0369A1"/><circle cx="32" cy="32" r="4" fill="#FFFFFF" stroke="#0F172A" stroke-width="2"/></svg>
+        <div class="test-label">16px · favicon</div>
+      </div>
+      <div class="test bg-white" style="min-height: 100px;">
+        <svg width="24" height="24" viewBox="0 0 64 64"><rect x="28" y="8" width="8" height="48" rx="1.5" fill="#0F172A"/><rect x="8" y="28" width="48" height="8" rx="1.5" fill="#0F172A"/><circle cx="14" cy="14" r="5" fill="#0369A1"/><path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#0F172A"/><circle cx="14" cy="50" r="5" fill="#0369A1"/><circle cx="50" cy="50" r="5" fill="#0369A1"/><circle cx="32" cy="32" r="4" fill="#FFFFFF" stroke="#0F172A" stroke-width="2"/></svg>
+        <div class="test-label">24px · inline 小</div>
+      </div>
+      <div class="test bg-white" style="min-height: 100px;">
+        <svg width="40" height="40" viewBox="0 0 64 64"><rect x="28" y="8" width="8" height="48" rx="1.5" fill="#0F172A"/><rect x="8" y="28" width="48" height="8" rx="1.5" fill="#0F172A"/><circle cx="14" cy="14" r="5" fill="#0369A1"/><path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#0F172A"/><circle cx="14" cy="50" r="5" fill="#0369A1"/><circle cx="50" cy="50" r="5" fill="#0369A1"/><circle cx="32" cy="32" r="4" fill="#FFFFFF" stroke="#0F172A" stroke-width="2"/></svg>
+        <div class="test-label">40px · 側欄</div>
+      </div>
+      <div class="test bg-white" style="min-height: 100px;">
+        <svg width="64" height="64" viewBox="0 0 64 64"><rect x="28" y="8" width="8" height="48" rx="1.5" fill="#0F172A"/><rect x="8" y="28" width="48" height="8" rx="1.5" fill="#0F172A"/><circle cx="14" cy="14" r="5" fill="#0369A1"/><path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#0F172A"/><circle cx="14" cy="50" r="5" fill="#0369A1"/><circle cx="50" cy="50" r="5" fill="#0369A1"/><circle cx="32" cy="32" r="4" fill="#FFFFFF" stroke="#0F172A" stroke-width="2"/></svg>
+        <div class="test-label">64px · 登入</div>
+      </div>
+      <div class="test bg-white" style="min-height: 160px;">
+        <svg width="128" height="128" viewBox="0 0 64 64"><rect x="28" y="8" width="8" height="48" rx="1.5" fill="#0F172A"/><rect x="8" y="28" width="48" height="8" rx="1.5" fill="#0F172A"/><circle cx="14" cy="14" r="5" fill="#0369A1"/><path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#0F172A"/><circle cx="14" cy="50" r="5" fill="#0369A1"/><circle cx="50" cy="50" r="5" fill="#0369A1"/><circle cx="32" cy="32" r="4" fill="#FFFFFF" stroke="#0F172A" stroke-width="2"/></svg>
+        <div class="test-label">128px · 海報/簡報</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================= -->
+  <!-- Test 5: 整頁 Dark Mode 模擬 -->
+  <!-- ============================================= -->
+  <div class="section">
+    <div class="section-title">Test 5 · 整頁 Dark Mode 情境模擬</div>
+    <div class="section-desc">
+      如果未來啟用 dark mode，sidebar + header + card 的 logo 會長這樣。
+    </div>
+    <div class="dark-mode-sim">
+      <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+        <div class="dark-sidebar">
+          <div class="dark-sidebar-icon" style="background: #0369A1;">
+            <svg width="28" height="28" viewBox="0 0 64 64" fill="none">
+              <rect x="28" y="8" width="8" height="48" rx="1.5" fill="#FFFFFF"/>
+              <rect x="8" y="28" width="48" height="8" rx="1.5" fill="#FFFFFF"/>
+              <circle cx="14" cy="14" r="5" fill="#0EA5E9"/>
+              <path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#FFFFFF"/>
+              <circle cx="14" cy="50" r="5" fill="#0EA5E9"/>
+              <circle cx="50" cy="50" r="5" fill="#0EA5E9"/>
+              <circle cx="32" cy="32" r="4" fill="#0F172A" stroke="#FFFFFF" stroke-width="2"/>
+            </svg>
+          </div>
+          <div class="dark-sidebar-text">
+            <h3>精準執法儀表板</h3>
+            <p>新化分局</p>
+          </div>
+        </div>
+
+        <div class="dark-sidebar" style="background: #1E293B;">
+          <div class="dark-sidebar-icon" style="background: #0F172A;">
+            <svg width="28" height="28" viewBox="0 0 64 64" fill="none">
+              <rect x="28" y="8" width="8" height="48" rx="1.5" fill="#FFFFFF"/>
+              <rect x="8" y="28" width="48" height="8" rx="1.5" fill="#FFFFFF"/>
+              <circle cx="14" cy="14" r="5" fill="#0EA5E9"/>
+              <path d="M 48.5 9.5 Q 50 10 51 11.5 Q 52 13 52 15 Q 51.8 17 50.5 18.5 Q 49 19.5 47.5 18.5 Q 46.5 17.5 46 15.5 Q 46 12.5 47 10.5 Q 47.5 9.5 48.5 9.5 Z" fill="#FFFFFF"/>
+              <circle cx="14" cy="50" r="5" fill="#0EA5E9"/>
+              <circle cx="50" cy="50" r="5" fill="#0EA5E9"/>
+              <circle cx="32" cy="32" r="4" fill="#0F172A" stroke="#FFFFFF" stroke-width="2"/>
+            </svg>
+          </div>
+          <div class="dark-sidebar-text">
+            <h3>精準執法儀表板</h3>
+            <p>新化分局</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================= -->
+  <!-- 使用規則總表 -->
+  <!-- ============================================= -->
+  <div class="section" style="background: #F0F9FF; border-color: #BAE6FD;">
+    <div class="section-title">📋 使用規則總表</div>
+    <div class="section-desc" style="color: #0C4A6E;">
+      未來 dark mode 啟動時，各場景該用哪個 variant，一表看懂。
+    </div>
+    <div style="font-size: 13px; line-height: 1.8; color: #0C4A6E;">
+      <p><code>variant="dark"</code> → 淺色背景（white / slate-50 / slate-100 / slate-200 / surface-2）</p>
+      <p><code>variant="light"</code> → 深色背景（primary / slate-900 / slate-800 / accent / accent-hover）</p>
+      <p><code>variant="mono-dark"</code> → 白底印刷、簡報黑白投影片</p>
+      <p><code>variant="mono-light"</code> → 深底浮水印、極簡 dark mode 場景</p>
+      <br>
+      <p><strong>⚠ 避免搭配：</strong> 任何 variant 都不建議放在 danger/warning/success 語意色背景上，會造成色彩衝突。</p>
+      <p><strong>✓ 最佳搭配：</strong> 包裝在 <code>bg-primary</code> 或 <code>bg-slate-900</code> 的 rounded 容器裡配 light variant — 這就是目前側欄和登入頁的做法。</p>
+    </div>
+  </div>
+
+</body>
+</html>

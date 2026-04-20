@@ -7,10 +7,21 @@
  *   右上 1 個替換為台灣島輪廓（在地識別）
  * - 中心白點：焦點、決策中心
  *
- * 用法：
- *   <BrandLogo size={40} variant="dark" />     // 白底/淺底
- *   <BrandLogo size={40} variant="light" />    // 深底/彩底 (反白)
- *   <BrandLogo size={24} variant="mono-dark" /> // 單色深
+ * Variant 使用規則（已驗證於 logo-dark-mode-verification.html）：
+ *
+ *   variant="dark"       → 淺色背景：white / surface-2 / slate-50 / slate-100
+ *   variant="light"      → 深色/品牌色背景：primary / slate-900 / slate-800 /
+ *                          accent / accent-hover
+ *   variant="mono-dark"  → 白底印刷、簡報黑白投影片、favicon 備用
+ *   variant="mono-light" → 深底浮水印、極簡 dark mode
+ *
+ * ⚠ 避免：放在 danger / warning / success 語意色背景上（色彩衝突）。
+ * ✓ 最佳實踐：包裝在 bg-primary 或 bg-slate-900 rounded 容器裡配 light variant。
+ *
+ * 用法範例：
+ *   <BrandLogo size={40} variant="dark" />     // 白底
+ *   <BrandLogo size={40} variant="light" />    // 深底反白
+ *   <BrandLogo size={16} variant="mono-dark" /> // favicon 16px
  */
 
 import React from 'react';
