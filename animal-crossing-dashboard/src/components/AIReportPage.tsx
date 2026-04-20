@@ -1,33 +1,36 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { apiClient, ReportResponse } from '../api/client';
-import { Leaf, Calendar, Printer, BarChart3, Bot, Settings, Key, AlertTriangle, X } from 'lucide-react';
+import { Leaf, Printer, BarChart3, Bot, Settings, Key, AlertTriangle, X, ChevronDown, ChevronUp, Database } from 'lucide-react';
 
-// Provider & Model Definitions
-const PROVIDER_MODELS: Record<string, { name: string; value: string }[]> = {
+// Provider & Model Definitions（僅列出經驗證真實可呼叫的 model id）
+// 若將來出現新版，只需在此加入即可，無需改其他檔案
+const PROVIDER_MODELS: Record<string, { name: string; value: string; hint?: string }[]> = {
     openai: [
-        { name: 'GPT-5 Pro (Latest)', value: 'gpt-5-pro' },
-        { name: 'GPT-4o (Omni)', value: 'gpt-4o' },
-        { name: 'OpenAI o3 (Reasoning)', value: 'openai-o3' },
-        { name: 'GPT-4.5 Preview', value: 'gpt-4.5-preview' }
+        { name: 'GPT-4o（推薦，穩定）', value: 'gpt-4o', hint: '平衡品質與速度，最適合長報告' },
+        { name: 'GPT-4o mini（快速便宜）', value: 'gpt-4o-mini', hint: '便宜 10 倍，適合測試' },
+        { name: 'GPT-4 Turbo', value: 'gpt-4-turbo', hint: '較舊但穩定' },
+        { name: 'o1-mini（推理型）', value: 'o1-mini', hint: '擅長邏輯分析，較慢' },
     ],
     anthropic: [
-        { name: 'Claude 4 Opus (Latest)', value: 'claude-4-opus' },
-        { name: 'Claude 3.5 Sonnet', value: 'claude-3-5-sonnet-20240620' },
-        { name: 'Claude Haiku 4.5', value: 'claude-haiku-4.5' }
+        { name: 'Claude 3.5 Sonnet（推薦）', value: 'claude-3-5-sonnet-20241022', hint: '品質最均衡，寫作能力優' },
+        { name: 'Claude 3.5 Haiku（便宜快速）', value: 'claude-3-5-haiku-20241022', hint: '適合測試' },
+        { name: 'Claude 3 Opus', value: 'claude-3-opus-20240229', hint: '最強但較貴較慢' },
     ],
     gemini: [
-        { name: 'Gemini 3 Pro (Latest)', value: 'gemini-3-pro' },
-        { name: 'Gemini 2.5 Flash', value: 'gemini-2.5-flash' },
-        { name: 'Gemini 3 Deep Think', value: 'gemini-3-deep-think' }
+        { name: 'Gemini 1.5 Pro（推薦）', value: 'gemini-1.5-pro-latest', hint: '免費 tier 可用，長文能力強' },
+        { name: 'Gemini 1.5 Flash（快）', value: 'gemini-1.5-flash-latest', hint: '快速、免費額度高' },
+        { name: 'Gemini 2.0 Flash（Experimental）', value: 'gemini-2.0-flash-exp', hint: '最新實驗版' },
     ],
     ollama: [
-        { name: 'Llama 3 (8B)', value: 'llama3' },
-        { name: 'Llama 3 (70B)', value: 'llama3:70b' },
-        { name: 'Mistral (7B)', value: 'mistral' },
-        { name: 'Gemma 2 (9B)', value: 'gemma:latest' },
-        { name: 'Custom Model...', value: 'custom' }
-    ]
+        { name: 'Llama 3.1 (8B)', value: 'llama3.1', hint: '需先 ollama pull llama3.1' },
+        { name: 'Qwen 2.5 (7B) 中文好', value: 'qwen2.5', hint: '需先 ollama pull qwen2.5' },
+        { name: 'Mistral (7B)', value: 'mistral', hint: '需先 ollama pull mistral' },
+        { name: '自訂模型名稱...', value: 'custom' },
+    ],
+    mock: [
+        { name: 'Mock（測試用，無需 API Key）', value: 'mock', hint: '使用模擬回應測試資料流與版型，不呼叫真實 LLM' },
+    ],
 };
 
 // API Key Modal Component
@@ -46,6 +49,8 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, curr
     const [customModel, setCustomModel] = useState('');
 
     const isLocal = provider === 'ollama';
+    const isMock = provider === 'mock';
+    const needsKey = !isLocal && !isMock;
 
     // Reset model when provider changes (default to first option)
     const handleProviderChange = (newProvider: string) => {
@@ -62,8 +67,10 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, curr
         e.preventDefault();
         // For Ollama, we might use custom model name if 'custom' is selected
         const finalModel = (provider === 'ollama' && model === 'custom') ? customModel : model;
-        // For Ollama, key is optional (send 'local' if empty to satisfy non-empty check if needed, or just let it be empty)
-        const finalKey = isLocal && !key ? 'local-ollama' : key;
+        // Mock + Ollama 不需要真正的 key，塞個 marker 字串讓前端 `if (!apiKey)` 邏輯能通過
+        let finalKey = key;
+        if (isMock) finalKey = 'mock-mode';
+        else if (isLocal && !key) finalKey = 'local-ollama';
 
         onSave(finalKey, provider, finalModel);
         onClose();
@@ -101,10 +108,11 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, curr
                                 onChange={(e) => handleProviderChange(e.target.value)}
                                 className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white"
                             >
+                                <option value="mock">🧪 Mock（測試）</option>
                                 <option value="openai">OpenAI</option>
                                 <option value="anthropic">Anthropic</option>
-                                <option value="gemini">Google</option>
-                                <option value="ollama">Ollama (Local)</option>
+                                <option value="gemini">Google Gemini</option>
+                                <option value="ollama">Ollama（本地）</option>
                             </select>
                         </div>
                         <div>
@@ -123,6 +131,13 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, curr
                         </div>
                     </div>
 
+                    {/* 模型提示 */}
+                    {PROVIDER_MODELS[provider]?.find(m => m.value === model)?.hint && (
+                        <div className="text-[11px] text-slate-500 -mt-2 pl-1">
+                            💡 {PROVIDER_MODELS[provider]?.find(m => m.value === model)?.hint}
+                        </div>
+                    )}
+
                     {/* Custom Model Input for Ollama */}
                     {isLocal && model === 'custom' && (
                         <div>
@@ -140,7 +155,7 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, curr
                         </div>
                     )}
 
-                    {!isLocal && (
+                    {needsKey && (
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-2">
                                 API Key
@@ -167,6 +182,14 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, curr
                         </div>
                     )}
 
+                    {isMock && (
+                        <div className="bg-amber-50 text-amber-800 text-sm p-3 rounded-lg space-y-1.5">
+                            <p className="font-bold">🧪 Mock 測試模式</p>
+                            <p className="text-xs">不呼叫真實 LLM，由後端直接根據資料組裝樣板報告。</p>
+                            <p className="text-xs">用途：驗證資料撈取、prompt 組裝、前端版型，不花 API 費用。</p>
+                        </div>
+                    )}
+
                     <div className="pt-2 flex justify-end gap-3">
                         <button
                             type="button"
@@ -188,6 +211,123 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, curr
     );
 };
 
+// ============================================
+// Raw Data 檢視元件 — 將後端回傳的 JSON 統計轉成可讀表格
+// 讓使用者驗證 AI 是否基於真實數據
+// ============================================
+const RawDataView: React.FC<{ data: any }> = ({ data }) => {
+    if (!data) return <div className="text-slate-400 text-sm">無資料</div>;
+
+    const overall = data.overall_stats || {};
+    const topics = data.topics || {};
+    const severity = data.severity || {};
+    const subtypes = data.enforcement_subtypes || {};
+    const units = data.unit_stats || [];
+    const accidentHot = data.accident_hotspots || [];
+    const violationHot = data.violation_hotspots || [];
+    const focusDistricts = data.focus_districts || [];
+    const focusCauses = data.focus_causes || [];
+
+    const StatRow: React.FC<{ label: string; stat: any }> = ({ label, stat }) => (
+        <div className="flex justify-between py-1 text-xs">
+            <span className="text-slate-600">{label}</span>
+            <span className="tabular-nums">
+                <span className="font-semibold text-slate-800">{stat?.current ?? 0}</span>
+                <span className="text-slate-400 mx-1">/ 去年 {stat?.last_year ?? 0}</span>
+                <span className={`ml-1 ${stat?.change_pct > 0 ? 'text-danger' : stat?.change_pct < 0 ? 'text-success' : 'text-slate-400'}`}>
+                    ({stat?.change_pct > 0 ? '+' : ''}{stat?.change_pct ?? 0}%)
+                </span>
+            </span>
+        </div>
+    );
+
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            {/* 總體 + 主題 */}
+            <div className="bg-slate-50 rounded-xl p-4 space-y-2">
+                <h4 className="font-semibold text-slate-700 text-xs uppercase tracking-wider mb-2">📊 總體與主題</h4>
+                <StatRow label="總違規" stat={overall.tickets} />
+                <StatRow label="總事故" stat={overall.accidents} />
+                <StatRow label="A1+A2 傷亡" stat={overall.injuries} />
+                <div className="h-px bg-slate-200 my-2" />
+                <StatRow label="酒駕" stat={topics.dui} />
+                <StatRow label="闖紅燈" stat={topics.red_light} />
+                <StatRow label="危險駕駛" stat={topics.dangerous} />
+            </div>
+
+            {/* 嚴重度 + 舉發子類型 */}
+            <div className="bg-slate-50 rounded-xl p-4 space-y-2">
+                <h4 className="font-semibold text-slate-700 text-xs uppercase tracking-wider mb-2">🚑 嚴重度 & 舉發類型</h4>
+                <div className="flex justify-between text-xs">
+                    <span className="text-slate-600">A1 死亡</span>
+                    <span className="font-semibold text-danger tabular-nums">{severity.A1 ?? 0}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                    <span className="text-slate-600">A2 受傷</span>
+                    <span className="font-semibold text-warning tabular-nums">{severity.A2 ?? 0}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                    <span className="text-slate-600">A3 財損</span>
+                    <span className="font-semibold text-slate-600 tabular-nums">{severity.A3 ?? 0}</span>
+                </div>
+                <div className="h-px bg-slate-200 my-2" />
+                {Object.entries(subtypes).map(([k, v]) => (
+                    <div key={k} className="flex justify-between text-xs">
+                        <span className="text-slate-600">{k}</span>
+                        <span className="tabular-nums text-slate-700">{String(v)}</span>
+                    </div>
+                ))}
+            </div>
+
+            {/* 派出所 */}
+            <div className="bg-slate-50 rounded-xl p-4 space-y-1.5">
+                <h4 className="font-semibold text-slate-700 text-xs uppercase tracking-wider mb-2">🏢 派出所表現 Top {units.length}</h4>
+                {units.length === 0 && <div className="text-xs text-slate-400">無資料</div>}
+                {units.map((u: any, i: number) => (
+                    <div key={i} className="flex justify-between text-xs">
+                        <span className="text-slate-700">{u.unit}</span>
+                        <span className="text-slate-500 tabular-nums">
+                            事故 <span className="text-warning font-semibold">{u.crashes}</span> · 違規 <span className="text-accent font-semibold">{u.tickets}</span>
+                        </span>
+                    </div>
+                ))}
+            </div>
+
+            {/* 熱點 */}
+            <div className="bg-slate-50 rounded-xl p-4 space-y-2">
+                <h4 className="font-semibold text-slate-700 text-xs uppercase tracking-wider mb-2">📍 熱點 Top 3</h4>
+                <div className="text-[11px] text-slate-500 font-medium">事故</div>
+                {accidentHot.slice(0, 3).map((h: any, i: number) => (
+                    <div key={i} className="flex justify-between text-xs pl-2">
+                        <span className="text-slate-700 truncate max-w-[70%]">{i + 1}. {h.district} {h.location}</span>
+                        <span className="tabular-nums text-slate-500">{h.count}</span>
+                    </div>
+                ))}
+                <div className="text-[11px] text-slate-500 font-medium mt-2">違規</div>
+                {violationHot.slice(0, 3).map((h: any, i: number) => (
+                    <div key={i} className="flex justify-between text-xs pl-2">
+                        <span className="text-slate-700 truncate max-w-[70%]">{i + 1}. {h.district} {h.location}</span>
+                        <span className="tabular-nums text-slate-500">{h.count}</span>
+                    </div>
+                ))}
+            </div>
+
+            {/* 重點關注 — 橫跨兩欄 */}
+            {(focusCauses.length > 0 || focusDistricts.length > 0) && (
+                <div className="md:col-span-2 bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-1">
+                    <h4 className="font-semibold text-amber-800 text-xs uppercase tracking-wider mb-2">⚠ AI 關注重點（自動偵測）</h4>
+                    {focusCauses.map((c: string, i: number) => (
+                        <div key={i} className="text-xs text-amber-700">• {c}</div>
+                    ))}
+                    {focusDistricts.length > 0 && (
+                        <div className="text-xs text-amber-700">• 事故增加較明顯區域：{focusDistricts.join('、')}</div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const AIReportPage: React.FC = () => {
     const [year, setYear] = useState(new Date().getFullYear());
     const [month, setMonth] = useState(new Date().getMonth() + 1);
@@ -195,11 +335,12 @@ const AIReportPage: React.FC = () => {
     const [report, setReport] = useState<ReportResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    // API Key State (Memory Only)
-    const [apiKey, setApiKey] = useState<string>('');
-    const [provider, setProvider] = useState<string>('openai');
-    const [model, setModel] = useState<string>('gpt-4o');
+    // API Key State (Memory Only) — 預設為 Mock 模式便於測試
+    const [apiKey, setApiKey] = useState<string>('mock-mode');
+    const [provider, setProvider] = useState<string>('mock');
+    const [model, setModel] = useState<string>('mock');
     const [showKeyModal, setShowKeyModal] = useState(false);
+    const [showRawData, setShowRawData] = useState(false);
 
     const handleGenerate = async () => {
         // 如果沒有 Key，先提示設定
@@ -210,12 +351,22 @@ const AIReportPage: React.FC = () => {
 
         setLoading(true);
         setError(null);
+        setReport(null);
         try {
             const data = await apiClient.generateAIReport(year, month, apiKey, provider, model);
             setReport(data);
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            setError('報告生成失敗，請檢查 API Key 是否正確或稍後再試');
+            // 嘗試從 fetch error 中提取後端回傳的 detail 訊息
+            let msg = '報告生成失敗';
+            if (err?.message) {
+                msg += '：' + err.message;
+            }
+            // 如果後端回傳 JSON detail，通常會 attach 在 err.detail
+            if (err?.detail) {
+                msg = err.detail;
+            }
+            setError(msg);
         } finally {
             setLoading(false);
         }
@@ -260,13 +411,15 @@ const AIReportPage: React.FC = () => {
                 <div className="flex gap-3 bg-slate-50 p-2 rounded-2xl">
                     <button
                         onClick={() => setShowKeyModal(true)}
-                        className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all border ${apiKey
+                        className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all border ${apiKey && apiKey !== 'mock-mode'
                             ? 'bg-sky-50 text-sky-700 border-sky-200'
-                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'}`}
-                        title="設定 API Key"
+                            : provider === 'mock'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                        title="設定 AI 模型"
                     >
                         <Settings className="w-4 h-4" />
-                        {apiKey ? 'API 已設定' : 'API 設定'}
+                        {provider === 'mock' ? 'Mock 測試' : (apiKey ? `${provider} 已設定` : 'API 設定')}
                     </button>
 
                     <div className="w-px bg-slate-200 mx-1"></div>
@@ -385,9 +538,38 @@ const AIReportPage: React.FC = () => {
                         </ReactMarkdown>
                     </div>
 
+                    {/* Raw Data 檢視 — 驗證 AI 是否基於真實資料 */}
+                    <div className="border-t border-slate-100 print:hidden">
+                        <button
+                            onClick={() => setShowRawData(!showRawData)}
+                            className="w-full px-6 py-3 flex items-center justify-between text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+                        >
+                            <span className="flex items-center gap-2">
+                                <Database className="w-4 h-4" />
+                                <span className="font-medium">檢視 AI 使用的原始資料</span>
+                                <span className="text-xs text-slate-400">（驗證 AI 是否編造數據）</span>
+                            </span>
+                            {showRawData ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </button>
+
+                        {showRawData && (
+                            <div className="px-6 pb-6 space-y-4">
+                                <RawDataView data={report.raw_data} />
+                                <details className="text-xs">
+                                    <summary className="cursor-pointer text-slate-500 hover:text-slate-700 py-2">
+                                        展開完整 JSON（開發者用）
+                                    </summary>
+                                    <pre className="mt-2 p-3 bg-slate-900 text-slate-100 rounded-lg overflow-x-auto text-[10px] leading-relaxed">
+                                        {JSON.stringify(report.raw_data, null, 2)}
+                                    </pre>
+                                </details>
+                            </div>
+                        )}
+                    </div>
+
                     {/* Footer */}
                     <div className="bg-slate-50 p-6 text-center text-sm text-slate-400 border-t border-slate-100 print:hidden">
-                        報告由 {report.ai_analysis.provider} ({report.ai_analysis.model}) 生成 • 僅供參考，決策請以實際情況為準
+                        報告由 <span className="font-mono">{report.ai_analysis.provider}</span> / <span className="font-mono">{report.ai_analysis.model}</span> 生成 • 僅供參考，決策請以實際情況為準
                     </div>
                 </div>
             )}

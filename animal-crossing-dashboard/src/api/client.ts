@@ -416,7 +416,20 @@ class APIClient {
       });
 
       if (!response.ok) {
-        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+        // 嘗試從 response body 中提取 FastAPI 的 detail 訊息（包含給 user 的具體錯誤）
+        let detail = `${response.status} ${response.statusText}`;
+        try {
+          const errorBody = await response.json();
+          if (errorBody?.detail) {
+            detail = typeof errorBody.detail === 'string' ? errorBody.detail : JSON.stringify(errorBody.detail);
+          }
+        } catch {
+          // body 不是 JSON，保留原始 status
+        }
+        const err = new Error(detail) as any;
+        err.detail = detail;
+        err.status = response.status;
+        throw err;
       }
 
       return await response.json();

@@ -32,19 +32,24 @@ class LLMService:
         """
         # 決定使用哪個 Provider
         active_provider = provider.lower() if provider else self.provider
-        
+
         # 決定使用哪個 Model
         active_model = model_name if model_name else self.model
-        
-        # 如果有動態 Key，則強制使用該 Provider (除非是 Mock)
+
+        # Mock 模式：前端可透過 provider="mock" 或傳 api_key="mock-mode" 顯式觸發
+        if active_provider == "mock" or api_key == "mock-mode":
+            return self._mock_response(system_prompt, user_prompt)
+
+        # 如果有動態 Key，則強制使用該 Provider
         current_api_key = api_key if api_key else (
-            settings.OPENAI_API_KEY if active_provider == "openai" else 
-            settings.GEMINI_API_KEY if active_provider == "gemini" else 
-            settings.CLAUDE_API_KEY
+            settings.OPENAI_API_KEY if active_provider == "openai" else
+            settings.GEMINI_API_KEY if active_provider == "gemini" else
+            settings.CLAUDE_API_KEY if active_provider == "anthropic" else
+            None
         )
 
-        # 若無 Key 且非 Mock，則自動降級為 Mock
-        if active_provider != "mock" and not current_api_key:
+        # 若無 Key 且非 Ollama（Ollama 不需要 key），則自動降級為 Mock
+        if active_provider != "ollama" and not current_api_key:
             active_provider = "mock"
 
         if active_provider == "mock":
@@ -108,39 +113,106 @@ class LLMService:
             return {"error": "Failed to parse JSON", "raw_content": response_text}
 
     async def _call_openai(self, system_prompt: str, user_prompt: str, temperature: float, api_key: str, model: str) -> str:
-        # 設定較長的超時時間 (120秒)
-        timeout = aiohttp.ClientTimeout(total=120)
+        """OpenAI Chat Completions API。支援 gpt-4o, gpt-4o-mini, gpt-4-turbo, o1 系列。"""
+        # o1 系列不支援 temperature + system message
+        is_reasoning = model.startswith("o1") or model.startswith("o3")
+
+        timeout = aiohttp.ClientTimeout(total=180)  # 給 reasoning 模型更多時間
         try:
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 headers = {
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json"
                 }
-                payload = {
-                    "model": model,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    "temperature": temperature
-                }
+                if is_reasoning:
+                    # o1/o3 系列：合併 system + user 為單一 user message
+                    payload = {
+                        "model": model,
+                        "messages": [
+                            {"role": "user", "content": f"{system_prompt}\n\n{user_prompt}"}
+                        ],
+                    }
+                else:
+                    payload = {
+                        "model": model,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt}
+                        ],
+                        "temperature": temperature
+                    }
                 async with session.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload) as resp:
                     if resp.status != 200:
                         error_text = await resp.text()
-                        raise Exception(f"OpenAI API Error: {error_text}")
+                        raise Exception(self._parse_openai_error(resp.status, error_text, model))
                     data = await resp.json()
                     return data["choices"][0]["message"]["content"]
         except asyncio.TimeoutError:
-            raise Exception("Request timed out. The model took too long to respond.")
+            raise Exception(f"OpenAI 回應超時（180 秒）。{model} 可能正在高負載中，請稍後再試或改用其他模型。")
+        except aiohttp.ClientConnectorError:
+            raise Exception("無法連線到 OpenAI API。請檢查網路連線與防火牆設定。")
         except Exception as e:
-            raise Exception(f"Connection Error: {str(e)}")
+            if "OpenAI" in str(e) or "API" in str(e):
+                raise  # 已是格式化的錯誤
+            raise Exception(f"OpenAI 呼叫失敗：{str(e)}")
 
     async def _call_gemini(self, system_prompt: str, user_prompt: str, temperature: float, api_key: str, model: str) -> str:
-        # 這裡僅為示意，需要根據 google-generativeai 官方 SDK 或 REST API 實作
-        return "Gemini integration not fully implemented yet."
+        """
+        Google Gemini API（REST 直呼，不依賴 SDK）。
+        支援 gemini-1.5-pro-latest, gemini-1.5-flash-latest, gemini-2.0-flash-exp 等。
+        """
+        timeout = aiohttp.ClientTimeout(total=180)
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                payload = {
+                    "systemInstruction": {
+                        "parts": [{"text": system_prompt}]
+                    },
+                    "contents": [
+                        {
+                            "role": "user",
+                            "parts": [{"text": user_prompt}]
+                        }
+                    ],
+                    "generationConfig": {
+                        "temperature": temperature,
+                        "maxOutputTokens": 4096,
+                    },
+                    # 關閉過度保守的 safety 設定（分析警務資料可能觸發 "violence" 類別）
+                    "safetySettings": [
+                        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
+                        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
+                        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH"},
+                        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
+                    ]
+                }
+                async with session.post(url, json=payload, headers={"Content-Type": "application/json"}) as resp:
+                    if resp.status != 200:
+                        error_text = await resp.text()
+                        raise Exception(self._parse_gemini_error(resp.status, error_text, model))
+                    data = await resp.json()
+                    # Gemini 回應結構：candidates[0].content.parts[0].text
+                    try:
+                        return data["candidates"][0]["content"]["parts"][0]["text"]
+                    except (KeyError, IndexError) as e:
+                        # 可能被 safety 過濾、或 finishReason != STOP
+                        finish_reason = data.get("candidates", [{}])[0].get("finishReason", "UNKNOWN")
+                        if finish_reason == "SAFETY":
+                            raise Exception("Gemini 因安全過濾拒絕回應。請改用較保守的 prompt 或切換至其他模型。")
+                        raise Exception(f"Gemini 回應格式異常（finishReason={finish_reason}）：{str(e)}")
+        except asyncio.TimeoutError:
+            raise Exception(f"Gemini 回應超時（180 秒）。{model} 可能正在高負載中，請稍後再試。")
+        except aiohttp.ClientConnectorError:
+            raise Exception("無法連線到 Gemini API。請檢查網路連線或 VPN（台灣需要能連到 googleapis.com）。")
+        except Exception as e:
+            if "Gemini" in str(e):
+                raise
+            raise Exception(f"Gemini 呼叫失敗：{str(e)}")
 
     async def _call_anthropic(self, system_prompt: str, user_prompt: str, temperature: float, api_key: str, model: str) -> str:
-        timeout = aiohttp.ClientTimeout(total=120)
+        """Anthropic Claude Messages API。"""
+        timeout = aiohttp.ClientTimeout(total=180)
         try:
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 headers = {
@@ -160,54 +232,200 @@ class LLMService:
                 async with session.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload) as resp:
                     if resp.status != 200:
                         error_text = await resp.text()
-                        raise Exception(f"Anthropic API Error: {error_text}")
+                        raise Exception(self._parse_anthropic_error(resp.status, error_text, model))
                     data = await resp.json()
                     return data["content"][0]["text"]
         except asyncio.TimeoutError:
-            raise Exception("Request timed out. The model took too long to respond.")
+            raise Exception(f"Anthropic 回應超時（180 秒）。")
+        except aiohttp.ClientConnectorError:
+            raise Exception("無法連線到 Anthropic API。請檢查網路連線。")
+        except Exception as e:
+            if "Anthropic" in str(e):
+                raise
+            raise Exception(f"Anthropic 呼叫失敗：{str(e)}")
+
+    # ============================================
+    # 錯誤訊息格式化（讓使用者看得懂）
+    # ============================================
+    def _parse_openai_error(self, status: int, text: str, model: str) -> str:
+        if status == 401:
+            return "OpenAI API Key 無效。請檢查 Key 是否正確、是否已啟用帳戶。"
+        if status == 403:
+            return f"OpenAI 無權呼叫 {model}。請檢查此 Key 是否有該模型的存取權。"
+        if status == 404:
+            return f"OpenAI 查無此模型：{model}。可能已下架或名稱有誤。"
+        if status == 429:
+            return "OpenAI 觸發速率限制或額度已用完。請稍後再試或檢查帳單。"
+        if status == 500 or status == 503:
+            return "OpenAI 伺服器暫時異常。請稍後再試。"
+        return f"OpenAI API 錯誤（HTTP {status}）：{text[:200]}"
+
+    def _parse_gemini_error(self, status: int, text: str, model: str) -> str:
+        if status == 400:
+            if "API_KEY_INVALID" in text or "API key not valid" in text:
+                return "Gemini API Key 無效。請至 Google AI Studio 重新取得 Key。"
+            return f"Gemini 請求格式錯誤：{text[:200]}"
+        if status == 403:
+            return f"Gemini 無權呼叫 {model}。可能需要升級方案或此 Key 未啟用該模型。"
+        if status == 404:
+            return f"Gemini 查無此模型：{model}。可能已下架或名稱有誤（目前推薦 gemini-1.5-pro-latest）。"
+        if status == 429:
+            return "Gemini 觸發速率限制（免費 tier 限制較嚴）。請稍後再試或升級付費方案。"
+        if status >= 500:
+            return "Gemini 伺服器暫時異常。請稍後再試。"
+        return f"Gemini API 錯誤（HTTP {status}）：{text[:200]}"
+
+    def _parse_anthropic_error(self, status: int, text: str, model: str) -> str:
+        if status == 401:
+            return "Anthropic API Key 無效。"
+        if status == 404:
+            return f"Anthropic 查無此模型：{model}。"
+        if status == 429:
+            return "Anthropic 觸發速率限制。請稍後再試。"
+        if status >= 500:
+            return "Anthropic 伺服器暫時異常。"
+        return f"Anthropic API 錯誤（HTTP {status}）：{text[:200]}"
 
     def _mock_response(self, system_prompt: str, user_prompt: str) -> str:
         """
-        開發用 Mock 回應 (Markdown 格式)
+        Mock 回應：從 user_prompt 內嵌的 JSON 解析出真實統計資料，
+        按照 Phase 3 的新 prompt 結構組裝模板化 Markdown。
+        用途：驗證資料撈取、prompt 組裝、前端版型，不花 API 費用。
         """
-        if "分析" in user_prompt or "報告" in user_prompt:
-            return """
-# 交通執法成效與事故防制分析報告
-分析期間：2026年1月
+        import re
+        import json as _json
 
-## 1. 成效摘要 (Summary)
-*   **事故顯著下降**：本月 A1/A2 事故共 **86件**，較去年同期（153件）大幅下降 **43.8%**，顯示近期防制策略已見成效。
-*   **違規取締策略調整**：總體違規取締雖減少 71.2%，但事故率同步下降，可能意味著執法更具**精準性**，而非僅追求數量。
-*   **總結**：「精準打擊見效，事故防制成果斐然，宜持續鎖定高風險熱點。」
+        # 嘗試解析 prompt 中的 JSON 資料區
+        try:
+            match = re.search(r"```json\s*(\{.*?\})\s*```", user_prompt, re.DOTALL)
+            if not match:
+                return "# Mock 模式錯誤\n\n無法從 prompt 解析 JSON 資料。請確認 prompt 結構。"
+            data = _json.loads(match.group(1))
+        except Exception as e:
+            return f"# Mock 模式解析錯誤\n\n{str(e)}"
 
-## 2. 事故與執法關聯分析 (M1 威嚇理論視角)
-*   **執法紅利浮現**：數據顯示，儘管罰單總量減少，但針對特定熱點的精準執法與能見度提升，成功產生了威嚇效果。
-*   **受傷人數下降**：A1+A2 受傷人數減少 37.5%，反映出事故嚴重度獲得有效控制。
+        return self._render_mock_report(data)
 
-## 3. 熱點與時空分析 (M2 熱點理論視角)
-### 事故熱點 (Top 3)
-1.  **新化區 中山路** (主要熱點)
-2.  山上區 縣道178線
-3.  山上區 市道178甲線
+    def _render_mock_report(self, d: dict) -> str:
+        """根據實際 ReportSummary 資料組裝一份模板化報告"""
+        period = d.get("period", {})
+        year = period.get("year", "?")
+        month = period.get("month", "?")
 
-### 違規熱點 (Top 3)
-1.  新化區 中山路
-2.  山上區 市區道路
-3.  新化區 中正路
+        overall = d.get("overall_stats", {})
+        topics = d.get("topics", {})
+        subtypes = d.get("enforcement_subtypes", {})
+        severity = d.get("severity", {})
+        units = d.get("unit_stats", [])
+        shifts = d.get("shift_stats", [])
+        a_hot = d.get("accident_hotspots", [])
+        v_hot = d.get("violation_hotspots", [])
+        focus_districts = d.get("focus_districts", [])
+        focus_causes = d.get("focus_causes", [])
 
-**重疊分析**：
-*   **新化區中山路**既是事故榜首，也是違規取締榜首，顯示執法資源已準確投放於核心問題路段。
+        def fmt_stat(key: str, label: str) -> str:
+            s = overall.get(key, {})
+            if not s:
+                return f"- {label}：資料缺失"
+            return f"- {label}：本期 {s.get('current', 0)} 件（去年同期 {s.get('last_year', 0)} 件，{s.get('change_pct', 0):+.1f}%）"
 
-## 4. 改進建議 (M3/M4 綜合視角)
-*   **執法策略 (Enforcement)**：
-    *   持續在**新化區中山路**維持高見警率。
-    *   針對 **山上區** 的對向車禍（常見於縣道），建議加強「跨越雙黃線」與「超速」取締。
-*   **工程建議**：
-    *   檢視縣道178線的標線清晰度與夜間照明。
-*   **教育宣導**：
-    *   針對高齡者（本月數據未特別惡化，但仍需關注）進行社區宣導，強調晨昏外出穿著亮色衣物。
+        def fmt_topic(key: str, label: str) -> str:
+            s = topics.get(key, {})
+            if not s:
+                return f"- {label}：資料缺失"
+            return f"- {label}：本期 {s.get('current', 0)} 件（去年 {s.get('last_year', 0)} 件，{s.get('change_pct', 0):+.1f}%）"
 
----
-*本報告由 AI 自動生成 (Mock Mode)，僅供測試參考。*
-"""
-        return "這是 Mock LLM 的回應。請設定 API Key 以啟用真實 AI 功能。"
+        # === 組裝報告 ===
+        lines = []
+
+        # 一、速覽
+        lines.append("## 一、月度成效速覽")
+        lines.append(fmt_stat("tickets", "總違規"))
+        lines.append(fmt_stat("accidents", "總事故"))
+        lines.append(f"- A1 死亡事故：{severity.get('A1', 0)} 件｜A2 受傷：{severity.get('A2', 0)} 件｜A3 財損：{severity.get('A3', 0)} 件")
+        if focus_causes:
+            lines.append(f"- ⚠ 本期重點：{'、'.join(focus_causes[:3])}")
+        if focus_districts:
+            lines.append(f"- ⚠ 事故增加較明顯區域：{'、'.join(focus_districts)}")
+        lines.append("")
+        lines.append(f"**總結**：本月為 {year} 年 {month} 月分析報告（Mock 模式樣板）。正式 AI 會根據上述數據寫出更精緻的執行面結論。")
+        lines.append("")
+
+        # 二、熱點
+        lines.append("## 二、熱點分析")
+        lines.append("### 事故熱點 Top 3")
+        if a_hot:
+            for i, h in enumerate(a_hot[:3], 1):
+                lines.append(f"{i}. **{h.get('district', '未知')} {h.get('location', '未知')}** — {h.get('count', 0)} 件")
+        else:
+            lines.append("- 本期無事故熱點資料")
+        lines.append("")
+        lines.append("### 違規熱點 Top 3")
+        if v_hot:
+            for i, h in enumerate(v_hot[:3], 1):
+                lines.append(f"{i}. **{h.get('district', '未知')} {h.get('location', '未知')}** — {h.get('count', 0)} 件")
+        else:
+            lines.append("- 本期無違規熱點資料")
+        lines.append("")
+        # 重疊檢視
+        a_locs = {h.get("location") for h in a_hot[:3] if h.get("location")}
+        v_locs = {h.get("location") for h in v_hot[:3] if h.get("location")}
+        overlap = a_locs & v_locs
+        if overlap:
+            lines.append(f"**重疊檢視**：事故與違規熱點都涵蓋 {'、'.join(overlap)}，顯示執法資源已投放於核心問題路段。")
+        else:
+            lines.append("**重疊檢視**：事故熱點未在違規熱點清單內，可能代表「執法未達事故源頭」，建議下月調整取締位置。")
+        lines.append("")
+
+        # 三、主題分析
+        lines.append("## 三、主題分析")
+        lines.append(fmt_topic("dui", "酒駕"))
+        lines.append(fmt_topic("red_light", "闖紅燈"))
+        lines.append(fmt_topic("dangerous", "危險駕駛"))
+        lines.append("")
+
+        # 四、派出所表現
+        lines.append("## 四、派出所表現")
+        if units:
+            lines.append("依事故+違規總件數排序，本期 Top 3：")
+            for u in units[:3]:
+                lines.append(
+                    f"- **{u.get('unit', '未知')}**：事故 {u.get('crashes', 0)} 件、違規 {u.get('tickets', 0)} 件"
+                )
+        else:
+            lines.append("- 本期無派出所統計資料")
+        lines.append("")
+
+        # 五、下月建議
+        lines.append("## 五、下月執法建議")
+        lines.append("")
+        lines.append("### 執法（Enforcement）")
+        # 根據 subtypes 變化給建議
+        top_subtype = max(subtypes.items(), key=lambda x: x[1], default=(None, 0)) if subtypes else (None, 0)
+        if top_subtype[0] and top_subtype[1] > 0:
+            lines.append(f"- 本月主力舉發類型為「{top_subtype[0]}」（{top_subtype[1]} 件），建議延續")
+        if a_hot:
+            top = a_hot[0]
+            lines.append(f"- 事故最嚴重路段 **{top.get('district')} {top.get('location')}** 建議加強見警率與取締密度")
+        lines.append("")
+        lines.append("### 工程（Engineering）")
+        if a_hot and len(a_hot) >= 2:
+            lines.append(f"- 建議道路管理單位評估 {a_hot[0].get('location')} 與 {a_hot[1].get('location')} 的號誌、標線、照明是否需改善")
+        else:
+            lines.append("- 本月無急需工程改善項目")
+        lines.append("")
+        lines.append("### 教育宣導（Education）")
+        elderly_c = d.get("elderly_crashes", 0)
+        youth_c = d.get("youth_crashes", 0)
+        heavy_c = d.get("heavy_vehicle_crashes", 0)
+        if elderly_c > 0:
+            lines.append(f"- 高齡者事故 {elderly_c} 件，建議社區宣導晨昏外出著亮色衣物、強化兩段式左轉觀念")
+        if youth_c > 0:
+            lines.append(f"- 青少年事故 {youth_c} 件，建議協調學校加強微電車/電輔車安全宣導")
+        if heavy_c > 0:
+            lines.append(f"- 大型車涉事 {heavy_c} 件，建議貨運業者入校園/公司宣導視線死角")
+        lines.append("")
+        lines.append("---")
+        lines.append(f"*本報告由 **Mock 模式** 生成（新化分局 {year}/{month} 資料樣板）。切換為真實 AI 模型後，內容將由 LLM 重新分析並提供更具判斷力的建議。*")
+
+        return "\n".join(lines)
