@@ -468,11 +468,11 @@ const AIReportPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Error Message */}
+            {/* Error Message — 支援多行訊息 */}
             {error && (
-                <div className="bg-red-50 text-red-600 p-4 rounded-xl flex items-center gap-2 border border-red-100 print:hidden">
-                    <Leaf className="w-5 h-5" />
-                    {error}
+                <div className="bg-red-50 text-red-700 p-4 rounded-xl flex gap-3 border border-red-200 print:hidden">
+                    <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-red-500" />
+                    <div className="text-sm leading-relaxed whitespace-pre-line">{error}</div>
                 </div>
             )}
 

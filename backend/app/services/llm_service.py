@@ -286,7 +286,30 @@ class LLMService:
                 f"（Gemini 1.5 系列已於 2025 年下架）"
             )
         if status == 429:
-            return "Gemini 觸發速率限制（免費 tier 限制較嚴）。請稍後再試或升級付費方案。"
+            # 嘗試從回應解析 retry 時間
+            retry_hint = ""
+            import re as _re
+            m = _re.search(r'"retryDelay":\s*"(\d+)s"', text)
+            if m:
+                retry_hint = f"（官方建議等待 {m.group(1)} 秒後重試）"
+
+            # 依模型提示可切換方案
+            if "pro" in model.lower():
+                suggestion = (
+                    "建議：① 切換至 gemini-2.5-flash（RPM 限制從 2 → 10 寬鬆 5 倍）"
+                    "② 或 gemini-2.5-flash-lite（RPM 15、RPD 1000）"
+                    "③ 或改用 🧪 Mock 模式先測試資料流。"
+                )
+            elif "flash-lite" in model.lower():
+                suggestion = "flash-lite 已是限制最寬的免費模型，請稍後再試或升級付費方案。"
+            else:
+                suggestion = "可改用 gemini-2.5-flash-lite（RPM 15）或升級付費方案。"
+
+            return (
+                f"Gemini 觸發速率限制 {retry_hint}。\n"
+                f"免費 tier 限制（參考）：pro=2 RPM/50 RPD；flash=10 RPM/250 RPD；flash-lite=15 RPM/1000 RPD。\n"
+                f"{suggestion}"
+            )
         if status >= 500:
             return "Gemini 伺服器暫時異常。請稍後再試。"
         return f"Gemini API 錯誤（HTTP {status}）：{text[:200]}"
