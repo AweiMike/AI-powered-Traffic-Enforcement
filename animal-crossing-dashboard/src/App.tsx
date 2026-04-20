@@ -47,6 +47,7 @@ import EVehicleAnalysisPage from './components/EVehicleAnalysisPage';
 import DuiPerformancePage from './components/DuiPerformancePage';
 import HeavyVehiclePerformancePage from './components/HeavyVehiclePerformancePage';
 import DateRangePicker, { type DateRange } from './components/DateRangePicker';
+import BrandLogo from './components/BrandLogo';
 
 // Import hooks
 import {
@@ -135,8 +136,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, readOnly, o
       {/* Brand Lockup */}
       <div className="p-5 border-b border-slate-100 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shrink-0">
-            <Shield className="w-5 h-5 text-white" strokeWidth={2.25} />
+          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shrink-0 p-1.5">
+            <BrandLogo size={28} variant="light" />
           </div>
           <div className="min-w-0">
             <h1 className="font-semibold text-slate-800 text-[15px] leading-tight tracking-tight">精準執法儀表板</h1>
@@ -372,15 +373,36 @@ const DashboardView: React.FC = () => {
 
   return (
     <div className="p-8">
-      {/* Welcome Banner */}
-      <div className="bg-gradient-to-r from-nook-leaf to-nook-leaf-dark rounded-3xl p-8 mb-8 text-white nook-shadow">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold mb-2">🌿 精準執法儀表板系統</h2>
-            <p className="text-white/80">事故分析 + 違規取締 + 精準執法建議（完全去識別化）</p>
+      {/* Welcome Banner — 在地紋理：等高線 + Taiwan 水印 */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-primary via-primary-light to-accent-hover rounded-2xl p-8 mb-6 text-white shadow-md">
+        {/* 等高線紋理（極淡）*/}
+        <svg className="absolute inset-0 w-full h-full opacity-[0.08] pointer-events-none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <pattern id="welcomeTopo" x="0" y="0" width="80" height="80" patternUnits="userSpaceOnUse">
+              <circle cx="40" cy="40" r="10" fill="none" stroke="white" strokeWidth="0.5" />
+              <circle cx="40" cy="40" r="20" fill="none" stroke="white" strokeWidth="0.5" />
+              <circle cx="40" cy="40" r="30" fill="none" stroke="white" strokeWidth="0.5" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#welcomeTopo)" />
+        </svg>
+        {/* Taiwan 水印（右側淡出）*/}
+        <svg className="absolute -right-12 -bottom-20 opacity-[0.08] pointer-events-none" width="320" height="320" viewBox="0 0 200 300" aria-hidden="true">
+          <path d="M 110 20 Q 125 30 130 55 Q 135 85 130 120 Q 125 155 120 180 Q 115 210 100 240 Q 85 265 70 270 Q 55 265 50 245 Q 45 215 50 180 Q 55 140 65 100 Q 75 60 90 35 Q 100 22 110 20 Z" fill="white"/>
+        </svg>
+
+        <div className="relative flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center p-2 border border-white/20">
+              <BrandLogo size={32} variant="light" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight">精準執法儀表板系統</h2>
+              <p className="text-sm text-white/70 mt-0.5">事故分析 · 違規取締 · 精準執法建議（完全去識別化）</p>
+            </div>
           </div>
-          <div className="flex items-center gap-2 bg-white/20 rounded-2xl px-4 py-2">
-            <Shield className="w-5 h-5" />
+          <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-3 py-1.5 border border-white/20 text-xs">
+            <Shield className="w-3.5 h-3.5" />
             <span className="font-medium">無個資風險</span>
           </div>
         </div>
@@ -934,14 +956,56 @@ const LoginPage: React.FC<{ onLogin: (u: string, p: string) => boolean }> = ({ o
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-nook-cream via-white to-nook-sky/10 flex items-center justify-center">
-      <div className={`bg-white/90 backdrop-blur-sm rounded-3xl p-10 nook-shadow w-full max-w-md ${shake ? 'animate-shake' : ''}`}>
+    <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-slate-50">
+      {/* 意境背景：台灣地形漸層 + 微細網格（新化在地 × 專業資料感）*/}
+      <div className="absolute inset-0 z-0">
+        {/* 底色漸層 */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-100 via-sky-50 to-slate-100" />
+        {/* 地形等高線 SVG 紋理 */}
+        <svg className="absolute inset-0 w-full h-full opacity-[0.12]" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <pattern id="topo" x="0" y="0" width="120" height="120" patternUnits="userSpaceOnUse">
+              {/* 同心圓漸層仿造等高線 */}
+              <circle cx="60" cy="60" r="12" fill="none" stroke="#0369A1" strokeWidth="0.6" />
+              <circle cx="60" cy="60" r="24" fill="none" stroke="#0369A1" strokeWidth="0.6" />
+              <circle cx="60" cy="60" r="36" fill="none" stroke="#0369A1" strokeWidth="0.6" />
+              <circle cx="60" cy="60" r="48" fill="none" stroke="#0369A1" strokeWidth="0.6" />
+            </pattern>
+            <radialGradient id="fade" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="white" stopOpacity="0" />
+              <stop offset="100%" stopColor="white" stopOpacity="1" />
+            </radialGradient>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#topo)" />
+          <rect width="100%" height="100%" fill="url(#fade)" />
+        </svg>
+        {/* 大型 watermark Taiwan 輪廓（右下角淡水印） */}
+        <svg className="absolute bottom-0 right-0 opacity-[0.04] translate-x-1/4 translate-y-1/4" width="500" height="500" viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path
+            d="M 110 20
+               Q 125 30 130 55
+               Q 135 85 130 120
+               Q 125 155 120 180
+               Q 115 210 100 240
+               Q 85 265 70 270
+               Q 55 265 50 245
+               Q 45 215 50 180
+               Q 55 140 65 100
+               Q 75 60 90 35
+               Q 100 22 110 20 Z"
+            fill="#0F172A"
+          />
+        </svg>
+      </div>
+
+      {/* 登入卡 */}
+      <div className={`relative z-10 bg-white rounded-2xl p-10 shadow-xl w-full max-w-md border border-slate-200 ${shake ? 'animate-shake' : ''}`}>
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-nook-leaf rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Shield className="w-9 h-9 text-white" />
+          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4 p-2.5">
+            <BrandLogo size={44} variant="light" />
           </div>
-          <h1 className="text-2xl font-bold text-nook-text">精準執法儀表板</h1>
-          <p className="text-sm text-nook-text/60 mt-1">管理員登入</p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">精準執法儀表板</h1>
+          <p className="text-sm text-slate-500 mt-1">新化分局 · 管理員登入</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
