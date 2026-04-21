@@ -130,6 +130,14 @@ class AnalyticsEngine:
         youth_crashes = self._count_crash_range(start_date, end_date, Crash.is_youth == True)
         heavy_vehicle_crashes = self._count_heavy_vehicle_crashes(start_date, end_date)
 
+        # 8.1 行人事故專區
+        pedestrian_crashes = self._count_pedestrian_crashes(start_date, end_date)
+        pedestrian_elderly_crashes = self._count_pedestrian_crashes(start_date, end_date, Crash.is_elderly == True)
+        pedestrian_deaths, pedestrian_injuries = self._sum_pedestrian_casualties(start_date, end_date)
+
+        # 8.2 重度超速（40+ km/h）件數
+        speeding_heavy_count = self._count_heavy_speeding(start_date, end_date)
+
         # 9. 趨勢
         trends = self._get_monthly_trends(year, month, months=6)
 
@@ -163,6 +171,11 @@ class AnalyticsEngine:
             elderly_tickets=elderly_tickets,
             youth_crashes=youth_crashes,
             heavy_vehicle_crashes=heavy_vehicle_crashes,
+            pedestrian_crashes=pedestrian_crashes,
+            pedestrian_elderly_crashes=pedestrian_elderly_crashes,
+            pedestrian_deaths=pedestrian_deaths,
+            pedestrian_injuries=pedestrian_injuries,
+            speeding_heavy_count=speeding_heavy_count,
             trends=trends,
             accident_hotspots=accident_hotspots,
             violation_hotspots=violation_hotspots,
@@ -242,7 +255,7 @@ class AnalyticsEngine:
         }
 
     def _get_topic_stats_range(self, start: date, end: date, last_start: date, last_end: date) -> dict:
-        """酒駕 / 闖紅燈 / 危駕 的對稱比較"""
+        """酒駕 / 闖紅燈 / 危駕 / 超速 的對稱比較"""
         def calc(curr: int, last: int) -> dict:
             change = curr - last
             pct = round((change / last * 100), 1) if last > 0 else 0
@@ -261,7 +274,57 @@ class AnalyticsEngine:
                 self._count_ticket_range(start, end, Ticket.topic_dangerous == True),
                 self._count_ticket_range(last_start, last_end, Ticket.topic_dangerous == True),
             )),
+            # 超速：violation_name LIKE '%超速%'（無 topic flag，用字串比對）
+            "speeding": StatComparison(**calc(
+                self._count_ticket_range(start, end, Ticket.violation_name.like('%超速%')),
+                self._count_ticket_range(last_start, last_end, Ticket.violation_name.like('%超速%')),
+            )),
         }
+
+    def _count_heavy_speeding(self, start: date, end: date) -> int:
+        """計算本期重度超速（40+ km/h）件數。
+        從 violation_name 中解析「超速 X 公里」，X >= 41 視為重度。
+        """
+        import re
+        pattern = re.compile(r"超速\s*(\d+)\s*公里")
+        rows = self.db.query(Ticket.violation_name).filter(
+            Ticket.violation_date >= start,
+            Ticket.violation_date <= end,
+            Ticket.violation_name.like('%超速%'),
+        ).all()
+        count = 0
+        for (name,) in rows:
+            if not name:
+                continue
+            m = pattern.search(name)
+            if m and int(m.group(1)) >= 41:
+                count += 1
+        return count
+
+    # 行人 party_type 值（與 enforcement.py 保持一致）
+    _PEDESTRIAN_PARTY_TYPES = ["行人", "人", "其他人"]
+
+    def _count_pedestrian_crashes(self, start: date, end: date, extra_filter=None) -> int:
+        """行人涉入事故件數"""
+        q = self.db.query(func.count(Crash.id)).filter(
+            Crash.occurred_date >= start,
+            Crash.occurred_date <= end,
+            Crash.party_type.in_(self._PEDESTRIAN_PARTY_TYPES),
+        )
+        if extra_filter is not None:
+            q = q.filter(extra_filter)
+        return q.scalar() or 0
+
+    def _sum_pedestrian_casualties(self, start: date, end: date) -> tuple[int, int]:
+        """回傳 (死亡人數, 受傷人數) — 僅針對行人事故"""
+        rows = self.db.query(Crash.death_count, Crash.injury_count).filter(
+            Crash.occurred_date >= start,
+            Crash.occurred_date <= end,
+            Crash.party_type.in_(self._PEDESTRIAN_PARTY_TYPES),
+        ).all()
+        deaths = sum(r.death_count or 0 for r in rows)
+        injuries = sum(r.injury_count or 0 for r in rows)
+        return deaths, injuries
 
     def _get_severity_breakdown_range(self, start: date, end: date) -> dict:
         """A1/A2/A3 事故數（range 版）"""
@@ -509,13 +572,18 @@ class AnalyticsEngine:
                     if msg:
                         focus.append(msg)
 
-        # 5. 主題變化
+        # 5. 主題變化（含超速）
+        topic_labels = {
+            "dui": "酒駕", "red_light": "闖紅燈",
+            "dangerous": "危險駕駛", "speeding": "超速取締"
+        }
         for topic, stat in topics.items():
+            if topic not in topic_labels:
+                continue
+            display = topic_labels[topic]
             if stat.change_pct >= 20 and stat.current > 10:
-                display = {"dui": "酒駕", "red_light": "闖紅燈", "dangerous": "危險駕駛"}[topic]
                 focus.append(f"{display}顯著增加（{stat.change_pct:+.0f}%）")
             elif stat.change_pct <= -20 and stat.last_year > 10:
-                display = {"dui": "酒駕", "red_light": "闖紅燈", "dangerous": "危險駕駛"}[topic]
                 focus.append(f"{display}顯著下降（{stat.change_pct:+.0f}%）")
 
         return focus[:6]  # 上限 6 項避免資訊過載

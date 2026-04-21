@@ -464,11 +464,16 @@ class LLMService:
             lines.append("**重疊檢視**：事故熱點未在違規熱點清單內，可能代表「執法未達事故源頭」，建議下月調整取締位置。")
         lines.append("")
 
-        # 三、主題分析
+        # 三、主題分析（四大主題）
         lines.append("## 三、主題分析")
         lines.append(fmt_topic("dui", "酒駕"))
         lines.append(fmt_topic("red_light", "闖紅燈"))
         lines.append(fmt_topic("dangerous", "危險駕駛"))
+        if "speeding" in topics:
+            lines.append(fmt_topic("speeding", "超速"))
+            heavy_n = d.get("speeding_heavy_count", 0)
+            if heavy_n > 0:
+                lines.append(f"  ⚠ 其中重度超速（40+ km/h）{heavy_n} 件，建議於該路段設置移動式測速點")
         lines.append("")
 
         # 四、派出所表現（4 管區分組，含取締/事故比率）
@@ -525,12 +530,20 @@ class LLMService:
         elderly_c = d.get("elderly_crashes", 0)
         youth_c = d.get("youth_crashes", 0)
         heavy_c = d.get("heavy_vehicle_crashes", 0)
+        ped_c = d.get("pedestrian_crashes", 0)
+        ped_elderly_c = d.get("pedestrian_elderly_crashes", 0)
         if elderly_c > 0:
             lines.append(f"- 高齡者事故 {elderly_c} 件，建議社區宣導晨昏外出著亮色衣物、強化兩段式左轉觀念")
         if youth_c > 0:
             lines.append(f"- 青少年事故 {youth_c} 件，建議協調學校加強微電車/電輔車安全宣導")
         if heavy_c > 0:
             lines.append(f"- 大型車涉事 {heavy_c} 件，建議貨運業者入校園/公司宣導視線死角")
+        if ped_c >= 3 or (ped_c > 0 and ped_elderly_c / ped_c >= 0.4):
+            ped_note = f"- **⚠ 行人事故 {ped_c} 件"
+            if ped_elderly_c > 0:
+                ped_note += f"，其中高齡行人 {ped_elderly_c} 件（{ped_elderly_c/ped_c*100:.0f}%）"
+            ped_note += "**，建議於高齡人口密集區（市場、宮廟、醫院周邊）加強「行人路口安全」社區宣導"
+            lines.append(ped_note)
         lines.append("")
         lines.append("---")
         lines.append(f"*本報告由 **Mock 模式** 生成（新化分局 {year}/{month} 資料樣板）。切換為真實 AI 模型後，內容將由 LLM 重新分析並提供更具判斷力的建議。*")

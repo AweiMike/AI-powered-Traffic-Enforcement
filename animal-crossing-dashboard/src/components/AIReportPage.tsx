@@ -273,6 +273,13 @@ const RawDataView: React.FC<{ data: any }> = ({ data }) => {
                 <StatRow label="酒駕" stat={topics.dui} />
                 <StatRow label="闖紅燈" stat={topics.red_light} />
                 <StatRow label="危險駕駛" stat={topics.dangerous} />
+                {topics.speeding && <StatRow label="超速" stat={topics.speeding} />}
+                {data.speeding_heavy_count > 0 && (
+                    <div className="flex justify-between pt-1 text-xs">
+                        <span className="text-red-600">├ 重度超速 (40+ km/h)</span>
+                        <span className="font-bold text-red-600 tabular-nums">{data.speeding_heavy_count} 件 ⚠</span>
+                    </div>
+                )}
             </div>
 
             {/* 嚴重度 + 舉發子類型 */}

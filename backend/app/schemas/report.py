@@ -60,8 +60,12 @@ class ReportSummary(BaseModel):
     # === 總體指標 ===
     overall_stats: Dict[str, StatComparison]  # keys: "accidents", "tickets", "injuries", "deaths"
 
-    # === 主題分類（三大執法主題）===
-    topics: Dict[str, StatComparison]  # keys: "dui"（酒駕）, "red_light"（闖紅燈）, "dangerous"（危駕）
+    # === 主題分類（四大執法主題）===
+    topics: Dict[str, StatComparison]
+    # keys: "dui"（酒駕）、"red_light"（闖紅燈）、"dangerous"（危駕）、"speeding"（超速）
+
+    # === 超速嚴重度（40+ km/h 是重點警訊）===
+    speeding_heavy_count: int = 0     # 本期重度超速（40+ km/h）件數
 
     # === 舉發子類型（8 種細分）===
     enforcement_subtypes: Dict[str, int]
@@ -82,6 +86,12 @@ class ReportSummary(BaseModel):
     elderly_tickets: int        # 本期高齡者違規數
     youth_crashes: int          # 青少年（<18）事故數
     heavy_vehicle_crashes: int  # 大型車涉事事故數
+
+    # === 行人事故專區指標 ===
+    pedestrian_crashes: int = 0        # 本期行人涉入事故件數
+    pedestrian_elderly_crashes: int = 0  # 本期高齡行人事故件數
+    pedestrian_deaths: int = 0           # 本期行人死亡人數
+    pedestrian_injuries: int = 0         # 本期行人受傷人數
 
     # === 趨勢數據 ===
     trends: List[MonthlyTrend]

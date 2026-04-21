@@ -133,16 +133,20 @@ class ReportPrompts:
 - A2 受傷：{sv.get("A2", 0)} 件
 - A3 財損：{sv.get("A3", 0)} 件
 
-### 主題分類
+### 主題分類（四大執法主題）
 - 酒駕取締：{fmt(tp["dui"])}
 - 闖紅燈取締：{fmt(tp["red_light"])}
 - 危險駕駛取締：{fmt(tp["dangerous"])}
+- 超速取締：{fmt(tp["speeding"])}
+- 其中「重度超速」（40+ km/h）：{data.speeding_heavy_count} 件{'（重點警訊）' if data.speeding_heavy_count > 0 else ''}
 
 ### 專區指標（本期）
 - 高齡者事故：{data.elderly_crashes} 件
 - 高齡者違規：{data.elderly_tickets} 件
 - 青少年事故：{data.youth_crashes} 件
 - 大型車涉事事故：{data.heavy_vehicle_crashes} 件
+- **行人事故：{data.pedestrian_crashes} 件**（高齡行人 {data.pedestrian_elderly_crashes} 件｜死亡 {data.pedestrian_deaths} 人｜受傷 {data.pedestrian_injuries} 人）
+  {'⚠ 高齡行人佔比高，需納入教育宣導重點' if data.pedestrian_crashes > 0 and data.pedestrian_elderly_crashes / max(data.pedestrian_crashes, 1) >= 0.4 else ''}
 
 ### 🏢 派出所 4 管區表現（必須全部列出，含取締比率）
 {ReportPrompts._format_unit_stats(data)}
@@ -183,8 +187,10 @@ class ReportPrompts:
 ## 報告結構（務必按此順序輸出 Markdown）
 
 ### 一、月度成效速覽
-- 用 3-5 個 bullet 點出本月最重要的變化（總事故、總違規、A1 死亡、酒駕、特定派出所突出表現等）
+- 用 3-6 個 bullet 點出本月最重要的變化（總事故、總違規、A1 死亡、酒駕、特定派出所突出表現等）
 - 每個 bullet 用「指標 + 數字 + 去年同期比較」格式
+- **若行人事故 ≥ 3 件 或高齡行人占比 ≥ 40%** → 速覽必須加一個 bullet 提及
+- **若有重度超速（40+ km/h）案件** → 速覽必須加一個 bullet 提及
 - 最後用一句話下總結（例：「事故下降但酒駕仍上升，需針對性加強夜間取締」）
 
 ### 二、熱點分析
@@ -192,10 +198,11 @@ class ReportPrompts:
 - **違規熱點 Top 3**：地點、件數
 - **重疊檢視**：事故熱點是否有在違規熱點清單內？若無，代表「執法未達事故源頭」，需調整
 
-### 三、主題分析
-分別針對 **酒駕 / 闖紅燈 / 危險駕駛** 三項：
+### 三、主題分析（四項）
+分別針對 **酒駕 / 闖紅燈 / 危險駕駛 / 超速** 四項：
 - 本期件數與變化
 - 若明顯變化（±20% 以上），簡述可能原因與對應建議
+- 超速若有「重度超速（40+ km/h）」案件，必須單獨指出並建議相對應執法（設置移動式測速點等）
 
 ### 四、派出所表現（新化分局 4 管區 — **必須全部列出**）
 - 新化分局實際業務以 4 管區檢討：新化派出所（含那拔）、唪口派出所（含知義）、山上分駐所、左鎮分駐所（含岡林）
@@ -219,6 +226,7 @@ class ReportPrompts:
 
 **教育宣導 (Education) 建議**
 - 針對高齡者 / 青少年微電車 / 酒駕熱點區域建議社區宣導重點
+- **若有行人事故且高齡占比 ≥ 40%** → 必須加入「高齡行人安全」的具體社區宣導建議（亮色衣物、路口停看聽、遵守號誌）
 - 具體列出 1-2 個可執行動作
 
 ## 格式要求（嚴格）
