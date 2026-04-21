@@ -30,6 +30,11 @@ class ReportPrompts:
 ### 5. 3E 落地建議
 - 每個問題對應 Engineering（工程）/ Enforcement（執法）/ Education（教育）至少一項具體動作
 
+### 5.5 A1 死亡事故 → 工程檢討**必要重點**（警政實務鐵則）
+- 若本期有 A1 死亡事故：工程建議章節**必須逐一檢討每個 A1 事故發生地點**
+- 每個 A1 地點至少提出一項具體工程改善方向（號誌、標線、照明、速限、路側障礙、視距）
+- 若無 A1：工程建議依其他熱點或 A2 重傷地點規劃即可
+
 ### 6. 專業但不裝逼
 - 用：A1/A2/A3 事故、逕舉/攔舉、派出所轄區、3E 政策
 - 禁用：威嚇理論、哈頓矩陣、M1/M2/M3、犯罪學視角等學術黑話
@@ -42,6 +47,16 @@ class ReportPrompts:
   - 10%~20% 稱「明顯」
   - <10% 稱「微幅」
 """
+
+    @staticmethod
+    def _format_a1_locations(data: ReportSummary) -> str:
+        """格式化 A1 地點清單給 prompt 用"""
+        if not data.a1_locations:
+            return "- （本期無 A1 死亡事故，工程建議依其他熱點或 A2 重傷地點規劃即可）"
+        lines = []
+        for loc in data.a1_locations:
+            lines.append(f"- {loc.district} {loc.location}（{loc.count} 件死亡事故）— **必須在工程建議章節具體檢討**")
+        return "\n".join(lines)
 
     @staticmethod
     def get_analysis_prompt(data: ReportSummary) -> str:
@@ -85,6 +100,9 @@ class ReportPrompts:
 - 高齡者違規：{data.elderly_tickets} 件
 - 青少年事故：{data.youth_crashes} 件
 - 大型車涉事事故：{data.heavy_vehicle_crashes} 件
+
+### 🔴 A1 死亡事故地點（工程建議章節必須逐一檢討）
+{ReportPrompts._format_a1_locations(data)}
 
 ### AI 自動偵測重點（請在報告中正面回應這些警訊）
 {chr(10).join(f"- {c}" for c in data.focus_causes) if data.focus_causes else "- （無自動偵測警訊）"}
@@ -145,8 +163,10 @@ class ReportPrompts:
 - 建議用「Top 2 急迫 + Top 3 常態」分層
 
 **工程 (Engineering) 建議**
-- 若特定地點反覆事故，列出建議工程單位評估的項目（號誌、標線、照明、速限）
-- 若無明顯工程議題可建議，可寫「本月無急需工程改善項目」
+- 🔴 **A1 死亡事故地點必列**：若本期有 A1 案件，**每個 A1 地點都必須單獨列出具體工程改善方向**（此為警政實務必要檢討項）
+  - 範例：「新化區中山路（1 件 A1 死亡）— 建議工程單位評估增設左轉專用時相、加強路口照明、標線清晰度」
+- 其他事故熱點：若該路段反覆發生事故，列出評估項目（號誌、標線、照明、速限）
+- 若本期完全無 A1 且其他熱點無明顯工程議題，可寫「本月無急需工程改善項目」
 
 **教育宣導 (Education) 建議**
 - 針對高齡者 / 青少年微電車 / 酒駕熱點區域建議社區宣導重點
@@ -167,6 +187,8 @@ class ReportPrompts:
 4. ☐ 有沒有使用學術黑話（M1/M2/哈頓矩陣/威嚇理論）？如有請移除。
 5. ☐ 每個下月建議是否具體到時段/地點/取締項目？
 6. ☐ 是否正面回應了「AI 自動偵測重點」中列出的警訊？
+7. ☐ **A1 死亡事故地點是否都在工程建議章節單獨列出並給具體改善方向？**（若本期有 A1）
+8. ☐ 派出所表現是否用 4 管區分組（新化/唪口/山上/左鎮）而非個別派出所？
 
 若任一項未達成，請重寫該段。
 

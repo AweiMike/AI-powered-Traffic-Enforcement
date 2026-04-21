@@ -471,11 +471,11 @@ class LLMService:
         lines.append(fmt_topic("dangerous", "危險駕駛"))
         lines.append("")
 
-        # 四、派出所表現
-        lines.append("## 四、派出所表現")
+        # 四、派出所表現（4 管區分組）
+        lines.append("## 四、派出所表現（4 管區）")
         if units:
-            lines.append("依事故+違規總件數排序，本期 Top 3：")
-            for u in units[:3]:
+            lines.append("依事故+違規總件數降序：")
+            for u in units:
                 lines.append(
                     f"- **{u.get('unit', '未知')}**：事故 {u.get('crashes', 0)} 件、違規 {u.get('tickets', 0)} 件"
                 )
@@ -496,9 +496,18 @@ class LLMService:
             lines.append(f"- 事故最嚴重路段 **{top.get('district')} {top.get('location')}** 建議加強見警率與取締密度")
         lines.append("")
         lines.append("### 工程（Engineering）")
+        # A1 死亡地點必須列入檢討（警政實務鐵則）
+        a1_locs = d.get("a1_locations", [])
+        if a1_locs:
+            lines.append("**🔴 A1 死亡事故地點（必要檢討）**：")
+            for loc in a1_locs:
+                lines.append(
+                    f"- **{loc.get('district', '')} {loc.get('location', '')}**（{loc.get('count', 0)} 件死亡）"
+                    f" — 建議工程單位評估該地點的號誌時相、標線清晰度、夜間照明、路側視距。"
+                )
         if a_hot and len(a_hot) >= 2:
-            lines.append(f"- 建議道路管理單位評估 {a_hot[0].get('location')} 與 {a_hot[1].get('location')} 的號誌、標線、照明是否需改善")
-        else:
+            lines.append(f"- 其他事故熱點建議評估：{a_hot[0].get('location')} 與 {a_hot[1].get('location')} 的號誌、標線、照明")
+        if not a1_locs and (not a_hot or len(a_hot) < 2):
             lines.append("- 本月無急需工程改善項目")
         lines.append("")
         lines.append("### 教育宣導（Education）")

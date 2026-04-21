@@ -59,8 +59,8 @@ class AnalyticsEngine:
         # 5. 嚴重度細分（改為 range 版避免資料跨月問題）
         severity = self._get_severity_breakdown_range(start_date, end_date)
 
-        # 6. 派出所統計（Top 5 by 事故+違規總數）
-        unit_stats = self._get_unit_stats(start_date, end_date, top_n=5)
+        # 6. 派出所統計（列出所有真實派出所/分駐所，排除交通分隊/交通組/警備隊等統籌單位）
+        unit_stats = self._get_unit_stats(start_date, end_date, top_n=None)
 
         # 7. 班別分析（含 0 值，完整 12 班）
         shift_stats = self._get_shift_stats(start_date, end_date)
@@ -77,6 +77,9 @@ class AnalyticsEngine:
         # 10. 熱點（過濾未知地點）
         accident_hotspots = self._get_accident_hotspots(start_date, end_date, top_n=5)
         violation_hotspots = self._get_violation_hotspots(start_date, end_date, top_n=5)
+
+        # 10.5 A1 死亡地點（工程改善必要重點）
+        a1_locations = self._get_a1_locations(start_date, end_date)
 
         # 11. 自動偵測重點關注（Wave 8.1：補上整體指標）
         focus_districts = self._detect_focus_districts(start_date, end_date, last_start_date, last_end_date)
@@ -104,6 +107,7 @@ class AnalyticsEngine:
             trends=trends,
             accident_hotspots=accident_hotspots,
             violation_hotspots=violation_hotspots,
+            a1_locations=a1_locations,
             focus_districts=focus_districts,
             focus_causes=focus_causes,
         )
@@ -234,9 +238,59 @@ class AnalyticsEngine:
             result[sev] = self._count_filtered(Crash, year, month, Crash.severity == sev)
         return result
 
-    def _get_unit_stats(self, start_date: date, end_date: date, top_n: int) -> list:
-        """各派出所/單位的事故 + 違規（依總和排序）"""
-        # 撈所有有紀錄的單位
+    # ========================================
+    # 派出所實際業務分組（新化分局 4 管區）
+    # ========================================
+    # 每個管區由一個主要派出所 + 0~1 個副派出所組成
+    # 使用 substring 比對，支援資料庫中各種變體（含前綴「新化分局」等）
+    # 注意 𦰡拔 / 那拔 兩種寫法都可能出現
+    STATION_GROUPS = [
+        {
+            "display": "新化派出所（含那拔）",
+            "members": ["新化派出所", "那拔派出所", "𦰡拔派出所"],
+        },
+        {
+            "display": "唪口派出所（含知義）",
+            "members": ["唪口派出所", "知義派出所"],
+        },
+        {
+            "display": "山上分駐所",
+            "members": ["山上分駐所"],
+        },
+        {
+            "display": "左鎮分駐所（含岡林）",
+            "members": ["左鎮分駐所", "岡林派出所"],
+        },
+    ]
+
+    def _classify_unit_to_group(self, unit: str) -> str | None:
+        """
+        將 DB 中的 sub_unit / unit_code 歸類到 4 個業務管區之一。
+        若為統籌單位（交通分隊/交通組/警備隊等）或未知，回傳 None。
+        """
+        if not unit:
+            return None
+        for group in self.STATION_GROUPS:
+            for member in group["members"]:
+                if member in unit:
+                    return group["display"]
+        return None
+
+    def _get_unit_stats(self, start_date: date, end_date: date, top_n: int | None = None) -> list:
+        """
+        派出所業務管區統計（新化分局實際檢討結構）：
+          1. 新化派出所（含那拔）
+          2. 唪口派出所（含知義）
+          3. 山上分駐所
+          4. 左鎮分駐所（含岡林）
+
+        排除：交通分隊、交通組、警備隊等統籌單位
+        （它們不是地理轄區，混入會誤導派出所比較）
+
+        回傳順序：依「事故+違規」總和降序。
+        top_n=None 時列出全部 4 個管區。
+        """
+        # 撈所有單位的 crash / ticket 計數
         crash_units = dict(
             self.db.query(Crash.sub_unit, func.count(Crash.id))
             .filter(
@@ -257,21 +311,34 @@ class AnalyticsEngine:
             .group_by(Ticket.unit_code)
             .all()
         )
-        all_units = set(crash_units.keys()) | set(ticket_units.keys())
 
-        def short_name(unit: str) -> str:
-            """移除共同前綴 新化分局，只保留派出所名"""
-            return unit.replace("新化分局", "") if unit else unit
+        # 聚合到 4 個管區
+        group_crashes: dict[str, int] = {g["display"]: 0 for g in self.STATION_GROUPS}
+        group_tickets: dict[str, int] = {g["display"]: 0 for g in self.STATION_GROUPS}
 
+        for unit, count in crash_units.items():
+            group = self._classify_unit_to_group(unit)
+            if group:
+                group_crashes[group] += count
+
+        for unit, count in ticket_units.items():
+            group = self._classify_unit_to_group(unit)
+            if group:
+                group_tickets[group] += count
+
+        # 組裝 UnitStat list
         items = [
             UnitStat(
-                unit=short_name(u),
-                crashes=crash_units.get(u, 0),
-                tickets=ticket_units.get(u, 0),
+                unit=group["display"],
+                crashes=group_crashes[group["display"]],
+                tickets=group_tickets[group["display"]],
             )
-            for u in all_units
+            for group in self.STATION_GROUPS
         ]
         items.sort(key=lambda x: x.crashes + x.tickets, reverse=True)
+
+        if top_n is None:
+            return items
         return items[:top_n]
 
     def _get_shift_stats(self, start_date: date, end_date: date) -> list:
@@ -527,6 +594,43 @@ class AnalyticsEngine:
             if len(hotspots) >= top_n:
                 break
         return hotspots
+
+    def _get_a1_locations(self, start_date: date, end_date: date) -> list:
+        """
+        取得本期所有 A1 死亡事故地點（不限 top_n）。
+
+        警政實務規則：A1 案件屬「工程檢討必要重點」，
+        AI 報告必須在工程建議章節逐一檢討每個 A1 地點。
+
+        若本期無 A1 事故，回傳空 list。
+        """
+        query = self.db.query(
+            Crash.district,
+            Crash.location_desc,
+            func.count(Crash.id).label('count'),
+        ).filter(
+            Crash.occurred_date >= start_date,
+            Crash.occurred_date <= end_date,
+            Crash.severity == 'A1',
+            Crash.location_desc.isnot(None),
+            Crash.location_desc != "",
+        ).group_by(
+            Crash.district, Crash.location_desc,
+        ).order_by(desc('count'))
+
+        results = query.all()
+        items = []
+        for row in results:
+            if not self._is_meaningful_location(row.location_desc):
+                continue
+            items.append(HotspotItem(
+                rank=len(items) + 1,
+                location=self._clean_location(row.location_desc, row.district),
+                district=self._clean_district(row.district),
+                count=row.count,
+                major_cause="A1",
+            ))
+        return items
 
     def _get_violation_hotspots(self, start_date: date, end_date: date, top_n: int) -> list:
         """違規熱點（過濾未知/空白地點）"""

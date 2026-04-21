@@ -87,6 +87,10 @@ class ReportSummary(BaseModel):
     accident_hotspots: List[HotspotItem]
     violation_hotspots: List[HotspotItem]
 
+    # === A1 死亡事故地點（工程改善必要檢討項）===
+    # 警政實務規則：任何 A1 案件皆為「工程檢討必要重點」
+    a1_locations: List[HotspotItem] = []
+
     # === AI 重點關注（自動偵測）===
     focus_districts: List[str]   # 事故增加最多的行政區
     focus_causes: List[str]      # 增加最多的違規/事故類型
