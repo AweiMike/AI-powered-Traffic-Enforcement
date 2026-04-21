@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { apiClient, ReportResponse } from '../api/client';
-import { Leaf, Printer, BarChart3, Bot, Settings, Key, AlertTriangle, X, ChevronDown, ChevronUp, Database } from 'lucide-react';
+import { Printer, BarChart3, Bot, Settings, Key, AlertTriangle, X, ChevronDown, ChevronUp, Database, Calendar } from 'lucide-react';
+import DateRangePicker, { type DateRange } from './DateRangePicker';
 
 // Provider & Model Definitions（僅列出經驗證真實可呼叫的 model id）
 // 若將來出現新版，只需在此加入即可，無需改其他檔案
@@ -349,8 +350,26 @@ const RawDataView: React.FC<{ data: any }> = ({ data }) => {
 };
 
 const AIReportPage: React.FC = () => {
+    // 期間模式：'month' = 完整月份；'range' = 自訂日期區間
+    const [periodMode, setPeriodMode] = useState<'month' | 'range'>('month');
+
+    // 完整月份模式
     const [year, setYear] = useState(new Date().getFullYear());
     const [month, setMonth] = useState(new Date().getMonth() + 1);
+
+    // 自訂區間模式（預設：本月 1 日至今）
+    const today = new Date();
+    const fmtDate = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${dd}`;
+    };
+    const [dateRange, setDateRange] = useState<DateRange>({
+        startDate: fmtDate(new Date(today.getFullYear(), today.getMonth(), 1)),
+        endDate: fmtDate(today),
+    });
+
     const [loading, setLoading] = useState(false);
     const [report, setReport] = useState<ReportResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -363,7 +382,6 @@ const AIReportPage: React.FC = () => {
     const [showRawData, setShowRawData] = useState(false);
 
     const handleGenerate = async () => {
-        // 如果沒有 Key，先提示設定
         if (!apiKey) {
             setShowKeyModal(true);
             return;
@@ -373,16 +391,22 @@ const AIReportPage: React.FC = () => {
         setError(null);
         setReport(null);
         try {
-            const data = await apiClient.generateAIReport(year, month, apiKey, provider, model);
+            const options: any = { apiKey, provider, model };
+            if (periodMode === 'range') {
+                options.startDate = dateRange.startDate;
+                options.endDate = dateRange.endDate;
+            } else {
+                options.year = year;
+                options.month = month;
+            }
+            const data = await apiClient.generateAIReport(options);
             setReport(data);
         } catch (err: any) {
             console.error(err);
-            // 嘗試從 fetch error 中提取後端回傳的 detail 訊息
             let msg = '報告生成失敗';
             if (err?.message) {
                 msg += '：' + err.message;
             }
-            // 如果後端回傳 JSON detail，通常會 attach 在 err.detail
             if (err?.detail) {
                 msg = err.detail;
             }
@@ -428,59 +452,96 @@ const AIReportPage: React.FC = () => {
                     <p className="text-slate-500 mt-1">基於數據驅動的執法成效分析與建議</p>
                 </div>
 
-                <div className="flex gap-3 bg-slate-50 p-2 rounded-2xl">
-                    <button
-                        onClick={() => setShowKeyModal(true)}
-                        className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all border ${apiKey && apiKey !== 'mock-mode'
-                            ? 'bg-sky-50 text-sky-700 border-sky-200'
-                            : provider === 'mock'
-                                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'}`}
-                        title="設定 AI 模型"
-                    >
-                        <Settings className="w-4 h-4" />
-                        {provider === 'mock' ? 'Mock 測試' : (apiKey ? `${provider} 已設定` : 'API 設定')}
-                    </button>
+                <div className="flex flex-col gap-3 bg-slate-50 p-3 rounded-2xl min-w-[420px]">
+                    {/* Row 1: API 設定 + 期間模式切換 + 生成 */}
+                    <div className="flex gap-2 items-center flex-wrap">
+                        <button
+                            onClick={() => setShowKeyModal(true)}
+                            className={`px-3 py-2 rounded-xl flex items-center gap-2 text-sm transition-all border ${apiKey && apiKey !== 'mock-mode'
+                                ? 'bg-sky-50 text-sky-700 border-sky-200'
+                                : provider === 'mock'
+                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                            title="設定 AI 模型"
+                        >
+                            <Settings className="w-4 h-4" />
+                            {provider === 'mock' ? 'Mock' : (apiKey ? `${provider}` : 'API 設定')}
+                        </button>
 
-                    <div className="w-px bg-slate-200 mx-1"></div>
+                        {/* 期間模式切換 */}
+                        <div className="flex bg-white rounded-xl border border-slate-200 p-0.5">
+                            <button
+                                onClick={() => setPeriodMode('month')}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                    periodMode === 'month'
+                                        ? 'bg-sky-700 text-white'
+                                        : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                完整月份
+                            </button>
+                            <button
+                                onClick={() => setPeriodMode('range')}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 ${
+                                    periodMode === 'range'
+                                        ? 'bg-sky-700 text-white'
+                                        : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                <Calendar className="w-3 h-3" />
+                                自訂區間
+                            </button>
+                        </div>
 
-                    <select
-                        value={year}
-                        onChange={(e) => setYear(Number(e.target.value))}
-                        className="px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white"
-                    >
-                        {[2024, 2025, 2026].map(y => (
-                            <option key={y} value={y}>{y}年</option>
-                        ))}
-                    </select>
-                    <select
-                        value={month}
-                        onChange={(e) => setMonth(Number(e.target.value))}
-                        className="px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white"
-                    >
-                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                            <option key={m} value={m}>{m}月</option>
-                        ))}
-                    </select>
-                    <button
-                        onClick={handleGenerate}
-                        disabled={loading}
-                        className={`px-6 py-2 text-white rounded-xl hover:shadow-lg transition-all font-medium flex items-center gap-2
-                            ${apiKey ? 'bg-sky-700 hover:bg-sky-700 shadow-sky-200' : 'bg-slate-400 hover:bg-slate-500'}
-                        `}
-                    >
-                        {loading ? (
+                        <button
+                            onClick={handleGenerate}
+                            disabled={loading}
+                            className={`ml-auto px-5 py-2 text-white rounded-xl hover:shadow-lg transition-all text-sm font-medium flex items-center gap-2
+                                ${apiKey ? 'bg-sky-700 hover:bg-sky-800' : 'bg-slate-400 hover:bg-slate-500'}
+                            `}
+                        >
+                            {loading ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    分析中...
+                                </>
+                            ) : (
+                                <>
+                                    <BarChart3 className="w-4 h-4" />
+                                    生成報告
+                                </>
+                            )}
+                        </button>
+                    </div>
+
+                    {/* Row 2: 期間選擇器（依 mode 切換） */}
+                    <div className="flex items-center gap-2">
+                        {periodMode === 'month' ? (
                             <>
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                分析中...
+                                <span className="text-xs text-slate-500 shrink-0">期間：</span>
+                                <select
+                                    value={year}
+                                    onChange={(e) => setYear(Number(e.target.value))}
+                                    className="px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white text-sm"
+                                >
+                                    {[2024, 2025, 2026].map(y => (
+                                        <option key={y} value={y}>{y}年</option>
+                                    ))}
+                                </select>
+                                <select
+                                    value={month}
+                                    onChange={(e) => setMonth(Number(e.target.value))}
+                                    className="px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white text-sm"
+                                >
+                                    {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                                        <option key={m} value={m}>{m}月</option>
+                                    ))}
+                                </select>
                             </>
                         ) : (
-                            <>
-                                <BarChart3 className="w-4 h-4" />
-                                生成報告
-                            </>
+                            <DateRangePicker value={dateRange} onChange={setDateRange} showCompare={false} />
                         )}
-                    </button>
+                    </div>
                 </div>
             </div>
 
@@ -522,7 +583,14 @@ const AIReportPage: React.FC = () => {
                             <div>
                                 <h2 className="text-3xl font-bold mb-2">交通執法成效與事故防制分析報告</h2>
                                 <p className="text-sky-100 print:text-slate-500">
-                                    分析期間：{report.period.year}年{report.period.month}月
+                                    {report.raw_data?.period?.start_date && report.raw_data?.period?.end_date ? (
+                                        <>
+                                            分析期間：{report.raw_data.period.start_date} ~ {report.raw_data.period.end_date}
+                                            {report.raw_data.period.is_partial && <span className="text-amber-200 print:text-amber-700 ml-2">（資料截止）</span>}
+                                        </>
+                                    ) : (
+                                        <>分析期間：{report.period.year}年{report.period.month}月</>
+                                    )}
                                 </p>
                             </div>
                             <div className="print:hidden">

@@ -16,36 +16,95 @@ class AnalyticsEngine:
     def __init__(self, db: Session):
         self.db = db
 
-    def generate_report_summary(self, year: int, month: int) -> ReportSummary:
+    def generate_report_summary(
+        self,
+        year: int = None,
+        month: int = None,
+        start_date_param: date = None,
+        end_date_param: date = None,
+    ) -> ReportSummary:
         """
-        生成指定年月的報告摘要數據（Wave 7：擴充資料集 + Wave 8：對稱比較）
+        生成報告摘要數據（Wave 13：支援自訂日期區間）
+
+        參數模式（二擇一）：
+        - year + month：完整月份分析（沿用舊邏輯，支援 partial period 自動偵測）
+        - start_date_param + end_date_param：自訂任意日期區間（給長官想要特定週/季度/活動期間用）
+
+        若提供 start/end 則優先採用，year/month 僅作為 metadata 顯示用。
         """
-        # 1. 決定完整月份的日期範圍
-        _, last_day = calendar.monthrange(year, month)
-        full_start_date = date(year, month, 1)
-        full_end_date = date(year, month, last_day)
+        # === 模式判斷：是否為自訂區間 ===
+        custom_range = start_date_param is not None and end_date_param is not None
 
-        # 2. 偵測資料實際涵蓋範圍（避免拿「半個月資料」與「完整 30 天去年同期」比較 → 假象下降）
-        data_end = self._get_actual_data_end(full_start_date, full_end_date)
-        is_partial = data_end < full_end_date
-        # 本期實際使用的結束日期
-        start_date = full_start_date
-        end_date = data_end if is_partial else full_end_date
-        days_covered = (end_date - start_date).days + 1
+        if custom_range:
+            # 自訂區間：直接使用
+            start_date = start_date_param
+            end_date = end_date_param
+            days_covered = (end_date - start_date).days + 1
 
-        # 3. 去年同期調整：若本期是部分資料，去年同期也裁切到相同天數
-        last_year = year - 1
-        last_start_date = date(last_year, month, 1)
-        last_end_date = date(last_year, month, min(days_covered, calendar.monthrange(last_year, month)[1]))
+            # 去年同期：完全對齊（同樣的 起始月日 ~ 結束月日，年份 -1）
+            last_start_date = start_date.replace(year=start_date.year - 1)
+            try:
+                last_end_date = end_date.replace(year=end_date.year - 1)
+            except ValueError:
+                # 處理 2/29 邊界
+                last_end_date = end_date.replace(year=end_date.year - 1, day=28)
 
-        comparison_note = None
-        if is_partial:
-            comparison_note = (
-                f"⚠ 本期資料僅涵蓋 {start_date} ~ {end_date}（共 {days_covered} 天），"
-                f"月份尚未結束或資料尚未匯入到月底。"
-                f"為了公平比較，去年同期已自動對齊為 {last_start_date} ~ {last_end_date}（同樣 {days_covered} 天）。"
-                f"請在報告中明確提及「本期資料截至 X 日」避免誤導讀者。"
-            )
+            # 自訂區間沒有「完整月」概念，is_partial 改用「資料是否涵蓋到 end_date」判斷
+            data_end = self._get_actual_data_end(start_date, end_date)
+            is_partial = data_end < end_date
+            if is_partial:
+                end_date = data_end
+                days_covered = (end_date - start_date).days + 1
+                # 去年同期也對應裁切
+                try:
+                    last_end_date = end_date.replace(year=end_date.year - 1)
+                except ValueError:
+                    last_end_date = end_date.replace(year=end_date.year - 1, day=28)
+
+            # 顯示用 year/month（取 start_date 的年月）
+            year = start_date.year
+            month = start_date.month
+
+            comparison_note = None
+            if is_partial:
+                comparison_note = (
+                    f"⚠ 自訂區間 {start_date_param} ~ {end_date_param}，但實際資料僅涵蓋 {start_date} ~ {end_date}（共 {days_covered} 天）。"
+                    f"為了公平比較，去年同期已自動對齊為 {last_start_date} ~ {last_end_date}（同樣 {days_covered} 天）。"
+                    f"請在報告中明確標明資料涵蓋範圍。"
+                )
+            else:
+                comparison_note = (
+                    f"📅 自訂區間 {start_date} ~ {end_date}（共 {days_covered} 天），"
+                    f"與去年同期 {last_start_date} ~ {last_end_date} 對齊比較。"
+                )
+
+        else:
+            # === 完整月份模式（原有邏輯）===
+            if year is None or month is None:
+                raise ValueError("必須提供 year+month 或 start_date+end_date")
+
+            _, last_day = calendar.monthrange(year, month)
+            full_start_date = date(year, month, 1)
+            full_end_date = date(year, month, last_day)
+
+            data_end = self._get_actual_data_end(full_start_date, full_end_date)
+            is_partial = data_end < full_end_date
+            start_date = full_start_date
+            end_date = data_end if is_partial else full_end_date
+            days_covered = (end_date - start_date).days + 1
+
+            last_year = year - 1
+            last_start_date = date(last_year, month, 1)
+            last_end_date = date(last_year, month, min(days_covered, calendar.monthrange(last_year, month)[1]))
+
+            comparison_note = None
+            if is_partial:
+                comparison_note = (
+                    f"⚠ 本期資料僅涵蓋 {start_date} ~ {end_date}（共 {days_covered} 天），"
+                    f"月份尚未結束或資料尚未匯入到月底。"
+                    f"為了公平比較，去年同期已自動對齊為 {last_start_date} ~ {last_end_date}（同樣 {days_covered} 天）。"
+                    f"請在報告中明確提及「本期資料截至 X 日」避免誤導讀者。"
+                )
 
         # 2. 總體指標（含對稱比較）
         overall_stats = self._get_overall_stats_range(start_date, end_date, last_start_date, last_end_date)

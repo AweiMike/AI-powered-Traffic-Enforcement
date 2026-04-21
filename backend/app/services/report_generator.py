@@ -48,12 +48,30 @@ class ReportGeneratorService:
         self.analytics = AnalyticsEngine(db)
         self.llm = LLMService()
 
-    async def generate_full_report(self, year: int, month: int, api_key: str = None, provider: str = None, model_name: str = None) -> dict:
+    async def generate_full_report(
+        self,
+        year: int = None,
+        month: int = None,
+        start_date_param=None,
+        end_date_param=None,
+        api_key: str = None,
+        provider: str = None,
+        model_name: str = None,
+    ) -> dict:
         """
         生成完整的 AI 分析報告
+
+        參數模式（二擇一）：
+        - year + month：完整月份
+        - start_date_param + end_date_param：自訂區間
         """
         # 1. 獲取數據
-        data: ReportSummary = self.analytics.generate_report_summary(year, month)
+        data: ReportSummary = self.analytics.generate_report_summary(
+            year=year,
+            month=month,
+            start_date_param=start_date_param,
+            end_date_param=end_date_param,
+        )
         
         # 2. 準備 Prompt
         system_prompt = ReportPrompts.SERVER_SYSTEM_PROMPT

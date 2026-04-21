@@ -795,7 +795,24 @@ class APIClient {
   // AI Report API
   // ============================================
 
-  async generateAIReport(year: number, month: number, apiKey?: string, provider: string = 'openai', model?: string): Promise<ReportResponse> {
+  /**
+   * 生成 AI 報告（支援兩種期間模式）
+   * - 完整月份：傳 year + month
+   * - 自訂區間：傳 startDate + endDate（YYYY-MM-DD）
+   */
+  async generateAIReport(
+    options: {
+      year?: number;
+      month?: number;
+      startDate?: string;
+      endDate?: string;
+      apiKey?: string;
+      provider?: string;
+      model?: string;
+    },
+  ): Promise<ReportResponse> {
+    const { year, month, startDate, endDate, apiKey, provider = 'openai', model } = options;
+
     const headers: Record<string, string> = {};
     if (apiKey) {
       headers['X-LLM-API-KEY'] = apiKey;
@@ -805,9 +822,20 @@ class APIClient {
       }
     }
 
-    return this.request(`/report/generate?year=${year}&month=${month}`, {
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.append('start_date', startDate);
+      params.append('end_date', endDate);
+    } else if (year && month) {
+      params.append('year', year.toString());
+      params.append('month', month.toString());
+    } else {
+      throw new Error('必須提供 year+month 或 startDate+endDate');
+    }
+
+    return this.request(`/report/generate?${params}`, {
       method: 'POST',
-      headers
+      headers,
     });
   }
 
