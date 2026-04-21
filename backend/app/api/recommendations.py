@@ -1144,7 +1144,9 @@ async def get_map_points(
             Crash.is_elderly,
             Crash.suspected_alcohol,
             Crash.party_type,
-            Crash.sub_unit
+            Crash.sub_unit,
+            Crash.death_count,    # 實際死亡人數（不是件數）
+            Crash.injury_count    # 實際受傷人數（不是件數）
         ).filter(
             Crash.occurred_date >= start_date,
             Crash.occurred_date <= end_date
@@ -1193,7 +1195,9 @@ async def get_map_points(
                     'is_elderly': c.is_elderly,
                     'is_dui': c.suspected_alcohol,
                     'vehicle_type': c.party_type,
-                    'unit': c.sub_unit
+                    'unit': c.sub_unit,
+                    'death_count': c.death_count or 0,        # 實際死亡人數
+                    'injury_count': c.injury_count or 0,       # 實際受傷人數
                 })
         result['summary']['crashes_with_coords'] = len(result['crash_points'])
     

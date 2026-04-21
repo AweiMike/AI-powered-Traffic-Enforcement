@@ -33,6 +33,9 @@ interface MapPoint {
     violation_name?: string;
     enforcement_type?: string;
     unit?: string;
+    // 事故才有：實際死亡/受傷人數（長官關心的「人命」數字）
+    death_count?: number;
+    injury_count?: number;
 }
 
 interface SelectionCircle {
@@ -279,10 +282,15 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
         const ticketsIn = data.ticket_points.filter(p => inside(p.lat, p.lng));
 
         const severityCount = { A1: 0, A2: 0, A3: 0 };
+        // 實際人數累計（長官關心的「人命」數字，不是件數）
+        let deathTotal = 0;
+        let injuryTotal = 0;
         crashesIn.forEach(c => {
             if (c.severity && c.severity in severityCount) {
                 severityCount[c.severity as 'A1' | 'A2' | 'A3']++;
             }
+            deathTotal += c.death_count || 0;
+            injuryTotal += c.injury_count || 0;
         });
 
         const topicCount: Record<string, number> = { DUI: 0, RED_LIGHT: 0, DANGEROUS_DRIVING: 0, OTHER: 0 };
@@ -300,6 +308,8 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
             crashTotal: crashesIn.length,
             ticketTotal: ticketsIn.length,
             severity: severityCount,
+            deathTotal,       // 圈內實際死亡人數
+            injuryTotal,      // 圈內實際受傷人數
             topic: topicCount,
             units: Object.entries(unitCount).sort((a, b) => b[1] - a[1]),
         };
@@ -874,24 +884,42 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                     <div className="bg-white rounded-lg p-2 space-y-1">
                                         <div className="flex justify-between text-xs">
                                             <span className="text-nook-text/60">事故總數</span>
-                                            <span className="font-bold text-red-600">{selectionStats.crashTotal}</span>
+                                            <span className="font-bold text-red-600 tabular-nums">{selectionStats.crashTotal}</span>
                                         </div>
                                         {selectionStats.severity.A1 > 0 && (
                                             <div className="flex justify-between text-[11px] pl-2">
                                                 <span className="text-red-700">A1 死亡</span>
-                                                <span className="font-medium">{selectionStats.severity.A1}</span>
+                                                <span className="font-medium tabular-nums">{selectionStats.severity.A1}</span>
                                             </div>
                                         )}
                                         {selectionStats.severity.A2 > 0 && (
                                             <div className="flex justify-between text-[11px] pl-2">
                                                 <span className="text-orange-600">A2 受傷</span>
-                                                <span className="font-medium">{selectionStats.severity.A2}</span>
+                                                <span className="font-medium tabular-nums">{selectionStats.severity.A2}</span>
                                             </div>
                                         )}
                                         {selectionStats.severity.A3 > 0 && (
                                             <div className="flex justify-between text-[11px] pl-2">
                                                 <span className="text-yellow-600">A3 財損</span>
-                                                <span className="font-medium">{selectionStats.severity.A3}</span>
+                                                <span className="font-medium tabular-nums">{selectionStats.severity.A3}</span>
+                                            </div>
+                                        )}
+
+                                        {/* 實際傷亡人數（非件數）— 長官決策依據 */}
+                                        {(selectionStats.deathTotal > 0 || selectionStats.injuryTotal > 0) && (
+                                            <div className="pt-1.5 mt-1.5 border-t border-red-100 space-y-0.5">
+                                                {selectionStats.deathTotal > 0 && (
+                                                    <div className="flex justify-between text-[11px]">
+                                                        <span className="text-red-700 font-semibold">💀 死亡人數</span>
+                                                        <span className="font-bold text-red-700 tabular-nums">{selectionStats.deathTotal} 人</span>
+                                                    </div>
+                                                )}
+                                                {selectionStats.injuryTotal > 0 && (
+                                                    <div className="flex justify-between text-[11px]">
+                                                        <span className="text-orange-700 font-semibold">🏥 受傷人數</span>
+                                                        <span className="font-bold text-orange-700 tabular-nums">{selectionStats.injuryTotal} 人</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
