@@ -46,7 +46,50 @@ class ReportPrompts:
   - |pct| ≥ 20% 稱「顯著」
   - 10%~20% 稱「明顯」
   - <10% 稱「微幅」
+
+## 🚫 禁止的錯誤比較方式
+
+### 絕對禁止：直接把事故件數跟取締件數做大小比較
+- ❌「事故 20 件 > 取締 39 件」（數學錯誤，20 本來就小於 39）
+- ❌「事故件數高於取締件數」（會邏輯矛盾）
+
+### 正確的警訊判斷方式：使用「取締/事故比率」（enforcement_ratio）
+- 每個管區的 ratio 會在「關鍵數字預覽」中給出
+- 比率越高 = 執法投入相對事故規模越積極
+- 比率越低 = 執法相對事故不成比例（需關注）
+
+### 正確的警訊描述句型範例
+- ✅「新化派出所（含那拔）事故 20 件為 4 管區最多，取締比率 1.95（每 1 件事故對應 1.95 件取締）低於唪口 3.88，**相對事故規模執法投入偏少**，需關注」
+- ✅「左鎮分駐所（含岡林）取締比率僅 1.33，為 4 管區最低，執法力道薄弱」
+- ✅「唪口派出所（含知義）取締比率 3.88 最高，執法積極有效」
 """
+
+    @staticmethod
+    def _format_unit_stats(data: ReportSummary) -> str:
+        """格式化 4 管區 unit_stats，含取締比率說明"""
+        if not data.unit_stats:
+            return "- （無派出所資料）"
+
+        lines = []
+        # 找最高/最低 ratio 作為比較錨點
+        valid_ratios = [(u.unit, u.enforcement_ratio) for u in data.unit_stats if u.enforcement_ratio is not None]
+        max_ratio_unit, max_ratio = max(valid_ratios, key=lambda x: x[1], default=(None, None))
+        min_ratio_unit, min_ratio = min(valid_ratios, key=lambda x: x[1], default=(None, None))
+
+        for u in data.unit_stats:
+            ratio_text = f"{u.enforcement_ratio}" if u.enforcement_ratio is not None else "N/A（事故為 0）"
+            line = f"- **{u.unit}**：事故 {u.crashes} 件、取締 {u.tickets} 件、取締/事故比率 = {ratio_text}"
+            if u.enforcement_ratio is not None:
+                if u.enforcement_ratio == max_ratio and max_ratio is not None:
+                    line += " ✅ 4 管區最高（執法相對積極）"
+                elif u.enforcement_ratio == min_ratio and min_ratio is not None and min_ratio < max_ratio:
+                    line += " ⚠️ 4 管區最低（執法相對事故規模不足）"
+            lines.append(line)
+
+        lines.append("")
+        lines.append("**解讀規則**：取締/事故比率 = 每 1 件事故對應幾件取締。比率越高代表執法投入相對事故規模越積極。")
+        lines.append("**禁止**：切勿直接把「事故件數」和「取締件數」做大小比較（如「事故 20 > 取締 39」是數學錯誤）。")
+        return "\n".join(lines)
 
     @staticmethod
     def _format_a1_locations(data: ReportSummary) -> str:
@@ -100,6 +143,9 @@ class ReportPrompts:
 - 高齡者違規：{data.elderly_tickets} 件
 - 青少年事故：{data.youth_crashes} 件
 - 大型車涉事事故：{data.heavy_vehicle_crashes} 件
+
+### 🏢 派出所 4 管區表現（必須全部列出，含取締比率）
+{ReportPrompts._format_unit_stats(data)}
 
 ### 🔴 A1 死亡事故地點（工程建議章節必須逐一檢討）
 {ReportPrompts._format_a1_locations(data)}
@@ -192,6 +238,9 @@ class ReportPrompts:
 6. ☐ 是否正面回應了「AI 自動偵測重點」中列出的警訊？
 7. ☐ **A1 死亡事故地點是否都在工程建議章節單獨列出並給具體改善方向？**（若本期有 A1）
 8. ☐ 派出所表現章節是否**完整列出全部 4 管區**（新化/唪口/山上/左鎮）？少寫任何一個都算違反。
+9. ☐ 是否使用「取締/事故比率」作警訊判斷，**而非**「事故件數 vs 取締件數」直接大小比較？
+   - ❌「事故 20 件 > 取締 39 件」（數學錯誤）
+   - ✅「事故 20 件最多，但取締比率 1.95 低於唪口 3.88，執法相對事故規模不足」
 
 若任一項未達成，請重寫該段。
 

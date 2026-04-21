@@ -471,14 +471,25 @@ class LLMService:
         lines.append(fmt_topic("dangerous", "危險駕駛"))
         lines.append("")
 
-        # 四、派出所表現（4 管區分組）
+        # 四、派出所表現（4 管區分組，含取締/事故比率）
         lines.append("## 四、派出所表現（4 管區）")
         if units:
-            lines.append("依事故+違規總件數降序：")
+            # 找最高/最低比率
+            valid_ratios = [(u.get('unit'), u.get('enforcement_ratio')) for u in units if u.get('enforcement_ratio') is not None]
+            max_unit = max(valid_ratios, key=lambda x: x[1], default=(None, None))[0]
+            min_ratio = min((r for _, r in valid_ratios), default=None)
+
+            lines.append("依事故+違規總件數降序，含取締/事故比率（執法投入相對事故規模）：")
             for u in units:
-                lines.append(
-                    f"- **{u.get('unit', '未知')}**：事故 {u.get('crashes', 0)} 件、違規 {u.get('tickets', 0)} 件"
-                )
+                ratio = u.get('enforcement_ratio')
+                ratio_str = f"取締/事故比 {ratio}" if ratio is not None else "取締/事故比 N/A"
+                line = f"- **{u.get('unit', '未知')}**：事故 {u.get('crashes', 0)} 件、取締 {u.get('tickets', 0)} 件、{ratio_str}"
+                if ratio is not None:
+                    if u.get('unit') == max_unit:
+                        line += " ✅ 執法最積極"
+                    elif ratio == min_ratio and min_ratio is not None:
+                        line += " ⚠️ 執法相對事故規模不足"
+                lines.append(line)
         else:
             lines.append("- 本期無派出所統計資料")
         lines.append("")

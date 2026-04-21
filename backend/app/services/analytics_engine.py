@@ -326,15 +326,19 @@ class AnalyticsEngine:
             if group:
                 group_tickets[group] += count
 
-        # 組裝 UnitStat list
-        items = [
-            UnitStat(
+        # 組裝 UnitStat list（含 enforcement_ratio）
+        items = []
+        for group in self.STATION_GROUPS:
+            c = group_crashes[group["display"]]
+            t = group_tickets[group["display"]]
+            # 取締比率：每 1 件事故對應幾件取締（衡量執法投入相對事故規模）
+            ratio = round(t / c, 2) if c > 0 else None
+            items.append(UnitStat(
                 unit=group["display"],
-                crashes=group_crashes[group["display"]],
-                tickets=group_tickets[group["display"]],
-            )
-            for group in self.STATION_GROUPS
-        ]
+                crashes=c,
+                tickets=t,
+                enforcement_ratio=ratio,
+            ))
         items.sort(key=lambda x: x.crashes + x.tickets, reverse=True)
 
         if top_n is None:

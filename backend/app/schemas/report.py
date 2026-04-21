@@ -23,10 +23,13 @@ class HotspotItem(BaseModel):
 
 
 class UnitStat(BaseModel):
-    """派出所/單位的執法與事故數據"""
+    """派出所/管區的執法與事故數據"""
     unit: str
     crashes: int
     tickets: int
+    # 取締比率（tickets / crashes）— 衡量「執法投入相對事故規模」
+    # None 表示事故為 0（無法除以 0）
+    enforcement_ratio: Optional[float] = None
 
 
 class ShiftStat(BaseModel):
