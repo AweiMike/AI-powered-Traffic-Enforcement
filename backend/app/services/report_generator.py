@@ -40,8 +40,8 @@ class ReportGeneratorService:
             },
             "raw_data": data, # 包含給 LLM 看的所有原始統計數據
             "ai_analysis": {
-                "provider": self.llm.provider,
-                "model": self.llm.model,
+                "provider": self.llm.last_provider,  # 本次實際使用的 provider（不是 config 預設）
+                "model": self.llm.last_model,        # 本次實際使用的 model
                 "content": report_content # Markdown 格式的報告內文
             }
         }

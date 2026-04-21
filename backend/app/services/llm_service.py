@@ -13,6 +13,7 @@ class LLMProvider(str, Enum):
 
 class LLMService:
     def __init__(self):
+        # 預設值（config 讀取）— 僅作為 fallback
         self.provider = settings.PRIMARY_LLM_PROVIDER.lower()
         self.model = settings.LLM_MODEL_NAME
         # 檢查是否有 API Key，若無則強制使用 Mock
@@ -22,6 +23,10 @@ class LLMService:
             self.provider = "mock"
         elif self.provider == "anthropic" and not settings.CLAUDE_API_KEY:
             self.provider = "mock"
+
+        # 追蹤「上一次呼叫實際使用」的 provider/model（給 UI footer 顯示）
+        self.last_provider = self.provider
+        self.last_model = self.model
 
     async def generate_text(self, system_prompt: str, user_prompt: str, temperature: float = 0.7, api_key: Optional[str] = None, provider: Optional[str] = None, model_name: Optional[str] = None) -> str:
         """
@@ -38,6 +43,8 @@ class LLMService:
 
         # Mock 模式：前端可透過 provider="mock" 或傳 api_key="mock-mode" 顯式觸發
         if active_provider == "mock" or api_key == "mock-mode":
+            self.last_provider = "mock"
+            self.last_model = active_model or "mock"
             return self._mock_response(system_prompt, user_prompt)
 
         # 如果有動態 Key，則強制使用該 Provider
@@ -53,7 +60,13 @@ class LLMService:
             active_provider = "mock"
 
         if active_provider == "mock":
+            self.last_provider = "mock"
+            self.last_model = active_model or "mock"
             return self._mock_response(system_prompt, user_prompt)
+
+        # 追蹤本次實際使用的 provider/model（給後端 response footer 顯示）
+        self.last_provider = active_provider
+        self.last_model = active_model
         
         if active_provider == "openai":
             return await self._call_openai(system_prompt, user_prompt, temperature, current_api_key, active_model)
@@ -171,7 +184,7 @@ class LLMService:
     async def _call_gemini(self, system_prompt: str, user_prompt: str, temperature: float, api_key: str, model: str) -> str:
         """
         Google Gemini API（REST 直呼，不依賴 SDK）。
-        支援 gemini-1.5-pro-latest, gemini-1.5-flash-latest, gemini-2.0-flash-exp 等。
+        支援 gemini-2.5-pro/flash/flash-lite, gemini-2.0-flash 等。
         """
         timeout = aiohttp.ClientTimeout(total=180)
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
@@ -189,7 +202,9 @@ class LLMService:
                     ],
                     "generationConfig": {
                         "temperature": temperature,
-                        "maxOutputTokens": 4096,
+                        # 拉高到 16384 避免長報告被截斷
+                        # Gemini 2.5 Pro 支援 65535, Flash 系列支援 65535, 16384 是保守值
+                        "maxOutputTokens": 16384,
                     },
                     # 關閉過度保守的 safety 設定（分析警務資料可能觸發 "violence" 類別）
                     "safetySettings": [
@@ -204,15 +219,37 @@ class LLMService:
                         error_text = await resp.text()
                         raise Exception(self._parse_gemini_error(resp.status, error_text, model))
                     data = await resp.json()
-                    # Gemini 回應結構：candidates[0].content.parts[0].text
-                    try:
-                        return data["candidates"][0]["content"]["parts"][0]["text"]
-                    except (KeyError, IndexError) as e:
-                        # 可能被 safety 過濾、或 finishReason != STOP
-                        finish_reason = data.get("candidates", [{}])[0].get("finishReason", "UNKNOWN")
+
+                    # 取得 candidate + finishReason 診斷
+                    candidates = data.get("candidates", [])
+                    if not candidates:
+                        # 整個 response 沒有 candidates — 通常是 prompt 觸發 input safety filter
+                        prompt_feedback = data.get("promptFeedback", {})
+                        block_reason = prompt_feedback.get("blockReason", "UNKNOWN")
+                        raise Exception(f"Gemini 未回傳任何內容（blockReason={block_reason}）。可能 prompt 觸發輸入過濾。")
+
+                    candidate = candidates[0]
+                    finish_reason = candidate.get("finishReason", "UNKNOWN")
+                    parts = candidate.get("content", {}).get("parts", [])
+
+                    # 合併所有 text parts（Gemini 有時會分段回應）
+                    text = "".join(p.get("text", "") for p in parts if "text" in p)
+
+                    if not text.strip():
+                        # 無文字內容
                         if finish_reason == "SAFETY":
-                            raise Exception("Gemini 因安全過濾拒絕回應。請改用較保守的 prompt 或切換至其他模型。")
-                        raise Exception(f"Gemini 回應格式異常（finishReason={finish_reason}）：{str(e)}")
+                            raise Exception("Gemini 因安全過濾拒絕回應。請改用其他模型或稍後再試。")
+                        if finish_reason == "RECITATION":
+                            raise Exception("Gemini 因引用限制拒絕回應。")
+                        raise Exception(f"Gemini 回傳空內容（finishReason={finish_reason}）。請重試或切換模型。")
+
+                    # 若非正常結束，附加警示但仍回傳（讓使用者看到部分內容比完全失敗好）
+                    if finish_reason == "MAX_TOKENS":
+                        text += "\n\n> ⚠️ **注意**：本段回應因長度限制被截斷。建議換用 Gemini 2.5 Pro（更高 token 上限）或請使用者縮短報告需求。"
+                    elif finish_reason == "SAFETY":
+                        text += "\n\n> ⚠️ **注意**：部分內容被安全過濾器移除。"
+
+                    return text
         except asyncio.TimeoutError:
             raise Exception(f"Gemini 回應超時（180 秒）。{model} 可能正在高負載中，請稍後再試。")
         except aiohttp.ClientConnectorError:
@@ -234,7 +271,7 @@ class LLMService:
                 }
                 payload = {
                     "model": model,
-                    "max_tokens": 4000,
+                    "max_tokens": 8192,  # 長報告需要（Claude 支援到 8192 或更高視模型）
                     "temperature": temperature,
                     "system": system_prompt,
                     "messages": [
