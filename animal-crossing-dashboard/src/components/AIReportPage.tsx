@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { apiClient, ReportResponse } from '../api/client';
 import { Printer, BarChart3, Bot, Settings, Key, AlertTriangle, X, ChevronDown, ChevronUp, Database, Calendar } from 'lucide-react';
 import DateRangePicker, { type DateRange } from './DateRangePicker';
@@ -619,6 +620,7 @@ const AIReportPage: React.FC = () => {
                     {/* Markdown Content */}
                     <div className="p-8 md:p-12 max-w-4xl mx-auto prose prose-emerald prose-lg print:max-w-none print:p-0">
                         <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
                             components={{
                                 h1: ({ node, ...props }: any) => <h1 className="text-3xl font-bold text-slate-800 mb-6 pb-4 border-b-2 border-sky-600" {...props} />,
                                 h2: ({ node, ...props }: any) => <h2 className="text-2xl font-bold text-slate-800 mt-8 mb-4 flex items-center gap-2" {...props} />,
@@ -627,6 +629,11 @@ const AIReportPage: React.FC = () => {
                                 ul: ({ node, ...props }: any) => <ul className="list-disc list-outside ml-6 space-y-2 mb-6" {...props} />,
                                 li: ({ node, ...props }: any) => <li className="text-slate-600" {...props} />,
                                 strong: ({ node, ...props }: any) => <strong className="font-bold text-slate-800 bg-sky-50 px-1 rounded" {...props} />,
+                                // GFM 表格樣式（若 LLM 仍輸出 table，至少能正確渲染）
+                                table: ({ node, ...props }: any) => <table className="w-full border-collapse border border-slate-300 my-4 text-sm" {...props} />,
+                                thead: ({ node, ...props }: any) => <thead className="bg-slate-100" {...props} />,
+                                th: ({ node, ...props }: any) => <th className="border border-slate-300 px-3 py-2 text-left font-semibold text-slate-700" {...props} />,
+                                td: ({ node, ...props }: any) => <td className="border border-slate-300 px-3 py-2 text-slate-600" {...props} />,
                             }}
                         >
                             {report.ai_analysis.content}
