@@ -850,6 +850,14 @@ class APIClient {
   async getHeavyVehiclePerformance(startDate: string, endDate: string): Promise<any> {
     return this.request(`/enforcement/heavy-vehicle?start_date=${startDate}&end_date=${endDate}`);
   }
+
+  async getSpeedPerformance(startDate: string, endDate: string): Promise<any> {
+    return this.request(`/enforcement/speed?start_date=${startDate}&end_date=${endDate}`);
+  }
+
+  async getPedestrianAnalysis(startDate: string, endDate: string): Promise<any> {
+    return this.request(`/enforcement/pedestrian?start_date=${startDate}&end_date=${endDate}`);
+  }
 }
 
 // 報告相關介面定義

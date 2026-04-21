@@ -26,7 +26,9 @@ import {
   Wine,
   Truck,
   Target,
-  Bot
+  Bot,
+  PersonStanding,
+  Gauge
 } from 'lucide-react';
 
 // Import custom components
@@ -46,6 +48,8 @@ import AIReportPage from './components/AIReportPage';
 import EVehicleAnalysisPage from './components/EVehicleAnalysisPage';
 import DuiPerformancePage from './components/DuiPerformancePage';
 import HeavyVehiclePerformancePage from './components/HeavyVehiclePerformancePage';
+import SpeedPerformancePage from './components/SpeedPerformancePage';
+import PedestrianAnalysisPage from './components/PedestrianAnalysisPage';
 import DateRangePicker, { type DateRange } from './components/DateRangePicker';
 import BrandLogo from './components/BrandLogo';
 
@@ -112,8 +116,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, readOnly, o
       section: '專區',
       items: [
         { id: 'elderly', icon: Users, label: '高齡者專區', description: '高齡者事故防治' },
+        { id: 'pedestrian', icon: PersonStanding, label: '行人事故', description: '行人事故發生率與熱點' },
         { id: 'evehicle', icon: Zap, label: '青少年微電車', description: '青少年微電車/電輔車事故分析' },
         { id: 'dui', icon: Wine, label: '酒駕成效', description: '各派出所酒駕取締與事故統計' },
+        { id: 'speed', icon: Gauge, label: '速度管理', description: '超速取締與嚴重度分級' },
         { id: 'heavy-vehicle', icon: Truck, label: '大型車成效', description: '各派出所大型車取締與事故統計' },
       ],
     },
@@ -1102,6 +1108,10 @@ const App: React.FC = () => {
         return <DuiPerformancePage />;
       case 'heavy-vehicle':
         return <HeavyVehiclePerformancePage />;
+      case 'speed':
+        return <SpeedPerformancePage />;
+      case 'pedestrian':
+        return <PedestrianAnalysisPage />;
       case 'monthly':
         return <PerformanceComparisonPage />;
       case 'ai-report':

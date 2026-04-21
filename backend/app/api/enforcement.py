@@ -287,3 +287,329 @@ async def get_heavy_vehicle_performance(
         "total": total,
         "code_labels": code_labels,
     }
+
+
+# ============================================
+# 速度管理（超速違規）專區
+# ============================================
+import re as _re
+
+# 超速 violation_name 解析：提取「超速 X 公里」的 X
+_SPEED_OVER_RE = _re.compile(r"超速\s*(\d+)\s*公里")
+# 解析「限速 X 公里」
+_SPEED_LIMIT_RE = _re.compile(r"限速\s*(\d+)\s*公里")
+
+
+def _classify_speed_severity(violation_name: str) -> str:
+    """從 violation_name 解析超速嚴重度：light/medium/heavy"""
+    if not violation_name:
+        return "unknown"
+    m = _SPEED_OVER_RE.search(violation_name)
+    if not m:
+        # violation_name 含「超速」但沒具體公里數 → 歸為 unknown
+        return "unknown"
+    over = int(m.group(1))
+    if over <= 20:
+        return "light"      # 輕度：11-20 km/h
+    if over <= 40:
+        return "medium"     # 中度：21-40 km/h
+    return "heavy"          # 重度：40+ km/h
+
+
+def _extract_speed_limit(violation_name: str) -> int | None:
+    """從 violation_name 解析速限"""
+    if not violation_name:
+        return None
+    m = _SPEED_LIMIT_RE.search(violation_name)
+    return int(m.group(1)) if m else None
+
+
+@router.get("/speed")
+async def get_speed_performance(
+    start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """
+    速度管理（超速違規）專區統計
+    - 總取締件數 + 去年同期比較
+    - 嚴重度分級（輕/中/重）
+    - 各派出所取締件數
+    - 速限分布
+    - 超速事故關聯（從 Crash.cause 撈「超速」相關）
+    """
+    sd = parse_date(start_date)
+    ed = parse_date(end_date)
+    if not sd or not ed:
+        return {"error": "日期格式錯誤"}
+
+    cmp_sd = shift_year(sd, -1)
+    cmp_ed = shift_year(ed, -1)
+
+    # --- 超速 Ticket（含 violation_name 以便解析嚴重度 & 速限）---
+    def query_speed_tickets(s, e):
+        return db.query(
+            Ticket.id,
+            Ticket.unit_code,
+            Ticket.violation_name,
+        ).filter(
+            Ticket.violation_date >= s,
+            Ticket.violation_date <= e,
+            Ticket.violation_name.like('%超速%'),
+        ).all()
+
+    curr_rows = query_speed_tickets(sd, ed)
+    prev_rows = query_speed_tickets(cmp_sd, cmp_ed)
+
+    def tally(rows):
+        """計算 unit 件數 + 嚴重度 + 速限分布"""
+        unit_counts = {}
+        severity_counts = {"light": 0, "medium": 0, "heavy": 0, "unknown": 0}
+        limit_counts = {}
+        for r in rows:
+            unit = r.unit_code or "未知"
+            unit_counts[unit] = unit_counts.get(unit, 0) + 1
+
+            sev = _classify_speed_severity(r.violation_name)
+            severity_counts[sev] += 1
+
+            limit = _extract_speed_limit(r.violation_name)
+            if limit is not None:
+                limit_counts[limit] = limit_counts.get(limit, 0) + 1
+        return {
+            "total": len(rows),
+            "unit_counts": unit_counts,
+            "severity": severity_counts,
+            "by_limit": limit_counts,
+        }
+
+    curr = tally(curr_rows)
+    prev = tally(prev_rows)
+
+    # --- 超速事故（Crash.cause LIKE '%超速%'）---
+    def query_speed_crashes(s, e):
+        return db.query(
+            Crash.sub_unit,
+            Crash.severity,
+            Crash.death_count,
+            Crash.injury_count,
+        ).filter(
+            Crash.occurred_date >= s,
+            Crash.occurred_date <= e,
+            Crash.cause.like('%超速%'),
+        ).all()
+
+    def tally_crashes(rows):
+        total = len(rows)
+        a1 = sum(1 for r in rows if r.severity == 'A1')
+        a2 = sum(1 for r in rows if r.severity == 'A2')
+        deaths = sum(r.death_count or 0 for r in rows)
+        injuries = sum(r.injury_count or 0 for r in rows)
+        unit_counts = {}
+        for r in rows:
+            u = r.sub_unit or "未知"
+            unit_counts[u] = unit_counts.get(u, 0) + 1
+        return {
+            "total": total,
+            "a1_crashes": a1,
+            "a2_crashes": a2,
+            "deaths": deaths,
+            "injuries": injuries,
+            "unit_counts": unit_counts,
+        }
+
+    curr_crashes = tally_crashes(query_speed_crashes(sd, ed))
+    prev_crashes = tally_crashes(query_speed_crashes(cmp_sd, cmp_ed))
+
+    # --- 派出所 Top 10 取締表 ---
+    all_units = sorted(set(curr["unit_counts"].keys()) | set(prev["unit_counts"].keys()))
+    unit_rows = []
+    for u in all_units:
+        if u == "未知":
+            continue
+        c = curr["unit_counts"].get(u, 0)
+        p = prev["unit_counts"].get(u, 0)
+        unit_rows.append({
+            "unit": u,
+            "tickets": c,
+            "tickets_prev": p,
+            "tickets_diff": c - p,
+        })
+    unit_rows.sort(key=lambda x: x["tickets"], reverse=True)
+
+    # --- 熱點（本期超速取締 Top 5 路段）---
+    hotspot_rows = db.query(
+        Ticket.district,
+        Ticket.location_desc,
+        func.count(Ticket.id).label('count'),
+    ).filter(
+        Ticket.violation_date >= sd,
+        Ticket.violation_date <= ed,
+        Ticket.violation_name.like('%超速%'),
+        Ticket.location_desc.isnot(None),
+        Ticket.location_desc != "",
+    ).group_by(Ticket.district, Ticket.location_desc).order_by(func.count(Ticket.id).desc()).limit(10).all()
+
+    hotspots = []
+    for row in hotspot_rows:
+        if row.location_desc and "未知" not in row.location_desc and "不詳" not in row.location_desc:
+            hotspots.append({
+                "rank": len(hotspots) + 1,
+                "district": row.district,
+                "location": row.location_desc,
+                "count": row.count,
+            })
+        if len(hotspots) >= 5:
+            break
+
+    return {
+        "period": {"start_date": start_date, "end_date": end_date},
+        "compare_period": {"start_date": cmp_sd.isoformat(), "end_date": cmp_ed.isoformat()},
+        "summary": {
+            "current": curr,
+            "previous": prev,
+            "diff_pct": round((curr["total"] - prev["total"]) / prev["total"] * 100, 1) if prev["total"] > 0 else None,
+        },
+        "crashes": {
+            "current": curr_crashes,
+            "previous": prev_crashes,
+        },
+        "unit_rows": unit_rows,
+        "hotspots": hotspots,
+    }
+
+
+# ============================================
+# 行人事故專區
+# ============================================
+_PEDESTRIAN_PARTY_TYPES = ["行人", "人", "其他人"]
+# 明確屬於「車輛對行人」的事故肇因關鍵字 — 行人為受害者
+_CAUSE_DRIVER_FAULT = ["未禮讓", "車輛未依規定暫停讓", "未讓行人"]
+# 行人自身違規的肇因關鍵字
+_CAUSE_PEDESTRIAN_FAULT = ["穿越道路未注意", "未依標誌或標線穿越", "未依號誌或手勢指揮"]
+
+
+@router.get("/pedestrian")
+async def get_pedestrian_analysis(
+    start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """
+    行人事故發生率專區統計
+    - 行人事故件數 + 佔比
+    - 實際死傷人數
+    - 高齡行人占比
+    - 肇因分類（駕駛違規 / 行人違規）
+    - 熱點地點
+    """
+    sd = parse_date(start_date)
+    ed = parse_date(end_date)
+    if not sd or not ed:
+        return {"error": "日期格式錯誤"}
+
+    cmp_sd = shift_year(sd, -1)
+    cmp_ed = shift_year(ed, -1)
+
+    def query_crashes(s, e, pedestrian_only: bool):
+        q = db.query(
+            Crash.id,
+            Crash.party_type,
+            Crash.severity,
+            Crash.is_elderly,
+            Crash.cause,
+            Crash.district,
+            Crash.location_desc,
+            Crash.death_count,
+            Crash.injury_count,
+        ).filter(
+            Crash.occurred_date >= s,
+            Crash.occurred_date <= e,
+        )
+        if pedestrian_only:
+            q = q.filter(Crash.party_type.in_(_PEDESTRIAN_PARTY_TYPES))
+        return q.all()
+
+    def classify_cause(cause: str | None) -> str:
+        """分類肇因：driver_fault / pedestrian_fault / other"""
+        if not cause:
+            return "other"
+        if any(kw in cause for kw in _CAUSE_DRIVER_FAULT):
+            return "driver_fault"
+        if any(kw in cause for kw in _CAUSE_PEDESTRIAN_FAULT):
+            return "pedestrian_fault"
+        return "other"
+
+    def tally(rows):
+        total = len(rows)
+        a1 = sum(1 for r in rows if r.severity == 'A1')
+        a2 = sum(1 for r in rows if r.severity == 'A2')
+        a3 = sum(1 for r in rows if r.severity == 'A3')
+        deaths = sum(r.death_count or 0 for r in rows)
+        injuries = sum(r.injury_count or 0 for r in rows)
+        elderly = sum(1 for r in rows if r.is_elderly)
+
+        fault_counts = {"driver_fault": 0, "pedestrian_fault": 0, "other": 0}
+        for r in rows:
+            fault_counts[classify_cause(r.cause)] += 1
+
+        return {
+            "total": total,
+            "a1": a1,
+            "a2": a2,
+            "a3": a3,
+            "deaths": deaths,
+            "injuries": injuries,
+            "elderly": elderly,
+            "elderly_pct": round(elderly / total * 100, 1) if total > 0 else 0,
+            "fault_breakdown": fault_counts,
+        }
+
+    curr_ped = query_crashes(sd, ed, pedestrian_only=True)
+    prev_ped = query_crashes(cmp_sd, cmp_ed, pedestrian_only=True)
+
+    curr_all_count = db.query(func.count(Crash.id)).filter(
+        Crash.occurred_date >= sd,
+        Crash.occurred_date <= ed,
+    ).scalar() or 0
+    prev_all_count = db.query(func.count(Crash.id)).filter(
+        Crash.occurred_date >= cmp_sd,
+        Crash.occurred_date <= cmp_ed,
+    ).scalar() or 0
+
+    curr_stats = tally(curr_ped)
+    prev_stats = tally(prev_ped)
+
+    # 佔比計算
+    curr_stats["pct_of_all"] = round(curr_stats["total"] / curr_all_count * 100, 2) if curr_all_count > 0 else 0
+    prev_stats["pct_of_all"] = round(prev_stats["total"] / prev_all_count * 100, 2) if prev_all_count > 0 else 0
+    curr_stats["all_crashes"] = curr_all_count
+    prev_stats["all_crashes"] = prev_all_count
+
+    # 熱點地點（本期行人事故 Top 5）
+    hotspots_raw = {}
+    for r in curr_ped:
+        if r.location_desc and "未知" not in (r.location_desc or "") and r.location_desc.strip():
+            key = f"{r.district}|{r.location_desc}"
+            if key not in hotspots_raw:
+                hotspots_raw[key] = {
+                    "district": r.district, "location": r.location_desc,
+                    "count": 0, "elderly_count": 0, "deaths": 0, "injuries": 0,
+                }
+            hotspots_raw[key]["count"] += 1
+            if r.is_elderly:
+                hotspots_raw[key]["elderly_count"] += 1
+            hotspots_raw[key]["deaths"] += r.death_count or 0
+            hotspots_raw[key]["injuries"] += r.injury_count or 0
+
+    hotspots = sorted(hotspots_raw.values(), key=lambda x: x["count"], reverse=True)[:5]
+    for i, h in enumerate(hotspots, 1):
+        h["rank"] = i
+
+    return {
+        "period": {"start_date": start_date, "end_date": end_date},
+        "compare_period": {"start_date": cmp_sd.isoformat(), "end_date": cmp_ed.isoformat()},
+        "current": curr_stats,
+        "previous": prev_stats,
+        "hotspots": hotspots,
+    }
