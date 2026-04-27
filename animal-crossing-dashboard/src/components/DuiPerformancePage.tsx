@@ -1,6 +1,6 @@
 /**
  * DuiPerformancePage - 酒後駕車防制成效
- * 各派出所取締件數 + A1/A2 事故數 + 去年同期比較
+ * 各派出所取締件數 + A1/A2/A3 事故數 + 去年同期比較
  */
 
 import React, { useState, useEffect } from 'react';
@@ -58,7 +58,7 @@ const DuiPerformancePage: React.FC = () => {
 
       {/* 摘要卡片 */}
       {data && (
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-5 gap-4 mb-6">
           <SummaryCard
             title="取締件數"
             current={data.total.tickets}
@@ -88,6 +88,14 @@ const DuiPerformancePage: React.FC = () => {
             color="orange"
             invertDiff
           />
+          <SummaryCard
+            title="A3 酒駕事故"
+            current={data.total.a3_crashes}
+            prev={data.total.a3_crashes_prev}
+            icon={<AlertTriangle className="w-5 h-5 text-amber-600" />}
+            color="amber"
+            invertDiff
+          />
         </div>
       )}
 
@@ -111,6 +119,8 @@ const DuiPerformancePage: React.FC = () => {
                   <th className="px-4 py-3 text-right font-medium">A1 去年</th>
                   <th className="px-4 py-3 text-right font-medium">A2 事故</th>
                   <th className="px-4 py-3 text-right font-medium">A2 去年</th>
+                  <th className="px-4 py-3 text-right font-medium">A3 事故</th>
+                  <th className="px-4 py-3 text-right font-medium">A3 去年</th>
                 </tr>
               </thead>
               <tbody>
@@ -124,6 +134,8 @@ const DuiPerformancePage: React.FC = () => {
                     <td className="px-4 py-2.5 text-right text-nook-text/60">{row.a1_crashes_prev}</td>
                     <td className="px-4 py-2.5 text-right font-bold text-orange-600">{row.a2_crashes}</td>
                     <td className="px-4 py-2.5 text-right text-nook-text/60">{row.a2_crashes_prev}</td>
+                    <td className="px-4 py-2.5 text-right font-bold text-amber-600">{row.a3_crashes}</td>
+                    <td className="px-4 py-2.5 text-right text-nook-text/60">{row.a3_crashes_prev}</td>
                   </tr>
                 ))}
                 {/* 合計列 */}
@@ -136,6 +148,8 @@ const DuiPerformancePage: React.FC = () => {
                   <td className="px-4 py-3 text-right text-nook-text/60">{data.total.a1_crashes_prev}</td>
                   <td className="px-4 py-3 text-right text-orange-600">{data.total.a2_crashes}</td>
                   <td className="px-4 py-3 text-right text-nook-text/60">{data.total.a2_crashes_prev}</td>
+                  <td className="px-4 py-3 text-right text-amber-600">{data.total.a3_crashes}</td>
+                  <td className="px-4 py-3 text-right text-nook-text/60">{data.total.a3_crashes_prev}</td>
                 </tr>
               </tbody>
             </table>
@@ -171,6 +185,7 @@ function SummaryCard({ title, current, prev, icon, color, invertDiff }: {
     purple: 'from-sky-50 to-sky-100/50 border-sky-200',
     red: 'from-red-50 to-red-100/50 border-red-200',
     orange: 'from-orange-50 to-orange-100/50 border-orange-200',
+    amber: 'from-amber-50 to-amber-100/50 border-amber-200',
     gray: 'from-gray-50 to-gray-100/50 border-gray-200',
   };
   return (

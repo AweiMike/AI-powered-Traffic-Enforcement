@@ -111,8 +111,8 @@ async def get_dui_performance(
         for r in rows:
             unit = r.unit or "未知"
             if unit not in result:
-                result[unit] = {"A1": 0, "A2": 0}
-            if r.severity in ("A1", "A2"):
+                result[unit] = {"A1": 0, "A2": 0, "A3": 0}
+            if r.severity in ("A1", "A2", "A3"):
                 result[unit][r.severity] += r.count
         return result
 
@@ -131,8 +131,8 @@ async def get_dui_performance(
             continue
         ct = curr_tickets.get(unit, 0)
         pt = prev_tickets.get(unit, 0)
-        cc = curr_crashes.get(unit, {"A1": 0, "A2": 0})
-        pc = prev_crashes.get(unit, {"A1": 0, "A2": 0})
+        cc = curr_crashes.get(unit, {"A1": 0, "A2": 0, "A3": 0})
+        pc = prev_crashes.get(unit, {"A1": 0, "A2": 0, "A3": 0})
         rows.append({
             "unit": unit,
             "tickets": ct,
@@ -142,6 +142,8 @@ async def get_dui_performance(
             "a1_crashes_prev": pc["A1"],
             "a2_crashes": cc["A2"],
             "a2_crashes_prev": pc["A2"],
+            "a3_crashes": cc["A3"],
+            "a3_crashes_prev": pc["A3"],
         })
 
     # 合計
@@ -152,6 +154,8 @@ async def get_dui_performance(
         "a1_crashes_prev": sum(r["a1_crashes_prev"] for r in rows),
         "a2_crashes": sum(r["a2_crashes"] for r in rows),
         "a2_crashes_prev": sum(r["a2_crashes_prev"] for r in rows),
+        "a3_crashes": sum(r["a3_crashes"] for r in rows),
+        "a3_crashes_prev": sum(r["a3_crashes_prev"] for r in rows),
     }
     total["tickets_diff"] = total["tickets"] - total["tickets_prev"]
 
