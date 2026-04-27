@@ -223,8 +223,9 @@ const DuiPerformancePage: React.FC = () => {
                   <th className="px-4 py-3 text-right font-medium">主動取締</th>
                   <th className="px-4 py-3 text-right font-medium">總取締</th>
                   <th className="px-4 py-3 text-right font-medium">肇事舉發</th>
-                  <th className="px-4 py-3 text-right font-medium">酒駕事故</th>
-                  <th className="px-4 py-3 text-right font-medium">A1 / A2 / A3</th>
+                  <th className="px-4 py-3 text-right font-medium">酒駕肇事率</th>
+                  <th className="px-4 py-3 text-center font-medium">執法缺口</th>
+                  <th className="px-4 py-3 text-right font-medium">A1/A2/A3</th>
                 </tr>
               </thead>
               <tbody>
@@ -239,21 +240,29 @@ const DuiPerformancePage: React.FC = () => {
                     </td>
                     <td className="px-4 py-2.5 text-right text-sky-800 tabular-nums">{g.tickets_total}</td>
                     <td className="px-4 py-2.5 text-right text-red-500 tabular-nums">{g.tickets_crash_derived}</td>
-                    <td className="px-4 py-2.5 text-right font-bold text-nook-text tabular-nums">{g.crashes_total}</td>
-                    <td className="px-4 py-2.5 text-right text-xs text-nook-text/60 tabular-nums">
+                    <td className="px-4 py-2.5 text-right tabular-nums">
+                      <CrashRate rate={g.dui_crash_rate} />
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <GapBadge gap={g.enforcement_gap} />
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-xs text-nook-text/50 tabular-nums">
                       <span className="text-red-600">{g.a1_crashes}</span>
-                      <span className="mx-1">/</span>
+                      <span className="mx-0.5">/</span>
                       <span className="text-orange-600">{g.a2_crashes}</span>
-                      <span className="mx-1">/</span>
+                      <span className="mx-0.5">/</span>
                       <span className="text-amber-600">{g.a3_crashes}</span>
+                      <span className="ml-1 text-nook-text/30" title="事故表 A1/A2/A3 可能因避免填寫而低估">⚠</span>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div className="px-4 py-3 text-xs text-nook-text/50 border-t border-nook-cream/30">
-            ⚠️ 排名僅看「主動取締」件數；若管區轄區大小差異大，可搭配酒駕事故數一起評估。事故並列時依事故少者為優先。
+          <div className="px-4 py-3 text-xs text-nook-text/60 border-t border-nook-cream/30 space-y-1">
+            <div>📊 <strong>酒駕肇事率</strong> = 攔舉-肇事 ÷ 總酒駕取締。資料來源是<u>舉發單</u>（強制填寫），比事故表 A1/A2/A3 可靠（事故表常被避免填寫嚴重度）。</div>
+            <div>⚠️ <strong>執法缺口</strong>：肇事率 ≥ 30% 且主動率 &lt; 50% → 「有缺口」（事先沒攔到，事故才補開）；主動率 ≥ 70% 且肇事率 &lt; 15% → 「無缺口」（路檢有效）。取締 &lt; 5 件視為樣本不足。</div>
+            <div className="text-nook-text/40">排名僅看「主動取締」件數；事故並列時依事故少者為優先。</div>
           </div>
         </div>
       )}
@@ -269,6 +278,30 @@ const DuiPerformancePage: React.FC = () => {
     </div>
   );
 };
+
+/** 酒駕肇事率：彩色文字，>=30% 紅、15-30% 黃、<15% 綠 */
+function CrashRate({ rate }: { rate: number }) {
+  const pct = (rate * 100).toFixed(1);
+  let cls = 'text-gray-500';
+  if (rate >= 0.30) cls = 'text-red-600 font-semibold';
+  else if (rate >= 0.15) cls = 'text-orange-500 font-semibold';
+  else if (rate > 0) cls = 'text-green-700 font-semibold';
+  return <span className={cls}>{pct}%</span>;
+}
+
+/** 執法缺口徽章 */
+function GapBadge({ gap }: { gap: 'HIGH' | 'LOW' | 'NEUTRAL' | 'INSUFFICIENT_DATA' }) {
+  if (gap === 'HIGH') {
+    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-semibold">⚠ 有缺口</span>;
+  }
+  if (gap === 'LOW') {
+    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-semibold">✅ 無缺口</span>;
+  }
+  if (gap === 'INSUFFICIENT_DATA') {
+    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-xs">樣本不足</span>;
+  }
+  return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-700 text-xs">中性</span>;
+}
 
 /** 排名徽章：第 1 名金、第 2 銀、第 3 銅、最後一名警示 */
 function RankBadge({ rank, total }: { rank: number; total: number }) {

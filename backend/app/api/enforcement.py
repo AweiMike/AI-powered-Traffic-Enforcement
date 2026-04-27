@@ -263,6 +263,29 @@ async def get_dui_performance(
         bucket["tickets_excl_crash"] = bucket["tickets_total"] - bucket["tickets_crash_derived"]
         bucket["crashes_total"] = bucket["a1_crashes"] + bucket["a2_crashes"] + bucket["a3_crashes"]
 
+        # 酒駕肇事率：以舉發單「攔舉-肇事」/ 總取締（比 Crash.A1A2A3 可靠，因事故表常被避免填寫嚴重度）
+        total = bucket["tickets_total"]
+        bucket["dui_crash_rate"] = (
+            bucket["tickets_crash_derived"] / total if total > 0 else 0.0
+        )
+        bucket["proactive_rate"] = (
+            bucket["tickets_proactive"] / total if total > 0 else 0.0
+        )
+
+        # 執法缺口判定：
+        # - HIGH (有缺口):  肇事率 ≥ 30% 且 主動率 < 50% → 事先沒攔到、事故才補開
+        # - LOW  (無缺口):  主動率 ≥ 70% 且 肇事率 < 15% → 路檢有效
+        # - INSUFFICIENT_DATA: 總取締 < 5 件，量太少不判斷
+        # - NEUTRAL: 其他狀況
+        if total < 5:
+            bucket["enforcement_gap"] = "INSUFFICIENT_DATA"
+        elif bucket["dui_crash_rate"] >= 0.30 and bucket["proactive_rate"] < 0.50:
+            bucket["enforcement_gap"] = "HIGH"
+        elif bucket["proactive_rate"] >= 0.70 and bucket["dui_crash_rate"] < 0.15:
+            bucket["enforcement_gap"] = "LOW"
+        else:
+            bucket["enforcement_gap"] = "NEUTRAL"
+
     unit_group_ranking = sorted(
         group_agg.values(),
         key=lambda b: (-b["tickets_excl_crash"], b["crashes_total"]),
