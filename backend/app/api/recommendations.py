@@ -482,17 +482,24 @@ async def get_accident_hotspots(
         a1 = a1 or 0
         a2 = a2 or 0
         a3 = a3 or 0
-        dui_crashes = dui_crashes or 0
+        dui_crashes = dui_crashes or 0  # Crash.suspected_alcohol 來源（保留作為對照，已知低估）
         a1_total += a1
         a2_total += a2
         a3_total += a3
-        dui_crash_total += dui_crashes
+        # dui_crash_total 改用 Ticket 攔舉-肇事真實計數，於下方計算後累加
         death_grand_total += deaths or 0
         injury_grand_total += injuries or 0
         
         violation_stats = db.query(
             func.count(Ticket.id).label('total_violations'),
             func.sum(case((Ticket.topic_dui == True, 1), else_=0)).label('dui'),
+            # 酒駕肇事舉發（真實酒駕肇事計數—事故表 A1/A2/A3 常被避免填寫，舉發單則強制填寫）
+            func.sum(
+                case(
+                    ((Ticket.topic_dui == True) & (Ticket.enforcement_subtype == '攔舉-肇事'), 1),
+                    else_=0,
+                )
+            ).label('dui_crash_derived'),
             func.sum(case((Ticket.topic_red_light == True, 1), else_=0)).label('red_light'),
             func.sum(case((Ticket.topic_dangerous == True, 1), else_=0)).label('dangerous')
         ).filter(
@@ -500,19 +507,25 @@ async def get_accident_hotspots(
             Ticket.violation_date <= end_date,
             Ticket.district.in_(district_variants)  # 匹配兩種格式
         ).first()
-        
+
+        # 真實酒駕肇事 = 攔舉-肇事 件數（覆寫 Crash 表的 dui_crashes，因 Crash.suspected_alcohol 系統性低估）
+        dui_crash_real = int(violation_stats.dui_crash_derived or 0)
+        dui_total_for_district = int(violation_stats.dui or 0)
+        dui_no_crash_real = max(0, dui_total_for_district - dui_crash_real)
+        dui_crash_total += dui_crash_real  # 全縣加總用真實計數
+
         violation_counts = {
-            'DUI': violation_stats.dui or 0,
+            'DUI': dui_total_for_district,
             'RED_LIGHT': violation_stats.red_light or 0,
             'DANGEROUS_DRIVING': violation_stats.dangerous or 0
         }
         priority_topic = max(violation_counts, key=violation_counts.get) if any(violation_counts.values()) else None
-        
+
         coords = DISTRICT_COORDINATES.get(normalized_district, DISTRICT_COORDINATES.get(district, DEFAULT_COORDS))
         enforcement_focus = "需要更多數據分析"
         if priority_topic:
             enforcement_focus = f"建議加強{TOPIC_NAMES.get(priority_topic, '')}取締"
-        
+
         hotspots.append({
             'district': normalized_district,  # 省略「市」前綴
             'latitude': coords[0],
@@ -528,15 +541,16 @@ async def get_accident_hotspots(
             },
             'violations': {
                 'total': violation_stats.total_violations or 0,
-                'dui': violation_stats.dui or 0,
-                'dui_no_crash': (violation_stats.dui or 0) - dui_crashes,  # 酒駕無肇事
+                'dui': dui_total_for_district,
+                'dui_no_crash': dui_no_crash_real,  # 酒駕無肇事 = 總酒駕 − 攔舉-肇事
                 'red_light': violation_stats.red_light or 0,
                 'dangerous_driving': violation_stats.dangerous or 0
             },
             'dui_stats': {
-                'total_dui': violation_stats.dui or 0,
-                'dui_with_crash': dui_crashes,  # 酒駕有肇事
-                'dui_no_crash': max(0, (violation_stats.dui or 0) - dui_crashes)  # 酒駕無肇事告發
+                'total_dui': dui_total_for_district,
+                'dui_with_crash': dui_crash_real,  # 酒駕有肇事（資料源：攔舉-肇事舉發）
+                'dui_no_crash': dui_no_crash_real,  # 酒駕無肇事
+                'dui_crash_source': 'ticket_subtype',  # 標明資料來源
             },
             'recommendation': {
                 'priority_topic': priority_topic,
