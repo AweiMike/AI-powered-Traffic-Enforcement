@@ -293,10 +293,16 @@ const AccidentAnalysisPage: React.FC = () => {
                 </div>
             )}
 
-            {/* 酒駕分析分頁 */}
+            {/* 酒駕分析分頁 — 純酒駕指標（與其他原因事故無關） */}
             {activeTab === 'dui' && (
                 <div className="space-y-6">
-                    {/* 酒駕統計概要 - 肇事為主，績效為輔 */}
+                    {/* 資料來源說明 */}
+                    <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 text-xs text-sky-800">
+                        ℹ️ 本專區僅分析<strong>酒駕</strong>相關案件，與其他事故原因無關。
+                        酒駕肇事數來源為<strong>舉發單「攔舉-肇事」子類</strong>（強制填寫，比事故表 A1/A2/A3 可靠）。
+                    </div>
+
+                    {/* 酒駕統計概要 - 純 DUI 指標 */}
                     <div className="grid grid-cols-5 gap-4">
                         {/* 核心：酒駕肇事 */}
                         <div className="bg-red-50 rounded-2xl p-4 nook-shadow text-center border-l-4 border-red-600">
@@ -306,12 +312,17 @@ const AccidentAnalysisPage: React.FC = () => {
                             <p className="text-sm text-red-600 font-medium">🚨 酒駕肇事</p>
                             <p className="text-xs text-red-400">（核心：降低事故）</p>
                         </div>
-                        {/* A1 死亡 */}
+                        {/* 酒駕肇事率（取代原 A1 死亡卡）*/}
                         <div className="bg-orange-50 rounded-2xl p-4 nook-shadow text-center border-l-4 border-orange-500">
                             <p className="text-3xl font-bold text-orange-600">
-                                {hotspots?.summary?.a1_total || 0}
+                                {(() => {
+                                    const total = hotspots?.summary?.total_dui_violations || 0;
+                                    const crash = hotspots?.summary?.dui_crash_total || 0;
+                                    return total > 0 ? `${((crash / total) * 100).toFixed(1)}%` : '—';
+                                })()}
                             </p>
-                            <p className="text-sm text-orange-500">A1 死亡事故</p>
+                            <p className="text-sm text-orange-500">📈 酒駕肇事率</p>
+                            <p className="text-xs text-orange-400">肇事 ÷ 總取締</p>
                         </div>
                         {/* 輔助：酒駕無肇事 */}
                         <div className="bg-amber-50 rounded-2xl p-4 nook-shadow text-center border-l-4 border-amber-400">
@@ -367,15 +378,15 @@ const AccidentAnalysisPage: React.FC = () => {
                                             <div className="grid grid-cols-3 gap-2 text-center text-xs">
                                                 <div className="bg-amber-50 rounded-lg p-2">
                                                     <p className="font-bold text-lg text-amber-700">{hotspot.violations?.dui || 0}</p>
-                                                    <p className="text-amber-600">酒駕</p>
+                                                    <p className="text-amber-600">酒駕總取締</p>
                                                 </div>
                                                 <div className="bg-red-50 rounded-lg p-2">
-                                                    <p className="font-bold text-lg text-red-600">{hotspot.accidents?.total || 0}</p>
-                                                    <p className="text-red-500">事故</p>
+                                                    <p className="font-bold text-lg text-red-600">{hotspot.dui_stats?.dui_with_crash ?? 0}</p>
+                                                    <p className="text-red-500">酒駕肇事</p>
                                                 </div>
-                                                <div className="bg-gray-50 rounded-lg p-2">
-                                                    <p className="font-bold text-lg text-gray-700">{hotspot.accidents?.a1_count || 0}</p>
-                                                    <p className="text-gray-500">A1</p>
+                                                <div className="bg-emerald-50 rounded-lg p-2">
+                                                    <p className="font-bold text-lg text-emerald-700">{hotspot.dui_stats?.dui_no_crash ?? 0}</p>
+                                                    <p className="text-emerald-600">無肇事</p>
                                                 </div>
                                             </div>
                                         </div>

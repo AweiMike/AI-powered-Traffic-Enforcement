@@ -269,8 +269,16 @@ export interface AccidentHotspot {
   violations: {
     total: number;
     dui: number;
+    dui_no_crash?: number;
     red_light: number;
     dangerous_driving: number;
+  };
+  /** DUI 專屬統計（資料來源：Ticket.enforcement_subtype，比 Crash.suspected_alcohol 可靠） */
+  dui_stats?: {
+    total_dui: number;
+    dui_with_crash: number;
+    dui_no_crash: number;
+    dui_crash_source?: string;
   };
   recommendation: {
     priority_topic: TopicCode | null;
