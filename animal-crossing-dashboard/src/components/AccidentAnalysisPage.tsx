@@ -417,8 +417,8 @@ const AccidentAnalysisPage: React.FC = () => {
                                             無肇事告發
                                         </span>
                                         <span className="flex items-center gap-1">
-                                            <span className="inline-block w-3 h-3 rounded bg-red-900"></span>
-                                            <strong className="text-red-900">含肇事</strong>
+                                            <span className="inline-block w-3 h-3 rounded bg-slate-900"></span>
+                                            <strong className="text-slate-900">含肇事</strong>
                                         </span>
                                         <span className="ml-auto text-nook-text/40">資料源：舉發單</span>
                                     </div>
@@ -443,7 +443,7 @@ const AccidentAnalysisPage: React.FC = () => {
                                                     <div
                                                         key={shift.shift_id}
                                                         className={`p-2 rounded-lg ${
-                                                            hasCrash ? 'bg-red-100 border-2 border-red-400 ring-1 ring-red-200' :
+                                                            hasCrash ? 'bg-slate-100 border-2 border-slate-400' :
                                                             isRecommended ? 'bg-red-50 border border-red-200' :
                                                             'bg-gray-50'
                                                         }`}
@@ -453,7 +453,7 @@ const AccidentAnalysisPage: React.FC = () => {
                                                                 {shift.time_range}
                                                                 {isNight && <span className="ml-2 text-purple-500">🌙</span>}
                                                                 {hasCrash && (
-                                                                    <span className="ml-2 text-xs bg-red-900 text-white px-1.5 py-0.5 rounded font-bold">
+                                                                    <span className="ml-2 text-xs bg-slate-900 text-white px-1.5 py-0.5 rounded font-bold">
                                                                         🚨 肇事 {crashCount}
                                                                     </span>
                                                                 )}
@@ -464,7 +464,7 @@ const AccidentAnalysisPage: React.FC = () => {
                                                             <span className={`text-xs font-bold ${duiCount > 0 ? 'text-red-600' : 'text-gray-400'}`}>
                                                                 {duiCount} 件
                                                                 {hasCrash && (
-                                                                    <span className="text-[10px] text-red-900 ml-1">
+                                                                    <span className="text-[10px] text-slate-900 ml-1">
                                                                         （含肇事 {crashCount}）
                                                                     </span>
                                                                 )}
@@ -473,7 +473,7 @@ const AccidentAnalysisPage: React.FC = () => {
                                                         {/* 雙色堆疊條形圖：左段為含肇事(深紅)、右段為無肇事(淡紅) */}
                                                         <div className="h-3 bg-gray-200 rounded-full overflow-hidden flex">
                                                             <div
-                                                                className="h-full bg-red-900 transition-all"
+                                                                className="h-full bg-slate-900 transition-all"
                                                                 style={{ width: `${crashWidth}%` }}
                                                                 title={`含肇事 ${crashCount} 件`}
                                                             />
@@ -490,7 +490,7 @@ const AccidentAnalysisPage: React.FC = () => {
                                     <div className="mt-4 p-3 bg-red-50 rounded-lg border border-red-200 text-xs">
                                         <p className="font-bold text-red-800 mb-1">📊 分析洞察</p>
                                         <ul className="list-disc pl-4 space-y-1 text-red-700/80">
-                                            <li><span className="bg-red-900 text-white px-1 rounded">深紅段</span> 為「攔舉-肇事」舉發數，代表<strong>該時段確實發生酒駕事故</strong>。</li>
+                                            <li><span className="bg-slate-900 text-white px-1 rounded">深紅段</span> 為「攔舉-肇事」舉發數，代表<strong>該時段確實發生酒駕事故</strong>。</li>
                                             <li><span className="bg-red-100 px-1 rounded text-red-600">重點時段</span> 為建議加強攔檢時間 (20:00-04:00)。</li>
                                             <li>若重點時段告發數低、肇事數卻高 → <strong>明顯執法缺口</strong>。</li>
                                         </ul>
