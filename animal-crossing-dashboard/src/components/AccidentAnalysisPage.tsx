@@ -409,7 +409,19 @@ const AccidentAnalysisPage: React.FC = () => {
                             </div>
                             {selectedDistrict && peakTimes ? (
                                 <div className="bg-white/80 rounded-2xl p-4 nook-shadow">
-                                    <h5 className="font-bold text-nook-text mb-4">{peakTimes.district} 酒駕告發時段分布</h5>
+                                    <h5 className="font-bold text-nook-text mb-2">{peakTimes.district} 酒駕告發時段分布</h5>
+                                    {/* 圖例 */}
+                                    <div className="flex items-center gap-4 mb-3 text-[11px] text-nook-text/70">
+                                        <span className="flex items-center gap-1">
+                                            <span className="inline-block w-3 h-3 rounded bg-gradient-to-r from-red-400 to-red-600"></span>
+                                            無肇事告發
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                            <span className="inline-block w-3 h-3 rounded bg-red-900"></span>
+                                            <strong className="text-red-900">含肇事</strong>
+                                        </span>
+                                        <span className="ml-auto text-nook-text/40">資料源：舉發單</span>
+                                    </div>
                                     <div className="space-y-2">
                                         {peakTimes.shifts
                                             // 只顯示有酒駕告發的時段，或如果該時段是建議時段也顯示
@@ -417,27 +429,58 @@ const AccidentAnalysisPage: React.FC = () => {
                                             .sort((a, b) => parseInt(a.shift_id) < 5 ? parseInt(a.shift_id) + 24 : parseInt(a.shift_id) - (parseInt(b.shift_id) < 5 ? parseInt(b.shift_id) + 24 : parseInt(b.shift_id)))
                                             .map((shift) => {
                                                 const duiCount = shift.dui_citations || 0;
+                                                const crashCount = shift.dui_crash_citations || 0;
+                                                const noCrashCount = Math.max(0, duiCount - crashCount);
                                                 const maxV = Math.max(...peakTimes.shifts.map(s => s.dui_citations || 0)) || 1;
-                                                const width = (duiCount / maxV) * 100;
+                                                const totalWidth = (duiCount / maxV) * 100;
+                                                const crashWidth = duiCount > 0 ? (crashCount / duiCount) * totalWidth : 0;
+                                                const noCrashWidth = totalWidth - crashWidth;
                                                 const isNight = ['10', '11', '12', '01', '02', '03'].includes(shift.shift_id);
                                                 const isRecommended = ['11', '12', '01', '02'].includes(shift.shift_id); // 20-04 建議時段
+                                                const hasCrash = crashCount > 0;
 
                                                 return (
-                                                    <div key={shift.shift_id} className={`p-2 rounded-lg ${isRecommended ? 'bg-red-50 border border-red-200' : 'bg-gray-50'}`}>
+                                                    <div
+                                                        key={shift.shift_id}
+                                                        className={`p-2 rounded-lg ${
+                                                            hasCrash ? 'bg-red-100 border-2 border-red-400 ring-1 ring-red-200' :
+                                                            isRecommended ? 'bg-red-50 border border-red-200' :
+                                                            'bg-gray-50'
+                                                        }`}
+                                                    >
                                                         <div className="flex justify-between items-center mb-1">
                                                             <span className="text-xs font-medium text-nook-text flex items-center">
                                                                 {shift.time_range}
                                                                 {isNight && <span className="ml-2 text-purple-500">🌙</span>}
-                                                                {isRecommended && <span className="ml-2 text-xs bg-red-100 text-red-600 px-1 rounded">重點時段</span>}
+                                                                {hasCrash && (
+                                                                    <span className="ml-2 text-xs bg-red-900 text-white px-1.5 py-0.5 rounded font-bold">
+                                                                        🚨 肇事 {crashCount}
+                                                                    </span>
+                                                                )}
+                                                                {isRecommended && !hasCrash && (
+                                                                    <span className="ml-2 text-xs bg-red-100 text-red-600 px-1 rounded">重點時段</span>
+                                                                )}
                                                             </span>
                                                             <span className={`text-xs font-bold ${duiCount > 0 ? 'text-red-600' : 'text-gray-400'}`}>
                                                                 {duiCount} 件
+                                                                {hasCrash && (
+                                                                    <span className="text-[10px] text-red-900 ml-1">
+                                                                        （含肇事 {crashCount}）
+                                                                    </span>
+                                                                )}
                                                             </span>
                                                         </div>
-                                                        <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                                                        {/* 雙色堆疊條形圖：左段為含肇事(深紅)、右段為無肇事(淡紅) */}
+                                                        <div className="h-3 bg-gray-200 rounded-full overflow-hidden flex">
                                                             <div
-                                                                className={`h-full rounded-full transition-all ${duiCount > 0 ? 'bg-gradient-to-r from-red-400 to-red-600' : 'bg-transparent'}`}
-                                                                style={{ width: `${width}%` }}
+                                                                className="h-full bg-red-900 transition-all"
+                                                                style={{ width: `${crashWidth}%` }}
+                                                                title={`含肇事 ${crashCount} 件`}
+                                                            />
+                                                            <div
+                                                                className="h-full bg-gradient-to-r from-red-400 to-red-600 transition-all"
+                                                                style={{ width: `${noCrashWidth}%` }}
+                                                                title={`無肇事 ${noCrashCount} 件`}
                                                             />
                                                         </div>
                                                     </div>
@@ -447,9 +490,9 @@ const AccidentAnalysisPage: React.FC = () => {
                                     <div className="mt-4 p-3 bg-red-50 rounded-lg border border-red-200 text-xs">
                                         <p className="font-bold text-red-800 mb-1">📊 分析洞察</p>
                                         <ul className="list-disc pl-4 space-y-1 text-red-700/80">
+                                            <li><span className="bg-red-900 text-white px-1 rounded">深紅段</span> 為「攔舉-肇事」舉發數，代表<strong>該時段確實發生酒駕事故</strong>。</li>
                                             <li><span className="bg-red-100 px-1 rounded text-red-600">重點時段</span> 為建議加強攔檢時間 (20:00-04:00)。</li>
-                                            <li>柱狀圖顯示實際「酒駕告發」數量。</li>
-                                            <li>若重點時段告發數低，可能有執法缺口。</li>
+                                            <li>若重點時段告發數低、肇事數卻高 → <strong>明顯執法缺口</strong>。</li>
                                         </ul>
                                     </div>
                                 </div>

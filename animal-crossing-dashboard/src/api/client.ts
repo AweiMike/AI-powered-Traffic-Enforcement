@@ -315,6 +315,8 @@ export interface ShiftData {
   violations: number;
   combined_score: number;
   dui_citations?: number;
+  /** 含肇事的酒駕舉發數（攔舉-肇事 子類）— 真實酒駕肇事的可靠指標 */
+  dui_crash_citations?: number;
 }
 
 export interface PeakTimesResponse {

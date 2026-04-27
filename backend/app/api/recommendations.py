@@ -642,22 +642,37 @@ async def get_accident_peak_times(
         Ticket.district.in_(district_variants),
         Ticket.topic_dui == True
     ).group_by(Ticket.shift_id).all()
-    
+
+    # 酒駕肇事舉發（攔舉-肇事 子類）— 真實酒駕肇事的可靠來源
+    dui_crash_by_shift = db.query(
+        Ticket.shift_id,
+        func.count(Ticket.id).label('count')
+    ).filter(
+        Ticket.violation_date >= start_date,
+        Ticket.violation_date <= end_date,
+        Ticket.district.in_(district_variants),
+        Ticket.topic_dui == True,
+        Ticket.enforcement_subtype == '攔舉-肇事',
+    ).group_by(Ticket.shift_id).all()
+
     crash_dict = {s.shift_id: s.count for s in crash_by_shift}
     violation_dict = {s.shift_id: s.count for s in violation_by_shift}
     dui_dict = {s.shift_id: s.count for s in dui_by_shift}
-    
+    dui_crash_dict = {s.shift_id: s.count for s in dui_crash_by_shift}
+
     shifts = []
     for shift_id in sorted(shift_names.keys()):
         accidents = crash_dict.get(shift_id, 0)
         violations = violation_dict.get(shift_id, 0)
         dui_citations = dui_dict.get(shift_id, 0)
+        dui_crash_citations = dui_crash_dict.get(shift_id, 0)
         shifts.append({
             'shift_id': shift_id,
             'time_range': shift_names[shift_id],
             'accidents': accidents,
             'violations': violations,
-            'dui_citations': dui_citations
+            'dui_citations': dui_citations,
+            'dui_crash_citations': dui_crash_citations,  # 含肇事的酒駕舉發數
         })
     
     peak_shifts = sorted(shifts, key=lambda x: x['accidents'], reverse=True)[:3]
