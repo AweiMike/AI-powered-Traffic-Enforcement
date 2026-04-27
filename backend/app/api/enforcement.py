@@ -264,12 +264,13 @@ async def get_dui_performance(
         bucket["crashes_total"] = bucket["a1_crashes"] + bucket["a2_crashes"] + bucket["a3_crashes"]
 
         # 酒駕肇事率：以舉發單「攔舉-肇事」/ 總取締（比 Crash.A1A2A3 可靠，因事故表常被避免填寫嚴重度）
-        total = bucket["tickets_total"]
+        # ⚠️ 此處用 group_total 而非 total，避免覆寫外層的 total 合計 dict
+        group_total = bucket["tickets_total"]
         bucket["dui_crash_rate"] = (
-            bucket["tickets_crash_derived"] / total if total > 0 else 0.0
+            bucket["tickets_crash_derived"] / group_total if group_total > 0 else 0.0
         )
         bucket["proactive_rate"] = (
-            bucket["tickets_proactive"] / total if total > 0 else 0.0
+            bucket["tickets_proactive"] / group_total if group_total > 0 else 0.0
         )
 
         # 執法缺口判定：
@@ -277,7 +278,7 @@ async def get_dui_performance(
         # - LOW  (無缺口):  主動率 ≥ 70% 且 肇事率 < 15% → 路檢有效
         # - INSUFFICIENT_DATA: 總取締 < 5 件，量太少不判斷
         # - NEUTRAL: 其他狀況
-        if total < 5:
+        if group_total < 5:
             bucket["enforcement_gap"] = "INSUFFICIENT_DATA"
         elif bucket["dui_crash_rate"] >= 0.30 and bucket["proactive_rate"] < 0.50:
             bucket["enforcement_gap"] = "HIGH"
