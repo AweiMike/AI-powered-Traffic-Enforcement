@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Wine, TrendingUp, TrendingDown, Minus, AlertTriangle, Shield } from 'lucide-react';
+import { Wine, TrendingUp, TrendingDown, Minus, AlertTriangle, Shield, Trophy } from 'lucide-react';
 import DateRangePicker, { type DateRange } from './DateRangePicker';
 import { apiClient } from '../api/client';
 
@@ -204,6 +204,60 @@ const DuiPerformancePage: React.FC = () => {
         )}
       </div>
 
+      {/* 管區績效排名（扣除肇事舉發）*/}
+      {data?.unit_group_ranking && data.unit_group_ranking.length > 0 && (
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl nook-shadow overflow-hidden mt-6">
+          <div className="p-4 border-b border-nook-cream/50 flex items-center gap-2">
+            <Trophy className="w-5 h-5 text-yellow-600" />
+            <h3 className="font-bold text-nook-text">管區績效排名（扣除肇事舉發）</h3>
+            <span className="text-xs text-nook-text/50 ml-2">
+              · 主動取締 = 總取締 − 肇事舉發；數字越高代表派出所主動出擊（路檢、酒測站）越積極
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-yellow-50 text-nook-text/80">
+                  <th className="px-4 py-3 text-center font-medium w-16">排名</th>
+                  <th className="px-4 py-3 text-left font-medium">管區（含合併所）</th>
+                  <th className="px-4 py-3 text-right font-medium">主動取締</th>
+                  <th className="px-4 py-3 text-right font-medium">總取締</th>
+                  <th className="px-4 py-3 text-right font-medium">肇事舉發</th>
+                  <th className="px-4 py-3 text-right font-medium">酒駕事故</th>
+                  <th className="px-4 py-3 text-right font-medium">A1 / A2 / A3</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.unit_group_ranking.map((g: any, i: number) => (
+                  <tr key={g.group} className={i % 2 === 0 ? 'bg-white' : 'bg-yellow-50/30'}>
+                    <td className="px-4 py-2.5 text-center">
+                      <RankBadge rank={g.rank} total={data.unit_group_ranking.length} />
+                    </td>
+                    <td className="px-4 py-2.5 font-medium text-nook-text">{g.group}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <span className="text-lg font-bold text-green-700 tabular-nums">{g.tickets_excl_crash}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-sky-800 tabular-nums">{g.tickets_total}</td>
+                    <td className="px-4 py-2.5 text-right text-red-500 tabular-nums">{g.tickets_crash_derived}</td>
+                    <td className="px-4 py-2.5 text-right font-bold text-nook-text tabular-nums">{g.crashes_total}</td>
+                    <td className="px-4 py-2.5 text-right text-xs text-nook-text/60 tabular-nums">
+                      <span className="text-red-600">{g.a1_crashes}</span>
+                      <span className="mx-1">/</span>
+                      <span className="text-orange-600">{g.a2_crashes}</span>
+                      <span className="mx-1">/</span>
+                      <span className="text-amber-600">{g.a3_crashes}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-4 py-3 text-xs text-nook-text/50 border-t border-nook-cream/30">
+            ⚠️ 排名僅看「主動取締」件數；若管區轄區大小差異大，可搭配酒駕事故數一起評估。事故並列時依事故少者為優先。
+          </div>
+        </div>
+      )}
+
       {/* 同期比較說明 */}
       {data && (
         <div className="mt-4 text-xs text-nook-text/40 flex items-center gap-2">
@@ -215,6 +269,23 @@ const DuiPerformancePage: React.FC = () => {
     </div>
   );
 };
+
+/** 排名徽章：第 1 名金、第 2 銀、第 3 銅、最後一名警示 */
+function RankBadge({ rank, total }: { rank: number; total: number }) {
+  if (rank === 1) {
+    return <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-yellow-400 text-yellow-900 font-bold text-sm shadow-sm">🥇</span>;
+  }
+  if (rank === 2) {
+    return <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-300 text-gray-800 font-bold text-sm shadow-sm">🥈</span>;
+  }
+  if (rank === 3) {
+    return <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-orange-300 text-orange-900 font-bold text-sm shadow-sm">🥉</span>;
+  }
+  if (rank === total) {
+    return <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-700 font-bold text-sm">{rank}</span>;
+  }
+  return <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-700 font-bold text-sm">{rank}</span>;
+}
 
 /** 摘要卡片 */
 function SummaryCard({ title, current, prev, icon, color, invertDiff, breakdown }: {

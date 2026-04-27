@@ -15,6 +15,27 @@ from app.models.core import Ticket, Crash
 router = APIRouter()
 
 
+# 4 管區分組規則（與 analytics_engine.STATION_GROUPS 對齊）
+# 用 substring 比對 sub_unit / unit_code，吸收「新化分局」前綴與罕見字寫法（𦰡拔/那拔）
+DUI_STATION_GROUPS = [
+    {"display": "新化派出所（含那拔）", "members": ["新化派出所", "那拔派出所", "𦰡拔派出所"]},
+    {"display": "唪口派出所（含知義）", "members": ["唪口派出所", "知義派出所"]},
+    {"display": "山上分駐所", "members": ["山上分駐所"]},
+    {"display": "左鎮分駐所（含岡林）", "members": ["左鎮分駐所", "岡林派出所"]},
+]
+
+
+def classify_to_group(unit: str) -> Optional[str]:
+    """歸類到 4 管區之一；統籌單位（交通分隊等）回傳 None。"""
+    if not unit:
+        return None
+    for g in DUI_STATION_GROUPS:
+        for m in g["members"]:
+            if m in unit:
+                return g["display"]
+    return None
+
+
 def parse_date(s: Optional[str]) -> Optional[date]:
     """解析 YYYY-MM-DD 字串"""
     if not s:
@@ -205,11 +226,56 @@ async def get_dui_performance(
     }
     total["tickets_diff"] = total["tickets"] - total["tickets_prev"]
 
+    # ----- 管區績效排名（扣除肇事舉發）-----
+    # 將所有派出所歸類到 4 管區，計算「主動取締」= 總取締 − 肇事舉發
+    # 排名依「主動取締」由高到低，反映派出所主動出擊（路檢）的績效
+    group_agg: dict[str, dict] = {
+        g["display"]: {
+            "group": g["display"],
+            "tickets_total": 0,
+            "tickets_proactive": 0,
+            "tickets_crash_derived": 0,
+            "tickets_citizen": 0,
+            "tickets_other": 0,
+            "tickets_excl_crash": 0,  # 扣除肇事的取締（= 總 − 肇事）
+            "a1_crashes": 0, "a2_crashes": 0, "a3_crashes": 0,
+            "crashes_total": 0,
+            "members": [],
+        } for g in DUI_STATION_GROUPS
+    }
+    for r in rows:
+        g = classify_to_group(r["unit"])
+        if g is None:
+            continue
+        bucket = group_agg[g]
+        bucket["members"].append(r["unit"])
+        bd = r["tickets_breakdown"]
+        bucket["tickets_total"] += r["tickets"]
+        bucket["tickets_proactive"] += bd["proactive"]
+        bucket["tickets_crash_derived"] += bd["crash_derived"]
+        bucket["tickets_citizen"] += bd["citizen"]
+        bucket["tickets_other"] += bd["other"]
+        bucket["a1_crashes"] += r["a1_crashes"]
+        bucket["a2_crashes"] += r["a2_crashes"]
+        bucket["a3_crashes"] += r["a3_crashes"]
+
+    for bucket in group_agg.values():
+        bucket["tickets_excl_crash"] = bucket["tickets_total"] - bucket["tickets_crash_derived"]
+        bucket["crashes_total"] = bucket["a1_crashes"] + bucket["a2_crashes"] + bucket["a3_crashes"]
+
+    unit_group_ranking = sorted(
+        group_agg.values(),
+        key=lambda b: (-b["tickets_excl_crash"], b["crashes_total"]),
+    )
+    for idx, b in enumerate(unit_group_ranking, start=1):
+        b["rank"] = idx
+
     return {
         "period": {"start_date": start_date, "end_date": end_date},
         "compare_period": {"start_date": cmp_sd.isoformat(), "end_date": cmp_ed.isoformat()},
         "rows": rows,
         "total": total,
+        "unit_group_ranking": unit_group_ranking,
     }
 
 
