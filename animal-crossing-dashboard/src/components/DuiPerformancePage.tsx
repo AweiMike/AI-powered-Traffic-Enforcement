@@ -1,6 +1,6 @@
 /**
  * DuiPerformancePage - 酒後駕車防制成效
- * 各派出所取締件數 + A1/A2/A3 事故數 + 去年同期比較
+ * 各派出所取締件數（含主動/肇事/民檢/其他細分）+ A1/A2/A3 事故數 + 去年同期比較
  */
 
 import React, { useState, useEffect } from 'react';
@@ -19,6 +19,37 @@ function DiffBadge({ value }: { value: number }) {
   if (value > 0) return <span className="inline-flex items-center gap-0.5 text-red-600 text-xs font-bold"><TrendingUp className="w-3 h-3"/>+{value}</span>;
   if (value < 0) return <span className="inline-flex items-center gap-0.5 text-green-600 text-xs font-bold"><TrendingDown className="w-3 h-3"/>{value}</span>;
   return <span className="inline-flex items-center gap-0.5 text-gray-400 text-xs"><Minus className="w-3 h-3"/>0</span>;
+}
+
+interface TicketBreakdown {
+  proactive: number;
+  crash_derived: number;
+  citizen: number;
+  other: number;
+}
+
+/** 取締件數細分小字：主動/肇事/民檢/其他
+ *  - 主動 (攔舉-一般)：值得鼓勵的主動出擊
+ *  - 肇事 (攔舉-肇事)：肇事後酒測，被動
+ *  - 民檢 (逕舉_民眾檢舉)：民眾通報
+ */
+function TicketBreakdownLine({ breakdown, align = 'right' }: { breakdown?: TicketBreakdown; align?: 'right' | 'left' }) {
+  if (!breakdown) return null;
+  const items = [
+    { label: '主動', value: breakdown.proactive, color: 'text-green-700' },
+    { label: '肇事', value: breakdown.crash_derived, color: 'text-red-500' },
+    { label: '民檢', value: breakdown.citizen, color: 'text-gray-500' },
+    { label: '其他', value: breakdown.other, color: 'text-gray-400' },
+  ];
+  return (
+    <div className={`mt-0.5 text-[10px] flex gap-1.5 ${align === 'right' ? 'justify-end' : ''}`}>
+      {items.map((it) => (
+        <span key={it.label} className={it.color}>
+          {it.label}<span className="ml-0.5 font-semibold tabular-nums">{it.value}</span>
+        </span>
+      ))}
+    </div>
+  );
 }
 
 const DuiPerformancePage: React.FC = () => {
@@ -65,12 +96,14 @@ const DuiPerformancePage: React.FC = () => {
             prev={data.total.tickets_prev}
             icon={<Shield className="w-5 h-5 text-sky-700" />}
             color="purple"
+            breakdown={data.total.tickets_breakdown}
           />
           <SummaryCard
             title="去年同期取締"
             current={data.total.tickets_prev}
             icon={<Shield className="w-5 h-5 text-gray-500" />}
             color="gray"
+            breakdown={data.total.tickets_prev_breakdown}
           />
           <SummaryCard
             title="A1 酒駕事故"
@@ -127,8 +160,14 @@ const DuiPerformancePage: React.FC = () => {
                 {data.rows.map((row: any, i: number) => (
                   <tr key={row.unit} className={i % 2 === 0 ? 'bg-white' : 'bg-sky-50/30'}>
                     <td className="px-4 py-2.5 font-medium text-nook-text">{row.unit}</td>
-                    <td className="px-4 py-2.5 text-right font-bold text-sky-800">{row.tickets}</td>
-                    <td className="px-4 py-2.5 text-right text-nook-text/60">{row.tickets_prev}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <div className="font-bold text-sky-800">{row.tickets}</div>
+                      <TicketBreakdownLine breakdown={row.tickets_breakdown} />
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <div className="text-nook-text/60">{row.tickets_prev}</div>
+                      <TicketBreakdownLine breakdown={row.tickets_prev_breakdown} />
+                    </td>
                     <td className="px-4 py-2.5 text-right"><DiffBadge value={row.tickets_diff} /></td>
                     <td className="px-4 py-2.5 text-right font-bold text-red-600">{row.a1_crashes}</td>
                     <td className="px-4 py-2.5 text-right text-nook-text/60">{row.a1_crashes_prev}</td>
@@ -141,8 +180,14 @@ const DuiPerformancePage: React.FC = () => {
                 {/* 合計列 */}
                 <tr className="bg-sky-100 font-bold border-t-2 border-sky-300">
                   <td className="px-4 py-3 text-nook-text">合計</td>
-                  <td className="px-4 py-3 text-right text-sky-800">{data.total.tickets}</td>
-                  <td className="px-4 py-3 text-right text-nook-text/60">{data.total.tickets_prev}</td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="text-sky-800">{data.total.tickets}</div>
+                    <TicketBreakdownLine breakdown={data.total.tickets_breakdown} />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="text-nook-text/60">{data.total.tickets_prev}</div>
+                    <TicketBreakdownLine breakdown={data.total.tickets_prev_breakdown} />
+                  </td>
                   <td className="px-4 py-3 text-right"><DiffBadge value={data.total.tickets_diff} /></td>
                   <td className="px-4 py-3 text-right text-red-600">{data.total.a1_crashes}</td>
                   <td className="px-4 py-3 text-right text-nook-text/60">{data.total.a1_crashes_prev}</td>
@@ -172,13 +217,14 @@ const DuiPerformancePage: React.FC = () => {
 };
 
 /** 摘要卡片 */
-function SummaryCard({ title, current, prev, icon, color, invertDiff }: {
+function SummaryCard({ title, current, prev, icon, color, invertDiff, breakdown }: {
   title: string;
   current: number;
   prev?: number;
   icon: React.ReactNode;
   color: string;
   invertDiff?: boolean;
+  breakdown?: TicketBreakdown;
 }) {
   const diff = prev !== undefined ? current - prev : undefined;
   const colorMap: Record<string, string> = {
@@ -195,6 +241,7 @@ function SummaryCard({ title, current, prev, icon, color, invertDiff }: {
         {icon}
       </div>
       <div className="text-2xl font-bold text-nook-text">{current}</div>
+      {breakdown && <TicketBreakdownLine breakdown={breakdown} align="left" />}
       {diff !== undefined && (
         <div className="mt-1">
           {invertDiff ? (
