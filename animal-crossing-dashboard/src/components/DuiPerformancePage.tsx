@@ -28,14 +28,28 @@ interface TicketBreakdown {
   other: number;
 }
 
-/** 取締件數細分小字：主動/肇事/民檢/其他
+/** 取締件數細分小字：主動/肇事/民檢/慢車
  *  - 主動 (攔舉-一般)：值得鼓勵的主動出擊
  *  - 肇事 (攔舉-肇事 + violation_name 關鍵字 UNION)：含肇事的酒駕舉發
  *  - 民檢 (逕舉_民眾檢舉)：民眾通報
+ *  - 慢車 (攔舉-慢行攤 + 其他逕舉)：微電車/腳踏車類酒駕
  *
- *  prevBreakdown 提供時，肇事項目額外顯示 vs 去年同期的增減
- *  （肇事增加=紅色警示、減少=綠色，與一般取締邏輯相反）
+ *  每項在 prevBreakdown 提供時都會顯示 vs 去年同期的增減箭頭。
+ *  語意：肇事 增加=壞(紅) / 減少=好(綠)；其餘取締量 增加=好(綠) / 減少=壞(紅)
  */
+function DiffArrow({ diff, invert = false, size = 'xs' }: {
+  diff: number;
+  invert?: boolean;  // true 表示「增加=壞」（如肇事）
+  size?: 'xs' | 'sm';
+}) {
+  const cls = size === 'sm' ? 'text-sm font-bold' : 'text-[10px] font-bold';
+  if (diff === 0) return <span className={`${cls} text-gray-400 ml-0.5`}>±0</span>;
+  const isBad = invert ? diff > 0 : diff < 0;
+  const color = isBad ? 'text-red-700' : 'text-emerald-700';
+  const sign = diff > 0 ? `↑+${diff}` : `↓${diff}`;
+  return <span className={`${cls} ${color} ml-0.5 tabular-nums`}>{sign}</span>;
+}
+
 function TicketBreakdownLine({
   breakdown, prevBreakdown, align = 'right'
 }: {
@@ -44,28 +58,18 @@ function TicketBreakdownLine({
   align?: 'right' | 'left';
 }) {
   if (!breakdown) return null;
-  const items = [
-    { label: '主動', value: breakdown.proactive, color: 'text-green-700' },
-    { label: '肇事', value: breakdown.crash_derived, color: 'text-red-500', isCrash: true },
-    { label: '民檢', value: breakdown.citizen, color: 'text-gray-500' },
-    { label: '其他', value: breakdown.other, color: 'text-gray-400' },
+  const items: { label: string; value: number; prev: number; color: string; invert: boolean }[] = [
+    { label: '主動', value: breakdown.proactive, prev: prevBreakdown?.proactive ?? 0, color: 'text-green-700', invert: false },
+    { label: '肇事', value: breakdown.crash_derived, prev: prevBreakdown?.crash_derived ?? 0, color: 'text-red-500', invert: true },
+    { label: '民檢', value: breakdown.citizen, prev: prevBreakdown?.citizen ?? 0, color: 'text-gray-500', invert: false },
+    { label: '慢車', value: breakdown.other, prev: prevBreakdown?.other ?? 0, color: 'text-gray-400', invert: false },
   ];
-  const crashDiff = prevBreakdown
-    ? breakdown.crash_derived - prevBreakdown.crash_derived
-    : null;
   return (
     <div className={`mt-0.5 text-[10px] flex flex-wrap items-center gap-x-1.5 gap-y-0.5 ${align === 'right' ? 'justify-end' : ''}`}>
       {items.map((it) => (
         <span key={it.label} className={it.color}>
           {it.label}<span className="ml-0.5 font-semibold tabular-nums">{it.value}</span>
-          {it.isCrash && crashDiff !== null && crashDiff !== 0 && (
-            <span className={`ml-0.5 font-bold tabular-nums ${crashDiff > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
-              {crashDiff > 0 ? `↑+${crashDiff}` : `↓${crashDiff}`}
-            </span>
-          )}
-          {it.isCrash && crashDiff === 0 && (
-            <span className="ml-0.5 text-gray-400">±0</span>
-          )}
+          {prevBreakdown && <DiffArrow diff={it.value - it.prev} invert={it.invert} />}
         </span>
       ))}
     </div>
@@ -372,27 +376,13 @@ function SummaryCard({ title, current, prev, icon, color, invertDiff, breakdown,
         <span className="text-sm text-nook-text/70">{title}</span>
         {icon}
       </div>
-      <div className="text-2xl font-bold text-nook-text">{current}</div>
+      <div className="text-2xl font-bold text-nook-text flex items-baseline gap-2">
+        <span>{current}</span>
+        {diff !== undefined && (
+          <DiffArrow diff={diff} invert={!!invertDiff} size="sm" />
+        )}
+      </div>
       {breakdown && <TicketBreakdownLine breakdown={breakdown} prevBreakdown={prevBreakdown} align="left" />}
-      {diff !== undefined && (
-        <div className="mt-1">
-          {invertDiff ? (
-            // 事故：減少是好的
-            diff > 0
-              ? <span className="text-xs text-red-600">較去年增加 {diff}</span>
-              : diff < 0
-              ? <span className="text-xs text-green-600">較去年減少 {Math.abs(diff)}</span>
-              : <span className="text-xs text-gray-500">與去年持平</span>
-          ) : (
-            // 取締：增加是好的
-            diff > 0
-              ? <span className="text-xs text-green-600">較去年增加 {diff}</span>
-              : diff < 0
-              ? <span className="text-xs text-red-600">較去年減少 {Math.abs(diff)}</span>
-              : <span className="text-xs text-gray-500">與去年持平</span>
-          )}
-        </div>
-      )}
     </div>
   );
 }
