@@ -70,3 +70,29 @@ def dui_crash_filter():
         Ticket.enforcement_subtype == '攔舉-肇事',
         *keyword_clauses,
     )
+
+
+def dui_refusal_filter():
+    """SQL expression: True 表示「拒檢/拒測」案件。
+
+    含 2 種樣態（道交§35 第 4 項衍生條款）：
+    - 拒絕接受酒精濃度測試之檢定（已停車但拒絕吹氣）
+    - 行經酒測檢定處不依指示停車接受稽查（直接逃逸）
+
+    包含汽機車與慢車（微電車/腳踏車）的拒檢案件。
+
+    Why:
+    用戶 2026-04-28 指出：酒駕罰則越來越重，預期駕駛逃避酒測案件會增加，
+    應獨立追蹤。實測 226 件 DUI 中有 13 件拒檢（5.7%）。
+
+    這類案件特殊性：
+    - 駕駛規避酒測（很可能本身就是酒駕）
+    - 罰鍰跟拒測同等嚴厲（18 萬 + 吊照 3 年）
+    - 是執法成效的「反指標」（規避成功的潛在酒駕）
+
+    必須與 topic_dui == True 同時使用。
+    """
+    return or_(
+        Ticket.violation_name.like('%拒絕%'),
+        Ticket.violation_name.like('%不依指示停車接受稽查%'),
+    )

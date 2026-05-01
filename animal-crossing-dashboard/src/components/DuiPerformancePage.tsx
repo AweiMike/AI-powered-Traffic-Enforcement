@@ -24,7 +24,10 @@ function DiffBadge({ value }: { value: number }) {
 interface TicketBreakdown {
   proactive: number;
   crash_derived: number;
+  /** 拒檢/拒測案件（§35-IV：拒絕酒測 或 不依指示停車接受稽查） */
+  refusal: number;
   citizen: number;
+  /** 慢車（攔舉-慢行攤 + 其他逕舉子類） */
   other: number;
 }
 
@@ -61,6 +64,7 @@ function TicketBreakdownLine({
   const items: { label: string; value: number; prev: number; color: string; invert: boolean }[] = [
     { label: '主動', value: breakdown.proactive, prev: prevBreakdown?.proactive ?? 0, color: 'text-green-700', invert: false },
     { label: '肇事', value: breakdown.crash_derived, prev: prevBreakdown?.crash_derived ?? 0, color: 'text-red-500', invert: true },
+    { label: '拒檢', value: breakdown.refusal ?? 0, prev: prevBreakdown?.refusal ?? 0, color: 'text-orange-600', invert: true },
     { label: '民檢', value: breakdown.citizen, prev: prevBreakdown?.citizen ?? 0, color: 'text-gray-500', invert: false },
     { label: '慢車', value: breakdown.other, prev: prevBreakdown?.other ?? 0, color: 'text-gray-400', invert: false },
   ];

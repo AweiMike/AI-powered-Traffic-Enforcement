@@ -11,7 +11,7 @@ from datetime import datetime, date
 
 from app.database import get_db
 from app.models.core import Ticket, Crash
-from app.utils.dui_crash import dui_crash_filter
+from app.utils.dui_crash import dui_crash_filter, dui_refusal_filter
 
 router = APIRouter()
 
@@ -102,38 +102,50 @@ async def get_dui_performance(
     cmp_sd = shift_year(sd, -1)
     cmp_ed = shift_year(ed, -1)
 
-    # --- 取締件數（各派出所 × enforcement_subtype × 是否肇事）---
+    # --- 取締件數（各派出所 × enforcement_subtype × 是否肇事 × 是否拒檢）---
     # is_crash 採 UNION 信號：subtype = 攔舉-肇事 OR violation_name 含肇事/致人/重傷 等關鍵字
-    # 用以修復同仁將肇事案件勾選為「攔舉-一般」的黑數（實測 +44%）
+    # is_refusal: violation_name 含「拒絕」或「不依指示停車接受稽查」(§35-IV 系列)
     def query_dui_tickets(s, e):
         is_crash_expr = case((dui_crash_filter(), 1), else_=0)
+        is_refusal_expr = case((dui_refusal_filter(), 1), else_=0)
         return db.query(
             Ticket.unit_code.label("unit"),
             Ticket.enforcement_subtype.label("subtype"),
             is_crash_expr.label("is_crash"),
+            is_refusal_expr.label("is_refusal"),
             func.count(Ticket.id).label("count"),
         ).filter(
             Ticket.violation_date >= s,
             Ticket.violation_date <= e,
             Ticket.topic_dui == True,
-        ).group_by(Ticket.unit_code, Ticket.enforcement_subtype, is_crash_expr).all()
+        ).group_by(
+            Ticket.unit_code, Ticket.enforcement_subtype,
+            is_crash_expr, is_refusal_expr,
+        ).all()
 
     def aggregate_tickets(rows):
-        """依（subtype, is_crash）拆分為 主動/肇事/民檢/其他
+        """5 桶分類：肇事 / 拒檢 / 主動 / 民檢 / 慢車
 
-        判定邏輯：
-        - is_crash = 1 → 一律進「肇事」桶（不論原 subtype 是什麼）
-          這會把 mis-classified 為「攔舉-一般」但 violation_name 含致人/重傷 的案件正確歸位
-        - is_crash = 0 時依原 subtype 分到 主動/民檢/其他
+        優先序（高至低）：
+        1. is_crash=1 → 肇事桶（最嚴重的後果）
+        2. is_refusal=1 → 拒檢桶（規避酒測，§35-IV）
+        3. subtype = '攔舉-一般' → 主動桶
+        4. subtype = '逕舉_民眾檢舉' → 民檢桶
+        5. else → 慢車桶（攔舉-慢行攤 + 其他逕舉子類）
         """
         result = {}
         for r in rows:
             unit = r.unit or "未知"
             if unit not in result:
-                result[unit] = {"total": 0, "proactive": 0, "crash_derived": 0, "citizen": 0, "other": 0}
+                result[unit] = {
+                    "total": 0, "proactive": 0, "crash_derived": 0,
+                    "refusal": 0, "citizen": 0, "other": 0,
+                }
             result[unit]["total"] += r.count
             if r.is_crash == 1:
                 result[unit]["crash_derived"] += r.count
+            elif r.is_refusal == 1:
+                result[unit]["refusal"] += r.count
             else:
                 st = r.subtype or ""
                 if st == "攔舉-一般":
@@ -141,7 +153,7 @@ async def get_dui_performance(
                 elif st == "逕舉_民眾檢舉":
                     result[unit]["citizen"] += r.count
                 else:
-                    # 攔舉-慢行攤、其他逕舉子類等都歸「其他」
+                    # 攔舉-慢行攤、其他逕舉子類等都歸「慢車」
                     result[unit]["other"] += r.count
         return result
 
@@ -179,7 +191,7 @@ async def get_dui_performance(
         list(curr_crashes.keys()) + list(prev_crashes.keys())
     ))
 
-    EMPTY_BREAKDOWN = {"total": 0, "proactive": 0, "crash_derived": 0, "citizen": 0, "other": 0}
+    EMPTY_BREAKDOWN = {"total": 0, "proactive": 0, "crash_derived": 0, "refusal": 0, "citizen": 0, "other": 0}
 
     rows = []
     for unit in all_units:
@@ -197,12 +209,14 @@ async def get_dui_performance(
             "tickets_breakdown": {
                 "proactive": ct["proactive"],
                 "crash_derived": ct["crash_derived"],
+                "refusal": ct["refusal"],
                 "citizen": ct["citizen"],
                 "other": ct["other"],
             },
             "tickets_prev_breakdown": {
                 "proactive": pt["proactive"],
                 "crash_derived": pt["crash_derived"],
+                "refusal": pt["refusal"],
                 "citizen": pt["citizen"],
                 "other": pt["other"],
             },
@@ -221,12 +235,14 @@ async def get_dui_performance(
         "tickets_breakdown": {
             "proactive": sum(r["tickets_breakdown"]["proactive"] for r in rows),
             "crash_derived": sum(r["tickets_breakdown"]["crash_derived"] for r in rows),
+            "refusal": sum(r["tickets_breakdown"]["refusal"] for r in rows),
             "citizen": sum(r["tickets_breakdown"]["citizen"] for r in rows),
             "other": sum(r["tickets_breakdown"]["other"] for r in rows),
         },
         "tickets_prev_breakdown": {
             "proactive": sum(r["tickets_prev_breakdown"]["proactive"] for r in rows),
             "crash_derived": sum(r["tickets_prev_breakdown"]["crash_derived"] for r in rows),
+            "refusal": sum(r["tickets_prev_breakdown"]["refusal"] for r in rows),
             "citizen": sum(r["tickets_prev_breakdown"]["citizen"] for r in rows),
             "other": sum(r["tickets_prev_breakdown"]["other"] for r in rows),
         },
@@ -248,6 +264,7 @@ async def get_dui_performance(
             "tickets_total": 0,
             "tickets_proactive": 0,
             "tickets_crash_derived": 0,
+            "tickets_refusal": 0,
             "tickets_citizen": 0,
             "tickets_other": 0,
             "tickets_excl_crash": 0,  # 扣除肇事的取締（= 總 − 肇事）
@@ -266,6 +283,7 @@ async def get_dui_performance(
         bucket["tickets_total"] += r["tickets"]
         bucket["tickets_proactive"] += bd["proactive"]
         bucket["tickets_crash_derived"] += bd["crash_derived"]
+        bucket["tickets_refusal"] += bd["refusal"]
         bucket["tickets_citizen"] += bd["citizen"]
         bucket["tickets_other"] += bd["other"]
         bucket["a1_crashes"] += r["a1_crashes"]
