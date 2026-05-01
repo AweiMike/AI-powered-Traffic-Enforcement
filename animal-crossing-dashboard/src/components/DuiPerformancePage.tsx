@@ -61,21 +61,52 @@ function TicketBreakdownLine({
   align?: 'right' | 'left';
 }) {
   if (!breakdown) return null;
-  const items: { label: string; value: number; prev: number; color: string; invert: boolean }[] = [
-    { label: '主動', value: breakdown.proactive, prev: prevBreakdown?.proactive ?? 0, color: 'text-green-700', invert: false },
+
+  // 主動 = 一般攔舉 + 拒檢 + 慢車（皆為警方主動出擊取締）
+  // 肇事 = 等事故發生後才舉發（執法缺口指標）
+  // 民檢 = 民眾通報
+  const refusal = breakdown.refusal ?? 0;
+  const proactiveTotal = breakdown.proactive + refusal + breakdown.other;
+  const prevProactiveTotal = prevBreakdown
+    ? prevBreakdown.proactive + (prevBreakdown.refusal ?? 0) + prevBreakdown.other
+    : 0;
+
+  const mainItems: { label: string; value: number; prev: number; color: string; invert: boolean }[] = [
+    { label: '主動', value: proactiveTotal, prev: prevProactiveTotal, color: 'text-green-700', invert: false },
     { label: '肇事', value: breakdown.crash_derived, prev: prevBreakdown?.crash_derived ?? 0, color: 'text-red-500', invert: true },
-    { label: '拒檢', value: breakdown.refusal ?? 0, prev: prevBreakdown?.refusal ?? 0, color: 'text-orange-600', invert: true },
     { label: '民檢', value: breakdown.citizen, prev: prevBreakdown?.citizen ?? 0, color: 'text-gray-500', invert: false },
-    { label: '慢車', value: breakdown.other, prev: prevBreakdown?.other ?? 0, color: 'text-gray-400', invert: false },
   ];
+
+  // 主動內細項（不顯示箭頭，純資訊）
+  const subItems: { label: string; value: number }[] = [
+    { label: '一般', value: breakdown.proactive },
+    { label: '拒檢', value: refusal },
+    { label: '慢車', value: breakdown.other },
+  ].filter(s => s.value > 0);
+
+  const justify = align === 'right' ? 'justify-end' : '';
+
   return (
-    <div className={`mt-0.5 text-[10px] flex flex-wrap items-center gap-x-1.5 gap-y-0.5 ${align === 'right' ? 'justify-end' : ''}`}>
-      {items.map((it) => (
-        <span key={it.label} className={it.color}>
-          {it.label}<span className="ml-0.5 font-semibold tabular-nums">{it.value}</span>
-          {prevBreakdown && <DiffArrow diff={it.value - it.prev} invert={it.invert} />}
-        </span>
-      ))}
+    <div className="mt-0.5 space-y-0.5">
+      <div className={`text-[10px] flex flex-wrap items-center gap-x-1.5 gap-y-0.5 ${justify}`}>
+        {mainItems.map((it) => (
+          <span key={it.label} className={it.color}>
+            {it.label}<span className="ml-0.5 font-semibold tabular-nums">{it.value}</span>
+            {prevBreakdown && <DiffArrow diff={it.value - it.prev} invert={it.invert} />}
+          </span>
+        ))}
+      </div>
+      {subItems.length > 0 && proactiveTotal > 0 && (
+        <div className={`text-[9px] text-nook-text/40 flex flex-wrap items-center gap-x-1 gap-y-0.5 ${justify}`}>
+          <span>主動內</span>
+          {subItems.map((s, i) => (
+            <span key={s.label}>
+              {i > 0 && <span className="mx-0.5">·</span>}
+              {s.label} <span className="font-semibold tabular-nums">{s.value}</span>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
