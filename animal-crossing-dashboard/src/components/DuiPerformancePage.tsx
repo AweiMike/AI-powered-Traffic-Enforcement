@@ -21,6 +21,37 @@ function DiffBadge({ value }: { value: number }) {
   return <span className="inline-flex items-center gap-0.5 text-gray-400 text-xs"><Minus className="w-3 h-3"/>0</span>;
 }
 
+/** 增減顯示：上方主動取締、下方肇事，分別與去年同期比較
+ *  主動 invert=false（增加=綠=好）；肇事 invert=true（增加=紅=壞）
+ */
+function ProactiveVsCrashDiff({
+  breakdown, prevBreakdown,
+}: {
+  breakdown?: TicketBreakdown;
+  prevBreakdown?: TicketBreakdown;
+}) {
+  if (!breakdown || !prevBreakdown) return <span className="text-gray-400 text-xs">—</span>;
+  const refusal = breakdown.refusal ?? 0;
+  const prevRefusal = prevBreakdown.refusal ?? 0;
+  const proactiveCur = breakdown.proactive + refusal + breakdown.other;
+  const proactivePrev = prevBreakdown.proactive + prevRefusal + prevBreakdown.other;
+  const proactiveDiff = proactiveCur - proactivePrev;
+  const crashDiff = breakdown.crash_derived - prevBreakdown.crash_derived;
+
+  return (
+    <div className="inline-flex flex-col items-end gap-0.5 text-[11px]">
+      <span className="flex items-center gap-1">
+        <span className="text-green-700/80 font-medium">主動</span>
+        <DiffArrow diff={proactiveDiff} invert={false} />
+      </span>
+      <span className="flex items-center gap-1">
+        <span className="text-red-500/80 font-medium">肇事</span>
+        <DiffArrow diff={crashDiff} invert={true} />
+      </span>
+    </div>
+  );
+}
+
 interface TicketBreakdown {
   proactive: number;
   crash_derived: number;
@@ -231,7 +262,12 @@ const DuiPerformancePage: React.FC = () => {
                       <div className="text-nook-text/60">{row.tickets_prev}</div>
                       <TicketBreakdownLine breakdown={row.tickets_prev_breakdown} />
                     </td>
-                    <td className="px-4 py-2.5 text-right"><DiffBadge value={row.tickets_diff} /></td>
+                    <td className="px-4 py-2.5 text-right">
+                      <ProactiveVsCrashDiff
+                        breakdown={row.tickets_breakdown}
+                        prevBreakdown={row.tickets_prev_breakdown}
+                      />
+                    </td>
                     <td className="px-4 py-2.5 text-right font-bold text-red-600">{row.a1_crashes}</td>
                     <td className="px-4 py-2.5 text-right text-nook-text/60">{row.a1_crashes_prev}</td>
                     <td className="px-4 py-2.5 text-right font-bold text-orange-600">{row.a2_crashes}</td>
@@ -254,7 +290,12 @@ const DuiPerformancePage: React.FC = () => {
                     <div className="text-nook-text/60">{data.total.tickets_prev}</div>
                     <TicketBreakdownLine breakdown={data.total.tickets_prev_breakdown} />
                   </td>
-                  <td className="px-4 py-3 text-right"><DiffBadge value={data.total.tickets_diff} /></td>
+                  <td className="px-4 py-3 text-right">
+                    <ProactiveVsCrashDiff
+                      breakdown={data.total.tickets_breakdown}
+                      prevBreakdown={data.total.tickets_prev_breakdown}
+                    />
+                  </td>
                   <td className="px-4 py-3 text-right text-red-600">{data.total.a1_crashes}</td>
                   <td className="px-4 py-3 text-right text-nook-text/60">{data.total.a1_crashes_prev}</td>
                   <td className="px-4 py-3 text-right text-orange-600">{data.total.a2_crashes}</td>
@@ -286,8 +327,8 @@ const DuiPerformancePage: React.FC = () => {
                 <tr className="bg-yellow-50 text-nook-text/80">
                   <th className="px-4 py-3 text-center font-medium w-16">排名</th>
                   <th className="px-4 py-3 text-left font-medium">管區（含合併所）</th>
-                  <th className="px-4 py-3 text-right font-medium">主動取締</th>
                   <th className="px-4 py-3 text-right font-medium">總取締</th>
+                  <th className="px-4 py-3 text-right font-medium">主動取締</th>
                   <th className="px-4 py-3 text-right font-medium">肇事舉發</th>
                   <th className="px-4 py-3 text-right font-medium">酒駕肇事率</th>
                   <th className="px-4 py-3 text-center font-medium">執法缺口</th>
@@ -301,10 +342,10 @@ const DuiPerformancePage: React.FC = () => {
                       <RankBadge rank={g.rank} total={data.unit_group_ranking.length} />
                     </td>
                     <td className="px-4 py-2.5 font-medium text-nook-text">{g.group}</td>
+                    <td className="px-4 py-2.5 text-right text-sky-800 tabular-nums font-semibold">{g.tickets_total}</td>
                     <td className="px-4 py-2.5 text-right">
                       <span className="text-lg font-bold text-green-700 tabular-nums">{g.tickets_excl_crash}</span>
                     </td>
-                    <td className="px-4 py-2.5 text-right text-sky-800 tabular-nums">{g.tickets_total}</td>
                     <td className="px-4 py-2.5 text-right text-red-500 tabular-nums">{g.tickets_crash_derived}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">
                       <CrashRate rate={g.dui_crash_rate} />
