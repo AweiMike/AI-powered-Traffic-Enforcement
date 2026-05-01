@@ -11,6 +11,7 @@ from datetime import datetime, date
 
 from app.database import get_db
 from app.models.core import Ticket, Crash
+from app.utils.dui_crash import dui_crash_filter
 
 router = APIRouter()
 
@@ -101,35 +102,47 @@ async def get_dui_performance(
     cmp_sd = shift_year(sd, -1)
     cmp_ed = shift_year(ed, -1)
 
-    # --- 取締件數（各派出所 × enforcement_subtype）---
+    # --- 取締件數（各派出所 × enforcement_subtype × 是否肇事）---
+    # is_crash 採 UNION 信號：subtype = 攔舉-肇事 OR violation_name 含肇事/致人/重傷 等關鍵字
+    # 用以修復同仁將肇事案件勾選為「攔舉-一般」的黑數（實測 +44%）
     def query_dui_tickets(s, e):
+        is_crash_expr = case((dui_crash_filter(), 1), else_=0)
         return db.query(
             Ticket.unit_code.label("unit"),
             Ticket.enforcement_subtype.label("subtype"),
+            is_crash_expr.label("is_crash"),
             func.count(Ticket.id).label("count"),
         ).filter(
             Ticket.violation_date >= s,
             Ticket.violation_date <= e,
             Ticket.topic_dui == True,
-        ).group_by(Ticket.unit_code, Ticket.enforcement_subtype).all()
+        ).group_by(Ticket.unit_code, Ticket.enforcement_subtype, is_crash_expr).all()
 
     def aggregate_tickets(rows):
-        """依 enforcement_subtype 拆分為 主動/肇事/民檢/其他"""
+        """依（subtype, is_crash）拆分為 主動/肇事/民檢/其他
+
+        判定邏輯：
+        - is_crash = 1 → 一律進「肇事」桶（不論原 subtype 是什麼）
+          這會把 mis-classified 為「攔舉-一般」但 violation_name 含致人/重傷 的案件正確歸位
+        - is_crash = 0 時依原 subtype 分到 主動/民檢/其他
+        """
         result = {}
         for r in rows:
             unit = r.unit or "未知"
             if unit not in result:
                 result[unit] = {"total": 0, "proactive": 0, "crash_derived": 0, "citizen": 0, "other": 0}
             result[unit]["total"] += r.count
-            st = r.subtype or ""
-            if st == "攔舉-一般":
-                result[unit]["proactive"] += r.count
-            elif st == "攔舉-肇事":
+            if r.is_crash == 1:
                 result[unit]["crash_derived"] += r.count
-            elif st == "逕舉_民眾檢舉":
-                result[unit]["citizen"] += r.count
             else:
-                result[unit]["other"] += r.count
+                st = r.subtype or ""
+                if st == "攔舉-一般":
+                    result[unit]["proactive"] += r.count
+                elif st == "逕舉_民眾檢舉":
+                    result[unit]["citizen"] += r.count
+                else:
+                    # 攔舉-慢行攤、其他逕舉子類等都歸「其他」
+                    result[unit]["other"] += r.count
         return result
 
     curr_tickets = aggregate_tickets(query_dui_tickets(sd, ed))

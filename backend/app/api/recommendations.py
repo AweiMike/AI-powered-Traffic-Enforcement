@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from app.database import get_db
 from app.models.core import Ticket, Crash
 from app.models.dimension import Site
+from app.utils.dui_crash import dui_crash_filter
 
 router = APIRouter()
 
@@ -493,10 +494,11 @@ async def get_accident_hotspots(
         violation_stats = db.query(
             func.count(Ticket.id).label('total_violations'),
             func.sum(case((Ticket.topic_dui == True, 1), else_=0)).label('dui'),
-            # 酒駕肇事舉發（真實酒駕肇事計數—事故表 A1/A2/A3 常被避免填寫，舉發單則強制填寫）
+            # 酒駕肇事舉發（UNION：subtype = '攔舉-肇事' OR violation_name 含肇事關鍵字）
+            # 修復同仁將肇事誤標為「攔舉-一般」的黑數，實測較舊版多抓約 44%
             func.sum(
                 case(
-                    ((Ticket.topic_dui == True) & (Ticket.enforcement_subtype == '攔舉-肇事'), 1),
+                    ((Ticket.topic_dui == True) & dui_crash_filter(), 1),
                     else_=0,
                 )
             ).label('dui_crash_derived'),
@@ -643,7 +645,8 @@ async def get_accident_peak_times(
         Ticket.topic_dui == True
     ).group_by(Ticket.shift_id).all()
 
-    # 酒駕肇事舉發（攔舉-肇事 子類）— 真實酒駕肇事的可靠來源
+    # 酒駕肇事舉發（UNION：subtype 攔舉-肇事 OR violation_name 含肇事關鍵字）
+    # 修復同仁誤標「攔舉-一般」的黑數
     dui_crash_by_shift = db.query(
         Ticket.shift_id,
         func.count(Ticket.id).label('count')
@@ -652,7 +655,7 @@ async def get_accident_peak_times(
         Ticket.violation_date <= end_date,
         Ticket.district.in_(district_variants),
         Ticket.topic_dui == True,
-        Ticket.enforcement_subtype == '攔舉-肇事',
+        dui_crash_filter(),
     ).group_by(Ticket.shift_id).all()
 
     crash_dict = {s.shift_id: s.count for s in crash_by_shift}
