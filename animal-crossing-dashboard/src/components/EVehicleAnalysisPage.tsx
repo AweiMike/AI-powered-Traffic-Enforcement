@@ -158,33 +158,89 @@ const HotspotCard: React.FC<{ hotspot: YouthHotspot; rank: number }> = ({ hotspo
     </div>
 );
 
-// 時段分析圖表
+// 時段分析圖表（堆疊條形圖：青少年違規 + 成人違規）
 const TimeChart: React.FC<{ data: TimeDistribution[] }> = ({ data }) => {
     const maxValue = Math.max(...data.map(d => d.total)) || 1;
 
     return (
-        <div className="space-y-2">
-            {data.map((item) => (
-                <div key={item.shift_id} className={`p-2 rounded-lg ${item.is_school_time ? 'bg-red-50 border border-red-200' : 'bg-gray-50'}`}>
-                    <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium text-nook-text">
-                            {item.time_range}
-                            {item.is_school_time && <span className="ml-2 text-red-600">🎒 通學時段</span>}
-                        </span>
-                        <div className="text-xs">
-                            <span className="font-bold text-nook-text">{item.total}</span>
-                            <span className="text-nook-text/40 mx-1">/</span>
-                            <span className="font-bold text-red-600">{item.youth_count} 青少年</span>
-                        </div>
-                    </div>
-                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div className="space-y-3">
+            {/* 圖例與說明 */}
+            <div className="flex items-center gap-4 text-[11px] text-nook-text/70 px-1 pb-1 border-b border-nook-cream/40">
+                <span className="flex items-center gap-1">
+                    <span className="inline-block w-3 h-3 rounded-sm bg-red-500"></span>
+                    <strong className="text-red-600">青少年違規</strong>
+                </span>
+                <span className="flex items-center gap-1">
+                    <span className="inline-block w-3 h-3 rounded-sm bg-blue-400"></span>
+                    成人違規
+                </span>
+                <span className="ml-auto text-nook-text/40">每段顯示「青少年 / 全部」件數</span>
+            </div>
+
+            <div className="space-y-2">
+                {data.map((item) => {
+                    const total = item.total;
+                    const youth = item.youth_count;
+                    const adult = Math.max(0, total - youth);
+                    const widthTotal = (total / maxValue) * 100;
+                    const widthYouth = total > 0 ? (youth / total) * widthTotal : 0;
+                    const widthAdult = widthTotal - widthYouth;
+                    const youthRatio = total > 0 ? Math.round((youth / total) * 100) : 0;
+                    const isSchoolTime = item.is_school_time;
+                    const youthHeavy = youthRatio >= 50 && youth > 0;
+
+                    return (
                         <div
-                            className={`h-full rounded-full transition-all ${item.is_school_time ? 'bg-red-500' : 'bg-blue-400'}`}
-                            style={{ width: `${(item.total / maxValue) * 100}%` }}
-                        />
-                    </div>
-                </div>
-            ))}
+                            key={item.shift_id}
+                            className={`p-2 rounded-lg ${
+                                youthHeavy ? 'bg-red-100 border-2 border-red-400' :
+                                isSchoolTime ? 'bg-red-50 border border-red-200' :
+                                'bg-gray-50'
+                            }`}
+                        >
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs font-medium text-nook-text flex items-center gap-2">
+                                    <span>{item.time_range}</span>
+                                    {isSchoolTime && (
+                                        <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded">
+                                            🎒 通學時段
+                                        </span>
+                                    )}
+                                    {youthHeavy && !isSchoolTime && (
+                                        <span className="text-[10px] bg-red-200 text-red-800 px-1.5 py-0.5 rounded font-bold">
+                                            ⚠ 青少年高佔比
+                                        </span>
+                                    )}
+                                </span>
+                                <div className="text-xs tabular-nums">
+                                    <span className="font-bold text-red-600">{youth}</span>
+                                    <span className="text-nook-text/40 mx-1">/</span>
+                                    <span className="font-bold text-nook-text">{total}</span>
+                                    <span className="text-nook-text/50 ml-1">件</span>
+                                    {total > 0 && (
+                                        <span className={`ml-2 ${youthHeavy ? 'text-red-700 font-bold' : 'text-nook-text/40'}`}>
+                                            ({youthRatio}%)
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            {/* 堆疊條形圖：紅色 = 青少年、藍色 = 成人 */}
+                            <div className="h-3 bg-gray-200 rounded-full overflow-hidden flex">
+                                <div
+                                    className="h-full bg-red-500 transition-all"
+                                    style={{ width: `${widthYouth}%` }}
+                                    title={`青少年 ${youth} 件`}
+                                />
+                                <div
+                                    className="h-full bg-blue-400 transition-all"
+                                    style={{ width: `${widthAdult}%` }}
+                                    title={`成人 ${adult} 件`}
+                                />
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 };
@@ -508,8 +564,10 @@ const EVehicleAnalysisPage: React.FC = () => {
                         <div className="grid grid-cols-2 gap-6">
                             <div className="space-y-4">
                                 <div className="bg-blue-100 rounded-2xl p-4">
-                                    <h4 className="font-bold text-blue-800 mb-1">⏰ 24 小時時段分布</h4>
-                                    <p className="text-xs text-blue-600">標記通學時段（上學 07-08、放學 16-18）</p>
+                                    <h4 className="font-bold text-blue-800 mb-1">⏰ 各時段微電車/慢車違規件數</h4>
+                                    <p className="text-xs text-blue-600">
+                                        紅色為青少年（&lt;18 歲）違規、藍色為成人。標記通學時段（上學 06-10、放學 16-18）。
+                                    </p>
                                 </div>
                                 <div className="bg-white/80 rounded-2xl p-6 nook-shadow">
                                     <TimeChart data={timeData} />
