@@ -68,8 +68,10 @@ interface YearlyTrend {
 interface TimeDistribution {
     shift_id: string;
     time_range: string;
-    total: number;
-    youth_count: number;
+    total: number;             // 違規總數
+    youth_count: number;       // 違規中青少年數
+    crash_total?: number;      // 該時段微電車/慢車事故總數
+    crash_youth_count?: number; // 事故中青少年數
     is_school_time: boolean;
 }
 
@@ -158,47 +160,70 @@ const HotspotCard: React.FC<{ hotspot: YouthHotspot; rank: number }> = ({ hotspo
     </div>
 );
 
-// 時段分析圖表（堆疊條形圖：青少年違規 + 成人違規）
+// 時段分析圖表（每個時段兩條：違規 + 事故）
 const TimeChart: React.FC<{ data: TimeDistribution[] }> = ({ data }) => {
-    const maxValue = Math.max(...data.map(d => d.total)) || 1;
+    const maxViolation = Math.max(...data.map(d => d.total)) || 1;
+    const maxCrash = Math.max(...data.map(d => d.crash_total || 0)) || 1;
 
     return (
         <div className="space-y-3">
             {/* 圖例與說明 */}
-            <div className="flex items-center gap-4 text-[11px] text-nook-text/70 px-1 pb-1 border-b border-nook-cream/40">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-nook-text/70 px-1 pb-1 border-b border-nook-cream/40">
                 <span className="flex items-center gap-1">
                     <span className="inline-block w-3 h-3 rounded-sm bg-red-500"></span>
-                    <strong className="text-red-600">青少年違規</strong>
+                    <strong className="text-red-600">青少年</strong>
                 </span>
                 <span className="flex items-center gap-1">
                     <span className="inline-block w-3 h-3 rounded-sm bg-blue-400"></span>
-                    成人違規
+                    成人
                 </span>
-                <span className="ml-auto text-nook-text/40">每段顯示「青少年 / 全部」件數</span>
+                <span className="text-nook-text/50">|</span>
+                <span className="flex items-center gap-1">
+                    <span className="inline-block w-3 h-3 rounded-sm bg-amber-500"></span>
+                    違規
+                </span>
+                <span className="flex items-center gap-1">
+                    <span className="inline-block w-3 h-3 rounded-sm bg-rose-700"></span>
+                    <strong className="text-rose-700">事故</strong>
+                </span>
+                <span className="ml-auto text-nook-text/40">數字：青少年 / 全部</span>
             </div>
 
             <div className="space-y-2">
                 {data.map((item) => {
                     const total = item.total;
                     const youth = item.youth_count;
+                    const crashTotal = item.crash_total ?? 0;
+                    const crashYouth = item.crash_youth_count ?? 0;
                     const adult = Math.max(0, total - youth);
-                    const widthTotal = (total / maxValue) * 100;
+                    const crashAdult = Math.max(0, crashTotal - crashYouth);
+
+                    const widthTotal = (total / maxViolation) * 100;
                     const widthYouth = total > 0 ? (youth / total) * widthTotal : 0;
                     const widthAdult = widthTotal - widthYouth;
+
+                    const widthCrash = (crashTotal / maxCrash) * 100;
+                    const widthCrashYouth = crashTotal > 0 ? (crashYouth / crashTotal) * widthCrash : 0;
+                    const widthCrashAdult = widthCrash - widthCrashYouth;
+
                     const youthRatio = total > 0 ? Math.round((youth / total) * 100) : 0;
+                    const crashYouthRatio = crashTotal > 0 ? Math.round((crashYouth / crashTotal) * 100) : 0;
                     const isSchoolTime = item.is_school_time;
                     const youthHeavy = youthRatio >= 50 && youth > 0;
+                    // 事故警訊：該時段有事故、青少年事故占比 ≥50% 或事故數 ≥3
+                    const crashAlert = crashYouth >= 3 || (crashTotal > 0 && crashYouthRatio >= 50);
 
                     return (
                         <div
                             key={item.shift_id}
-                            className={`p-2 rounded-lg ${
+                            className={`p-2 rounded-lg space-y-1.5 ${
+                                crashAlert ? 'bg-rose-100 border-2 border-rose-500' :
                                 youthHeavy ? 'bg-red-100 border-2 border-red-400' :
                                 isSchoolTime ? 'bg-red-50 border border-red-200' :
                                 'bg-gray-50'
                             }`}
                         >
-                            <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center justify-between">
                                 <span className="text-xs font-medium text-nook-text flex items-center gap-2">
                                     <span>{item.time_range}</span>
                                     {isSchoolTime && (
@@ -206,36 +231,71 @@ const TimeChart: React.FC<{ data: TimeDistribution[] }> = ({ data }) => {
                                             🎒 通學時段
                                         </span>
                                     )}
-                                    {youthHeavy && !isSchoolTime && (
+                                    {crashAlert && (
+                                        <span className="text-[10px] bg-rose-700 text-white px-1.5 py-0.5 rounded font-bold">
+                                            🚨 青少年事故警訊
+                                        </span>
+                                    )}
+                                    {youthHeavy && !isSchoolTime && !crashAlert && (
                                         <span className="text-[10px] bg-red-200 text-red-800 px-1.5 py-0.5 rounded font-bold">
                                             ⚠ 青少年高佔比
                                         </span>
                                     )}
                                 </span>
-                                <div className="text-xs tabular-nums">
-                                    <span className="font-bold text-red-600">{youth}</span>
-                                    <span className="text-nook-text/40 mx-1">/</span>
-                                    <span className="font-bold text-nook-text">{total}</span>
-                                    <span className="text-nook-text/50 ml-1">件</span>
-                                    {total > 0 && (
-                                        <span className={`ml-2 ${youthHeavy ? 'text-red-700 font-bold' : 'text-nook-text/40'}`}>
-                                            ({youthRatio}%)
-                                        </span>
-                                    )}
-                                </div>
                             </div>
-                            {/* 堆疊條形圖：紅色 = 青少年、藍色 = 成人 */}
-                            <div className="h-3 bg-gray-200 rounded-full overflow-hidden flex">
-                                <div
-                                    className="h-full bg-red-500 transition-all"
-                                    style={{ width: `${widthYouth}%` }}
-                                    title={`青少年 ${youth} 件`}
-                                />
-                                <div
-                                    className="h-full bg-blue-400 transition-all"
-                                    style={{ width: `${widthAdult}%` }}
-                                    title={`成人 ${adult} 件`}
-                                />
+
+                            {/* 違規列 */}
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-amber-700 font-semibold w-10 shrink-0">違規</span>
+                                <div className="h-3 flex-1 bg-gray-200 rounded-full overflow-hidden flex">
+                                    <div
+                                        className="h-full bg-red-500 transition-all"
+                                        style={{ width: `${widthYouth}%` }}
+                                        title={`青少年違規 ${youth} 件`}
+                                    />
+                                    <div
+                                        className="h-full bg-blue-400 transition-all"
+                                        style={{ width: `${widthAdult}%` }}
+                                        title={`成人違規 ${adult} 件`}
+                                    />
+                                </div>
+                                <span className="text-[11px] tabular-nums shrink-0 w-20 text-right">
+                                    <span className="font-bold text-red-600">{youth}</span>
+                                    <span className="text-nook-text/40 mx-0.5">/</span>
+                                    <span className="font-bold text-nook-text">{total}</span>
+                                    {total > 0 && (
+                                        <span className="text-nook-text/40 ml-1 text-[10px]">{youthRatio}%</span>
+                                    )}
+                                </span>
+                            </div>
+
+                            {/* 事故列（凸顯） */}
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-rose-700 font-bold w-10 shrink-0">事故</span>
+                                <div className="h-3 flex-1 bg-gray-200 rounded-full overflow-hidden flex">
+                                    <div
+                                        className="h-full bg-red-600 transition-all"
+                                        style={{ width: `${widthCrashYouth}%` }}
+                                        title={`青少年事故 ${crashYouth} 件`}
+                                    />
+                                    <div
+                                        className="h-full bg-rose-400 transition-all"
+                                        style={{ width: `${widthCrashAdult}%` }}
+                                        title={`成人事故 ${crashAdult} 件`}
+                                    />
+                                </div>
+                                <span className="text-[11px] tabular-nums shrink-0 w-20 text-right">
+                                    {crashTotal > 0 ? (
+                                        <>
+                                            <span className="font-bold text-red-700">{crashYouth}</span>
+                                            <span className="text-nook-text/40 mx-0.5">/</span>
+                                            <span className="font-bold text-rose-700">{crashTotal}</span>
+                                            <span className="text-nook-text/40 ml-1 text-[10px]">{crashYouthRatio}%</span>
+                                        </>
+                                    ) : (
+                                        <span className="text-nook-text/30">—</span>
+                                    )}
+                                </span>
                             </div>
                         </div>
                     );
@@ -564,9 +624,10 @@ const EVehicleAnalysisPage: React.FC = () => {
                         <div className="grid grid-cols-2 gap-6">
                             <div className="space-y-4">
                                 <div className="bg-blue-100 rounded-2xl p-4">
-                                    <h4 className="font-bold text-blue-800 mb-1">⏰ 各時段微電車/慢車違規件數</h4>
+                                    <h4 className="font-bold text-blue-800 mb-1">⏰ 各時段微電車/慢車 違規 與 事故</h4>
                                     <p className="text-xs text-blue-600">
-                                        紅色為青少年（&lt;18 歲）違規、藍色為成人。標記通學時段（上學 06-10、放學 16-18）。
+                                        每段顯示兩條柱：上為違規、下為事故。紅色＝青少年(&lt;18)、藍/粉＝成人。
+                                        青少年事故 ≥3 件或佔比 ≥50% 自動標警訊。
                                     </p>
                                 </div>
                                 <div className="bg-white/80 rounded-2xl p-6 nook-shadow">

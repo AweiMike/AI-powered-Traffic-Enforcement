@@ -295,12 +295,20 @@ async def get_time_analysis(
     """通學時段分析"""
     sd, ed = _get_date_range(days, start_date, end_date)
 
-    # 慢車條件
+    # 慢車條件（違規）
     evehicle_filter_ticket = or_(
         Ticket.evehicle_type.isnot(None),
         Ticket.vehicle_type.ilike("%自行車%"),
         Ticket.vehicle_type.ilike("%電動%"),
         Ticket.vehicle_type.ilike("%腳踏車%"),
+    )
+
+    # 慢車條件（事故）
+    evehicle_filter_crash = or_(
+        Crash.evehicle_type.isnot(None),
+        Crash.party_type.ilike("%自行車%"),
+        Crash.party_type.ilike("%電動%"),
+        Crash.party_type.ilike("%腳踏車%"),
     )
 
     # 青少年違規時段分析
@@ -314,6 +322,17 @@ async def get_time_analysis(
         evehicle_filter_ticket,
     ).group_by(Ticket.shift_id).all()
 
+    # 青少年事故時段分析
+    crash_time_stats = db.query(
+        Crash.shift_id,
+        func.count(Crash.id).label("total"),
+        func.sum(case((or_(Crash.is_youth == True, Crash.driver_age_group == "<18"), 1), else_=0)).label("youth_count"),
+    ).filter(
+        Crash.occurred_date >= sd,
+        Crash.occurred_date <= ed,
+        evehicle_filter_crash,
+    ).group_by(Crash.shift_id).all()
+
     # 轉換班別為時段
     shift_mapping = {
         "01": "00-02", "02": "02-04", "03": "04-06", "04": "06-08",
@@ -321,30 +340,61 @@ async def get_time_analysis(
         "09": "16-18", "10": "18-20", "11": "20-22", "12": "22-24",
     }
 
+    # 整理事故統計成 dict 方便查詢
+    crash_by_shift = {
+        c.shift_id: {"total": c.total, "youth": c.youth_count or 0}
+        for c in crash_time_stats if c.shift_id
+    }
+
+    # 收集所有出現過的 shift_id（違規或事故任一）
+    all_shifts = set()
+    for t in ticket_time_stats:
+        if t.shift_id:
+            all_shifts.add(t.shift_id)
+    for c in crash_time_stats:
+        if c.shift_id:
+            all_shifts.add(c.shift_id)
+
+    ticket_by_shift = {
+        t.shift_id: {"total": t.total, "youth": t.youth_count or 0}
+        for t in ticket_time_stats if t.shift_id
+    }
+
     time_distribution = []
     school_time_total = 0
     school_time_youth = 0
+    school_time_crash = 0
+    school_time_crash_youth = 0
     total_all = 0
     total_youth = 0
-    
-    for t in ticket_time_stats:
-        if not t.shift_id:
-            continue
-        time_range = shift_mapping.get(t.shift_id, t.shift_id)
-        is_school_time = t.shift_id in ["04", "05", "09"]  # 06-10, 16-18
-        
-        total_all += t.total
-        total_youth += t.youth_count or 0
-        
+    total_crash = 0
+    total_crash_youth = 0
+
+    for shift_id in all_shifts:
+        time_range = shift_mapping.get(shift_id, shift_id)
+        is_school_time = shift_id in ["04", "05", "09"]  # 06-10, 16-18
+
+        ticket_info = ticket_by_shift.get(shift_id, {"total": 0, "youth": 0})
+        crash_info = crash_by_shift.get(shift_id, {"total": 0, "youth": 0})
+
+        total_all += ticket_info["total"]
+        total_youth += ticket_info["youth"]
+        total_crash += crash_info["total"]
+        total_crash_youth += crash_info["youth"]
+
         if is_school_time:
-            school_time_total += t.total
-            school_time_youth += t.youth_count or 0
-        
+            school_time_total += ticket_info["total"]
+            school_time_youth += ticket_info["youth"]
+            school_time_crash += crash_info["total"]
+            school_time_crash_youth += crash_info["youth"]
+
         time_distribution.append({
-            "shift_id": t.shift_id,
+            "shift_id": shift_id,
             "time_range": time_range,
-            "total": t.total,
-            "youth_count": t.youth_count or 0,
+            "total": ticket_info["total"],            # 違規總數
+            "youth_count": ticket_info["youth"],      # 違規青少年數
+            "crash_total": crash_info["total"],       # 事故總數
+            "crash_youth_count": crash_info["youth"], # 事故青少年數
             "is_school_time": is_school_time,
         })
 
@@ -357,11 +407,15 @@ async def get_time_analysis(
         "school_time_summary": {
             "total_violations": school_time_total,
             "youth_violations": school_time_youth,
+            "total_crashes": school_time_crash,
+            "youth_crashes": school_time_crash_youth,
             "peak_periods": ["06:00-10:00 (上學)", "16:00-18:00 (放學)"],
         },
         "summary": {
             "total": total_all,
             "youth_total": total_youth,
+            "total_crashes": total_crash,
+            "youth_total_crashes": total_crash_youth,
         },
         "recommendation": "建議在通學時段加強校園周邊巡邏" if school_time_youth > 0 else None,
     }
