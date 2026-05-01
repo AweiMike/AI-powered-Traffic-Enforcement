@@ -1235,6 +1235,12 @@ async def get_map_points(
     
     # 取得違規點位
     if point_type in ['all', 'ticket']:
+        # is_dui_crash: 採 UNION 信號（subtype=攔舉-肇事 OR violation_name 含肇事/致人/重傷等關鍵字）
+        # 修復同仁將肇事誤標為「攔舉-一般」的黑數
+        is_dui_crash_expr = case(
+            ((Ticket.topic_dui == True) & dui_crash_filter(), 1),
+            else_=0,
+        )
         ticket_query = db.query(
             Ticket.id,
             Ticket.latitude,
@@ -1251,7 +1257,8 @@ async def get_map_points(
             Ticket.is_elderly,
             Ticket.vehicle_type,
             Ticket.enforcement_subtype,
-            Ticket.unit_code
+            Ticket.unit_code,
+            is_dui_crash_expr.label('is_dui_crash'),
         ).filter(
             Ticket.violation_date >= start_date,
             Ticket.violation_date <= end_date
@@ -1270,7 +1277,11 @@ async def get_map_points(
 
         tickets = ticket_query.all()
         result['summary']['total_tickets'] = len(tickets)
-        
+
+        # DUI 統計：總酒駕 + 含肇事（UNION 信號）
+        dui_total_count = 0
+        dui_crash_count = 0
+
         for t in tickets:
             if t.latitude and t.longitude:
                 # 判斷主題
@@ -1281,7 +1292,13 @@ async def get_map_points(
                     topic_name = 'RED_LIGHT'
                 elif t.topic_dangerous:
                     topic_name = 'DANGEROUS_DRIVING'
-                
+
+                is_crash_flag = bool(getattr(t, 'is_dui_crash', 0))
+                if t.topic_dui:
+                    dui_total_count += 1
+                    if is_crash_flag:
+                        dui_crash_count += 1
+
                 result['ticket_points'].append({
                     'id': t.id,
                     'lat': t.latitude,
@@ -1296,9 +1313,12 @@ async def get_map_points(
                     'is_elderly': t.is_elderly,
                     'vehicle_type': t.vehicle_type,
                     'enforcement_type': t.enforcement_subtype,
-                    'unit': t.unit_code
+                    'unit': t.unit_code,
+                    'is_dui_crash': is_crash_flag,
                 })
         result['summary']['tickets_with_coords'] = len(result['ticket_points'])
+        result['summary']['dui_tickets'] = dui_total_count
+        result['summary']['dui_crash_tickets'] = dui_crash_count
     
     result['note'] = '點位資料已去識別化，座標僅供執法分析使用'
     return result

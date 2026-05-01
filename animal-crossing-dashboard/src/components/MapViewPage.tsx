@@ -29,6 +29,8 @@ interface MapPoint {
     shift?: string;
     is_elderly?: boolean;
     is_dui?: boolean;
+    /** 違規點位專用：是否為酒駕肇事舉發（UNION 信號，含黑數修復） */
+    is_dui_crash?: boolean;
     vehicle_type?: string;
     violation_name?: string;
     enforcement_type?: string;
@@ -52,6 +54,10 @@ interface MapData {
         total_tickets: number;
         crashes_with_coords: number;
         tickets_with_coords: number;
+        /** 全部酒駕舉發件數（不限是否有座標） */
+        dui_tickets?: number;
+        /** 全部酒駕中含肇事件數（UNION 信號，含黑數修復） */
+        dui_crash_tickets?: number;
     };
 }
 
@@ -294,9 +300,12 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
         });
 
         const topicCount: Record<string, number> = { DUI: 0, RED_LIGHT: 0, DANGEROUS_DRIVING: 0, OTHER: 0 };
+        // 圈內酒駕中含肇事的件數（UNION 信號，含黑數修復）
+        let duiCrashCountInCircle = 0;
         ticketsIn.forEach(t => {
             if (t.topic && t.topic in topicCount) topicCount[t.topic]++;
             else topicCount.OTHER++;
+            if (t.topic === 'DUI' && t.is_dui_crash) duiCrashCountInCircle++;
         });
 
         const unitCount: Record<string, number> = {};
@@ -311,6 +320,7 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
             deathTotal,       // 圈內實際死亡人數
             injuryTotal,      // 圈內實際受傷人數
             topic: topicCount,
+            duiCrashCount: duiCrashCountInCircle,  // 圈內酒駕中含肇事件數
             units: Object.entries(unitCount).sort((a, b) => b[1] - a[1]),
         };
     }, [selectionCircle, data]);
@@ -550,19 +560,21 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
 
                         markersRef.current.push(marker);
                     } else {
-                        // 一般模式
+                        // 一般模式 — 酒駕肇事用深紅外圈強調
+                        const isDuiCrash = !!point.is_dui_crash;
                         const marker = L.circleMarker([lat, lng], {
-                            radius: 5,
-                            color: color,
+                            radius: isDuiCrash ? 7 : 5,
+                            color: isDuiCrash ? '#B91C1C' : color,
                             fillColor: color,
-                            fillOpacity: 0.6,
-                            weight: 1
+                            fillOpacity: isDuiCrash ? 0.85 : 0.6,
+                            weight: isDuiCrash ? 3 : 1,
                         }).addTo(map);
 
                         marker.bindPopup(`
                             <div style="font-size: 13px; min-width: 220px;">
                                 <div style="font-weight: bold; color: ${color}; margin-bottom: 6px; border-bottom: 1px solid #eee; padding-bottom: 4px;">
                                     📋 ${violationDesc}
+                                    ${isDuiCrash ? '<span style="margin-left: 6px; background: #B91C1C; color: white; padding: 1px 6px; border-radius: 4px; font-size: 11px;">🚨 含肇事</span>' : ''}
                                 </div>
                                 <table style="width: 100%; font-size: 12px;">
                                     <tr><td style="color: #666;">位置</td><td style="text-align: right;">${point.district} ${point.location || ''}</td></tr>
@@ -689,6 +701,19 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                     <span className="text-nook-text/60">有座標</span>
                                     <span className="font-medium text-nook-text">{data.summary.tickets_with_coords}</span>
                                 </div>
+                                {(data.summary.dui_tickets ?? 0) > 0 && (
+                                    <div className="flex justify-between pl-2">
+                                        <span className="text-purple-600 text-xs">🍺 酒駕</span>
+                                        <span className="font-medium text-purple-700 text-xs">
+                                            {data.summary.dui_tickets}
+                                            {(data.summary.dui_crash_tickets ?? 0) > 0 && (
+                                                <span className="ml-1 text-red-600">
+                                                    （含肇事 {data.summary.dui_crash_tickets}）
+                                                </span>
+                                            )}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -932,7 +957,14 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                         {selectionStats.topic.DUI > 0 && (
                                             <div className="flex justify-between text-[11px] pl-2">
                                                 <span className="text-purple-600">🍺 酒駕</span>
-                                                <span className="font-medium">{selectionStats.topic.DUI}</span>
+                                                <span className="font-medium">
+                                                    {selectionStats.topic.DUI}
+                                                    {selectionStats.duiCrashCount > 0 && (
+                                                        <span className="ml-1 text-red-600">
+                                                            （含肇事 {selectionStats.duiCrashCount}）
+                                                        </span>
+                                                    )}
+                                                </span>
                                             </div>
                                         )}
                                         {selectionStats.topic.RED_LIGHT > 0 && (
