@@ -30,22 +30,42 @@ interface TicketBreakdown {
 
 /** 取締件數細分小字：主動/肇事/民檢/其他
  *  - 主動 (攔舉-一般)：值得鼓勵的主動出擊
- *  - 肇事 (攔舉-肇事)：肇事後酒測，被動
+ *  - 肇事 (攔舉-肇事 + violation_name 關鍵字 UNION)：含肇事的酒駕舉發
  *  - 民檢 (逕舉_民眾檢舉)：民眾通報
+ *
+ *  prevBreakdown 提供時，肇事項目額外顯示 vs 去年同期的增減
+ *  （肇事增加=紅色警示、減少=綠色，與一般取締邏輯相反）
  */
-function TicketBreakdownLine({ breakdown, align = 'right' }: { breakdown?: TicketBreakdown; align?: 'right' | 'left' }) {
+function TicketBreakdownLine({
+  breakdown, prevBreakdown, align = 'right'
+}: {
+  breakdown?: TicketBreakdown;
+  prevBreakdown?: TicketBreakdown;
+  align?: 'right' | 'left';
+}) {
   if (!breakdown) return null;
   const items = [
     { label: '主動', value: breakdown.proactive, color: 'text-green-700' },
-    { label: '肇事', value: breakdown.crash_derived, color: 'text-red-500' },
+    { label: '肇事', value: breakdown.crash_derived, color: 'text-red-500', isCrash: true },
     { label: '民檢', value: breakdown.citizen, color: 'text-gray-500' },
     { label: '其他', value: breakdown.other, color: 'text-gray-400' },
   ];
+  const crashDiff = prevBreakdown
+    ? breakdown.crash_derived - prevBreakdown.crash_derived
+    : null;
   return (
-    <div className={`mt-0.5 text-[10px] flex gap-1.5 ${align === 'right' ? 'justify-end' : ''}`}>
+    <div className={`mt-0.5 text-[10px] flex flex-wrap items-center gap-x-1.5 gap-y-0.5 ${align === 'right' ? 'justify-end' : ''}`}>
       {items.map((it) => (
         <span key={it.label} className={it.color}>
           {it.label}<span className="ml-0.5 font-semibold tabular-nums">{it.value}</span>
+          {it.isCrash && crashDiff !== null && crashDiff !== 0 && (
+            <span className={`ml-0.5 font-bold tabular-nums ${crashDiff > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
+              {crashDiff > 0 ? `↑+${crashDiff}` : `↓${crashDiff}`}
+            </span>
+          )}
+          {it.isCrash && crashDiff === 0 && (
+            <span className="ml-0.5 text-gray-400">±0</span>
+          )}
         </span>
       ))}
     </div>
@@ -97,6 +117,7 @@ const DuiPerformancePage: React.FC = () => {
             icon={<Shield className="w-5 h-5 text-sky-700" />}
             color="purple"
             breakdown={data.total.tickets_breakdown}
+            prevBreakdown={data.total.tickets_prev_breakdown}
           />
           <SummaryCard
             title="去年同期取締"
@@ -162,7 +183,10 @@ const DuiPerformancePage: React.FC = () => {
                     <td className="px-4 py-2.5 font-medium text-nook-text">{row.unit}</td>
                     <td className="px-4 py-2.5 text-right">
                       <div className="font-bold text-sky-800">{row.tickets}</div>
-                      <TicketBreakdownLine breakdown={row.tickets_breakdown} />
+                      <TicketBreakdownLine
+                        breakdown={row.tickets_breakdown}
+                        prevBreakdown={row.tickets_prev_breakdown}
+                      />
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       <div className="text-nook-text/60">{row.tickets_prev}</div>
@@ -182,7 +206,10 @@ const DuiPerformancePage: React.FC = () => {
                   <td className="px-4 py-3 text-nook-text">合計</td>
                   <td className="px-4 py-3 text-right">
                     <div className="text-sky-800">{data.total.tickets}</div>
-                    <TicketBreakdownLine breakdown={data.total.tickets_breakdown} />
+                    <TicketBreakdownLine
+                      breakdown={data.total.tickets_breakdown}
+                      prevBreakdown={data.total.tickets_prev_breakdown}
+                    />
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="text-nook-text/60">{data.total.tickets_prev}</div>
@@ -321,7 +348,7 @@ function RankBadge({ rank, total }: { rank: number; total: number }) {
 }
 
 /** 摘要卡片 */
-function SummaryCard({ title, current, prev, icon, color, invertDiff, breakdown }: {
+function SummaryCard({ title, current, prev, icon, color, invertDiff, breakdown, prevBreakdown }: {
   title: string;
   current: number;
   prev?: number;
@@ -329,6 +356,7 @@ function SummaryCard({ title, current, prev, icon, color, invertDiff, breakdown 
   color: string;
   invertDiff?: boolean;
   breakdown?: TicketBreakdown;
+  prevBreakdown?: TicketBreakdown;
 }) {
   const diff = prev !== undefined ? current - prev : undefined;
   const colorMap: Record<string, string> = {
@@ -345,7 +373,7 @@ function SummaryCard({ title, current, prev, icon, color, invertDiff, breakdown 
         {icon}
       </div>
       <div className="text-2xl font-bold text-nook-text">{current}</div>
-      {breakdown && <TicketBreakdownLine breakdown={breakdown} align="left" />}
+      {breakdown && <TicketBreakdownLine breakdown={breakdown} prevBreakdown={prevBreakdown} align="left" />}
       {diff !== undefined && (
         <div className="mt-1">
           {invertDiff ? (
