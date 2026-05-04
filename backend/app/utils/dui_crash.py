@@ -12,6 +12,16 @@
 
 因此單純查 enforcement_subtype = '攔舉-肇事' 會低估真實酒駕肇事數約 44%。
 
+Crash 側的 ground truth (2026-05-04 新增)
+==========================================
+EIS 事故調查表有兩個結構化代碼：
+- 32. 飲酒情形代碼：04-08 表示有飲酒（02=無、01/未填=未調查）
+- 26. 當事者區分子類別代碼：H 開頭=行人（要排除）
+
+import 過程已 case-level rollup 寫入 Crash.is_dui_crash_party。
+查詢 Crash 表酒駕案件時，**優先用 `crash_dui_real_filter()`**，比 Ticket-side
+UNION 信號更接近真值（事故發生時警方記錄駕駛狀態，不依賴後續開單流程）。
+
 判定方式
 ========
 
@@ -38,7 +48,7 @@ B. violation_name 含「肇事/致人/重傷/致死/致傷/死亡」等加重情
 """
 from sqlalchemy import or_
 
-from app.models.core import Ticket
+from app.models.core import Crash, Ticket
 
 
 # violation_name 中代表肇事/傷亡的關鍵字（任一出現即視為肇事案件）
@@ -70,6 +80,28 @@ def dui_crash_filter():
         Ticket.enforcement_subtype == '攔舉-肇事',
         *keyword_clauses,
     )
+
+
+def crash_dui_real_filter():
+    """SQL expression: True 表示「事故表中酒駕涉案」案件（ground truth）。
+
+    用於查詢 Crash 表時取代 Crash.suspected_alcohol。
+
+    判定規則（在 import 階段已 rollup 寫入 is_dui_crash_party 欄位）：
+    - 事故當事者中，飲酒情形代碼 ∈ {04, 05, 06, 07, 08}
+    - 且該當事者非行人（當事者區分子類別代碼不以 H 開頭）
+
+    為何優於 Ticket UNION：
+    - Ticket UNION 抓「酒駕被開單」，Crash 旗標抓「酒駕涉案（不論是否開單）」
+    - 拒測案件、暫無酒測值案件 都會被計入
+    - 結構化代碼難以人為竄改
+
+    範例:
+        db.query(Crash).filter(crash_dui_real_filter())
+        # 取代既有的:
+        # db.query(Crash).filter(Crash.suspected_alcohol == True)
+    """
+    return Crash.is_dui_crash_party == True  # noqa: E712
 
 
 def dui_refusal_filter():

@@ -64,7 +64,7 @@ def _migrate_eis_columns():
     """檢查並補上 EIS 整合所需的新欄位（不刪資料）"""
     inspector = inspect(engine)
 
-    # core_crash 表需要的新欄位（EIS 整合 + 慢車分析）
+    # core_crash 表需要的新欄位（EIS 整合 + 慢車分析 + 酒駕飲酒情形代碼）
     _ensure_columns(inspector, "core_crash", {
         "precinct": "VARCHAR(100)",
         "sub_unit": "VARCHAR(100)",
@@ -73,6 +73,10 @@ def _migrate_eis_columns():
         "evehicle_type": "VARCHAR(50)",
         "is_youth": "BOOLEAN DEFAULT 0",
         "is_underage_14": "BOOLEAN DEFAULT 0",
+        # 酒駕新邏輯（事故表 ground truth）
+        "drinking_code": "VARCHAR(2)",
+        "party_subtype_code": "VARCHAR(10)",
+        "is_dui_crash_party": "BOOLEAN DEFAULT 0",
     })
 
     # core_ticket 表可能缺少的欄位

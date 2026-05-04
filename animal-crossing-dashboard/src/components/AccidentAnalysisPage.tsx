@@ -299,8 +299,54 @@ const AccidentAnalysisPage: React.FC = () => {
                     {/* 資料來源說明 */}
                     <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 text-xs text-sky-800">
                         ℹ️ 本專區僅分析<strong>酒駕</strong>相關案件，與其他事故原因無關。
-                        酒駕肇事數來源為<strong>舉發單「攔舉-肇事」子類</strong>（強制填寫，比事故表 A1/A2/A3 可靠）。
+                        雙來源：<strong>事故表（飲酒情形 4-8 排除行人）</strong>= 真實涉酒事故；
+                        <strong>舉發單（攔舉-肇事 + 關鍵字）</strong>= 已開單酒駕肇事。差距即為黑數。
                     </div>
+
+                    {/* 黑數警示卡：事故表側真實涉酒事故 vs 舉發單側已開單肇事 */}
+                    {hotspots?.summary && (
+                      (() => {
+                        const real = (hotspots.summary as any).crash_dui_real_total ?? 0;
+                        const cited = hotspots.summary.dui_crash_total ?? 0;
+                        const gap = (hotspots.summary as any).dui_dark_figure ?? Math.max(0, real - cited);
+                        if (real === 0 && cited === 0) return null;
+                        return (
+                          <div className={`rounded-2xl p-4 border-2 ${gap > 0 ? 'bg-rose-50 border-rose-400' : 'bg-emerald-50 border-emerald-400'}`}>
+                            <div className="flex items-center justify-between gap-4 flex-wrap">
+                              <div>
+                                <h4 className="font-bold text-nook-text mb-1">
+                                  {gap > 0 ? '⚠️ 酒駕執法黑數揭露' : '✅ 涉酒事故已全數對應舉發'}
+                                </h4>
+                                <p className="text-xs text-nook-text/60">
+                                  事故表記載涉酒事故 vs 舉發單實際開出的酒駕肇事；差距代表事故發生但未開單的潛在缺口。
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="text-center px-3">
+                                  <p className="text-2xl font-bold text-rose-700 tabular-nums">{real}</p>
+                                  <p className="text-[11px] text-rose-600">🚗 事故涉酒</p>
+                                  <p className="text-[10px] text-nook-text/40">飲酒情形 4-8</p>
+                                </div>
+                                <span className="text-2xl text-nook-text/40">→</span>
+                                <div className="text-center px-3">
+                                  <p className="text-2xl font-bold text-amber-700 tabular-nums">{cited}</p>
+                                  <p className="text-[11px] text-amber-600">📋 舉發肇事</p>
+                                  <p className="text-[10px] text-nook-text/40">攔舉-肇事+關鍵字</p>
+                                </div>
+                                <span className="text-2xl text-nook-text/40">=</span>
+                                <div className="text-center px-3 border-l-2 border-rose-300">
+                                  <p className={`text-2xl font-bold tabular-nums ${gap > 0 ? 'text-rose-800' : 'text-emerald-700'}`}>{gap}</p>
+                                  <p className={`text-[11px] font-bold ${gap > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                                    {gap > 0 ? '⚠ 黑數' : '✓ 無黑數'}
+                                  </p>
+                                  <p className="text-[10px] text-nook-text/40">未對應到舉發</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    )}
 
                     {/* 酒駕統計概要 - 純 DUI 指標 */}
                     <div className="grid grid-cols-5 gap-4">

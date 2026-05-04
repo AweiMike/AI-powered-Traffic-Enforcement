@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from app.database import get_db
 from app.models.core import Ticket, Crash
 from app.models.dimension import Site
-from app.utils.dui_crash import dui_crash_filter
+from app.utils.dui_crash import dui_crash_filter, crash_dui_real_filter
 
 router = APIRouter()
 
@@ -461,7 +461,8 @@ async def get_accident_hotspots(
         func.sum(case((Crash.severity == 'A2', 1), else_=0)).label('a2_count'),
         func.sum(case((Crash.severity == 'A3', 1), else_=0)).label('a3_count'),
         func.sum(Crash.severity_weight).label('severity_score'),
-        func.sum(case((Crash.suspected_alcohol == True, 1), else_=0)).label('dui_crashes'),
+        # 改用 is_dui_crash_party (飲酒情形 4-8 + 排除行人) ground truth
+        func.sum(case((Crash.is_dui_crash_party == True, 1), else_=0)).label('dui_crashes'),
         func.coalesce(func.sum(Crash.death_count), 0).label('death_total'),
         func.coalesce(func.sum(Crash.injury_count), 0).label('injury_total'),
     ).filter(
@@ -470,6 +471,7 @@ async def get_accident_hotspots(
 
     hotspots = []
     a1_total = a2_total = a3_total = dui_crash_total = 0
+    crash_dui_real_total = 0  # 事故表 ground truth (is_dui_crash_party 加總)
     death_grand_total = injury_grand_total = 0
 
     for district, total, a1, a2, a3, severity_score, dui_crashes, deaths, injuries in crash_stats:
@@ -483,10 +485,11 @@ async def get_accident_hotspots(
         a1 = a1 or 0
         a2 = a2 or 0
         a3 = a3 or 0
-        dui_crashes = dui_crashes or 0  # Crash.suspected_alcohol 來源（保留作為對照，已知低估）
+        dui_crashes = dui_crashes or 0  # 事故表 ground truth (is_dui_crash_party)
         a1_total += a1
         a2_total += a2
         a3_total += a3
+        crash_dui_real_total += dui_crashes  # 累加事故表側真實酒駕案件數
         # dui_crash_total 改用 Ticket 攔舉-肇事真實計數，於下方計算後累加
         death_grand_total += deaths or 0
         injury_grand_total += injuries or 0
@@ -573,7 +576,9 @@ async def get_accident_hotspots(
             'a1_total': a1_total,
             'a2_total': a2_total,
             'a3_total': a3_total,
-            'dui_crash_total': dui_crash_total,
+            'dui_crash_total': dui_crash_total,             # Ticket UNION (有開單的酒駕肇事)
+            'crash_dui_real_total': crash_dui_real_total,    # Crash ground truth (事故表側真實酒駕案件)
+            'dui_dark_figure': max(0, crash_dui_real_total - dui_crash_total),  # 黑數 = 涉酒事故未對應到舉發
             'total_dui_violations': sum(h['violations']['dui'] for h in hotspots),
             'death_total': death_grand_total,
             'injury_total': injury_grand_total,
@@ -946,7 +951,7 @@ async def get_dui_environment_analysis(
         Crash.weather,
         func.count(Crash.id).label('count')
     ).filter(
-        Crash.suspected_alcohol == True,
+        Crash.is_dui_crash_party == True,
         Crash.occurred_date >= start_date,
         Crash.occurred_date <= end_date,
         Crash.weather.isnot(None)
@@ -957,7 +962,7 @@ async def get_dui_environment_analysis(
         Crash.light,
         func.count(Crash.id).label('count')
     ).filter(
-        Crash.suspected_alcohol == True,
+        Crash.is_dui_crash_party == True,
         Crash.occurred_date >= start_date,
         Crash.occurred_date <= end_date,
         Crash.light.isnot(None)
@@ -965,7 +970,7 @@ async def get_dui_environment_analysis(
     
     # 總計
     total_dui = db.query(func.count(Crash.id)).filter(
-        Crash.suspected_alcohol == True,
+        Crash.is_dui_crash_party == True,
         Crash.occurred_date >= start_date,
         Crash.occurred_date <= end_date
     ).scalar() or 0

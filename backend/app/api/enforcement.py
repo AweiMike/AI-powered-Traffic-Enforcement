@@ -11,7 +11,7 @@ from datetime import datetime, date
 
 from app.database import get_db
 from app.models.core import Ticket, Crash
-from app.utils.dui_crash import dui_crash_filter, dui_refusal_filter
+from app.utils.dui_crash import dui_crash_filter, dui_refusal_filter, crash_dui_real_filter
 
 router = APIRouter()
 
@@ -169,7 +169,7 @@ async def get_dui_performance(
         ).filter(
             Crash.occurred_date >= s,
             Crash.occurred_date <= e,
-            Crash.suspected_alcohol == True,
+            crash_dui_real_filter(),  # 改用 ground truth (飲酒情形 4-8 排除行人)
         ).group_by(Crash.sub_unit, Crash.severity).all()
 
     def aggregate_crashes(rows):

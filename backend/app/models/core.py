@@ -70,7 +70,23 @@ class Crash(Base):
 
     # === 主題相關（可能無法判定） ===
     suspected_alcohol = Column(
-        Boolean, default=False, comment="疑似酒駕（若有明確資訊）"
+        Boolean, default=False, index=True,
+        comment="疑似酒駕（與 is_dui_crash_party 同步維護，沿用舊查詢用）"
+    )
+    # 飲酒情形代碼（EIS 32. 欄位）4-8 表示有飲酒，其他無或未填
+    drinking_code = Column(
+        String(2), index=True,
+        comment="飲酒情形代碼（駕駛者）：04-08=有飲酒；02=無；01/未填=未調查"
+    )
+    # 當事者區分子類別代碼（EIS 26. 欄位）H 開頭=行人，B/C 開頭=機車/汽車等
+    party_subtype_code = Column(
+        String(10), index=True,
+        comment="當事者區分子類別代碼（駕駛者）：H開頭=行人、B/C/F=車輛、A=其他"
+    )
+    # 案件層級 rollup：該案件是否有非行人當事者飲酒
+    is_dui_crash_party = Column(
+        Boolean, default=False, index=True,
+        comment="案件層級判定：任一非行人當事者飲酒情形∈4-8 即為 True（事故表ground truth）"
     )
     cause = Column(String(200), index=True, comment="肇事主要原因")
     party_type = Column(String(50), index=True, comment="當事人車種（如：自用小客車、機車、行人）")

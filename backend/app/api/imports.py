@@ -617,6 +617,62 @@ async def import_crash_file(
         error_messages = []
         seen_case_ids: set = set()
 
+        # ==============================================================
+        # Pre-pass：以 case_id 為單位 rollup 飲酒情形
+        # ==============================================================
+        # EIS 是 per-當事者 row，多筆共用 case_id。原 import 邏輯只保留第一 row，
+        # 會丟失「行人 + 肇事駕駛飲酒」這類情境的駕駛資訊。
+        #
+        # 規則：
+        #   - 飲酒情形代碼 ∈ {04,05,06,07,08} 視為「有飲酒」
+        #   - 當事者區分子類別代碼 H 開頭視為「行人」（飲酒行人不算酒駕肇事）
+        #   - is_dui_crash_party = (任一非行人當事者有飲酒)
+        # 駕駛者欄位（drinking_code, party_subtype_code）的選擇優先序：
+        #   1) 非行人 + 有飲酒（首選，肇事駕駛）
+        #   2) 非行人 + 任意飲酒值（次選）
+        #   3) 第一筆 row（行人為主案件 fallback）
+        case_rollup: dict[str, dict] = {}
+        if data_format == "EIS":
+            DRINKING_CODES = {"04", "05", "06", "07", "08", "4", "5", "6", "7", "8"}
+            for _, row in df.iterrows():
+                # 取案件編號
+                rid = None
+                for col_name in ["總編號(案件編號)", "總編號（案件編號）", "案件編號", "總編號"]:
+                    if col_name in row.index and pd.notna(row.get(col_name)):
+                        val = str(row.get(col_name)).strip()
+                        if val:
+                            rid = val
+                            break
+                if not rid:
+                    continue
+
+                subtype = _safe_eis_str(row, "26.當事者區分(類別)子類別代碼(車種)") or ""
+                drinking = _safe_eis_str(row, "32.飲酒情形代碼") or ""
+                # 標準化（02 vs 2）
+                subtype = subtype.strip()
+                drinking = drinking.strip().lstrip("0") or drinking.strip()
+
+                is_pedestrian = subtype.startswith("H")
+                is_drinking = drinking in DRINKING_CODES or drinking in {"4", "5", "6", "7", "8"}
+
+                bucket = case_rollup.setdefault(rid, {
+                    "has_drinking_party": False,
+                    "driver_subtype_code": None,
+                    "driver_drinking_code": None,
+                    "_picked_priority": 0,  # 內部用：1=肇事駕駛飲酒, 2=非行人, 3=fallback
+                })
+
+                # 旗標：只要有任何非行人飲酒就標記
+                if not is_pedestrian and is_drinking:
+                    bucket["has_drinking_party"] = True
+
+                # 駕駛代表 row 選擇（priority 越高越佳，3>2>1）
+                priority = 3 if (not is_pedestrian and is_drinking) else (2 if not is_pedestrian else 1)
+                if priority > bucket["_picked_priority"]:
+                    bucket["_picked_priority"] = priority
+                    bucket["driver_subtype_code"] = subtype[:10] if subtype else None
+                    bucket["driver_drinking_code"] = drinking[:2] if drinking else None
+
         for idx, row in df.iterrows():
             try:
                 # ============================
@@ -720,18 +776,29 @@ async def import_crash_file(
                     weather = _safe_eis_str(row, "天候") or None
                     light = _safe_eis_str(row, "光線") or None
 
-                    # --- 酒駕 ---
-                    suspected_alcohol = False
-                    alcohol_val = _safe_eis_str(row, "酒測值") or _safe_eis_str(row, "飲酒情形")
-                    if alcohol_val:
-                        if "飲酒" in alcohol_val or "酒後" in alcohol_val:
-                            suspected_alcohol = True
-                        else:
-                            try:
-                                if float(alcohol_val) > 0:
-                                    suspected_alcohol = True
-                            except (ValueError, TypeError):
-                                pass
+                    # --- 酒駕（新邏輯：用 32. 飲酒情形代碼 + 排除行人）---
+                    # 從 case_rollup 取得本案件層級的 ground truth（pre-pass 算好）
+                    rollup = case_rollup.get(case_id, {})
+                    is_dui_crash_party = bool(rollup.get("has_drinking_party", False))
+                    drinking_code = rollup.get("driver_drinking_code")
+                    party_subtype_code = rollup.get("driver_subtype_code")
+                    # suspected_alcohol 與新欄位同步維護（沿用舊查詢）
+                    suspected_alcohol = is_dui_crash_party
+
+                    # 舊邏輯 fallback（若資料未含新欄位，例如歷史檔）
+                    if not is_dui_crash_party and (drinking_code is None and party_subtype_code is None):
+                        alcohol_val = _safe_eis_str(row, "酒測值") or _safe_eis_str(row, "飲酒情形")
+                        if alcohol_val:
+                            if "飲酒" in alcohol_val or "酒後" in alcohol_val:
+                                suspected_alcohol = True
+                                is_dui_crash_party = True
+                            else:
+                                try:
+                                    if float(alcohol_val) > 0:
+                                        suspected_alcohol = True
+                                        is_dui_crash_party = True
+                                except (ValueError, TypeError):
+                                    pass
 
                 # ============================
                 # 分局舊格式處理路徑（LEGACY）
@@ -796,6 +863,11 @@ async def import_crash_file(
                                     suspected_alcohol = True
                             except (ValueError, TypeError):
                                 pass
+
+                    # LEGACY 沒有結構化代碼，只能 fallback 用 suspected_alcohol 同步新欄位
+                    drinking_code = None
+                    party_subtype_code = None
+                    is_dui_crash_party = suspected_alcohol
 
                 # ============================
                 # 共用欄位（兩種格式皆走此路徑）
@@ -884,6 +956,10 @@ async def import_crash_file(
                     party_type=party_type,
                     cause=cause,
                     suspected_alcohol=suspected_alcohol,
+                    # 新邏輯：飲酒情形代碼 + 行人排除（EIS 才有；LEGACY 為 None）
+                    drinking_code=drinking_code,
+                    party_subtype_code=party_subtype_code,
+                    is_dui_crash_party=is_dui_crash_party,
                     # EIS 擴充欄位
                     precinct=precinct,
                     sub_unit=sub_unit,
@@ -1034,6 +1110,38 @@ def _do_batch_import(txt_files: list, db):
             stats = {"total": len(df), "new": 0, "skipped": 0, "errors": 0, "updated": 0}
             coords_stats = {"with_gps": 0, "fallback": 0}
 
+            # Pre-pass：以 case_id 為單位 rollup 飲酒情形（同 web import 邏輯）
+            case_rollup: dict[str, dict] = {}
+            if data_format == "EIS":
+                _DRINKING_CODES = {"04", "05", "06", "07", "08", "4", "5", "6", "7", "8"}
+                for _, _row in df.iterrows():
+                    _rid = None
+                    for _c in ["總編號(案件編號)", "總編號（案件編號）", "案件編號", "總編號"]:
+                        if _c in _row.index and pd.notna(_row.get(_c)):
+                            _v = str(_row.get(_c)).strip()
+                            if _v:
+                                _rid = _v
+                                break
+                    if not _rid:
+                        continue
+                    _subtype = (_safe_eis_str(_row, "26.當事者區分(類別)子類別代碼(車種)") or "").strip()
+                    _drinking = (_safe_eis_str(_row, "32.飲酒情形代碼") or "").strip()
+                    _is_pedestrian = _subtype.startswith("H")
+                    _is_drinking = _drinking in _DRINKING_CODES
+                    _bucket = case_rollup.setdefault(_rid, {
+                        "has_drinking_party": False,
+                        "driver_subtype_code": None,
+                        "driver_drinking_code": None,
+                        "_picked_priority": 0,
+                    })
+                    if not _is_pedestrian and _is_drinking:
+                        _bucket["has_drinking_party"] = True
+                    _priority = 3 if (not _is_pedestrian and _is_drinking) else (2 if not _is_pedestrian else 1)
+                    if _priority > _bucket["_picked_priority"]:
+                        _bucket["_picked_priority"] = _priority
+                        _bucket["driver_subtype_code"] = _subtype[:10] if _subtype else None
+                        _bucket["driver_drinking_code"] = _drinking[:2] if _drinking else None
+
             for idx, row in df.iterrows():
                 try:
                     # 案件編號
@@ -1115,17 +1223,27 @@ def _do_batch_import(txt_files: list, db):
                         )
                         weather = _safe_eis_str(row, "天候") or None
                         light = _safe_eis_str(row, "光線") or None
-                        suspected_alcohol = False
-                        alcohol_val = _safe_eis_str(row, "酒測值") or _safe_eis_str(row, "飲酒情形")
-                        if alcohol_val:
-                            if "飲酒" in alcohol_val or "酒後" in alcohol_val:
-                                suspected_alcohol = True
-                            else:
-                                try:
-                                    if float(alcohol_val) > 0:
-                                        suspected_alcohol = True
-                                except (ValueError, TypeError):
-                                    pass
+                        # 新邏輯：飲酒情形代碼（從 case_rollup 取）
+                        rollup = case_rollup.get(case_id, {})
+                        is_dui_crash_party = bool(rollup.get("has_drinking_party", False))
+                        drinking_code = rollup.get("driver_drinking_code")
+                        party_subtype_code = rollup.get("driver_subtype_code")
+                        suspected_alcohol = is_dui_crash_party
+
+                        # 舊邏輯 fallback
+                        if not is_dui_crash_party and (drinking_code is None and party_subtype_code is None):
+                            alcohol_val = _safe_eis_str(row, "酒測值") or _safe_eis_str(row, "飲酒情形")
+                            if alcohol_val:
+                                if "飲酒" in alcohol_val or "酒後" in alcohol_val:
+                                    suspected_alcohol = True
+                                    is_dui_crash_party = True
+                                else:
+                                    try:
+                                        if float(alcohol_val) > 0:
+                                            suspected_alcohol = True
+                                            is_dui_crash_party = True
+                                    except (ValueError, TypeError):
+                                        pass
                     else:
                         # LEGACY 路徑（TXT 通常不會走到這裡）
                         stats["errors"] += 1
@@ -1206,6 +1324,9 @@ def _do_batch_import(txt_files: list, db):
                         party_type=party_type,
                         cause=cause,
                         suspected_alcohol=suspected_alcohol,
+                        drinking_code=drinking_code,
+                        party_subtype_code=party_subtype_code,
+                        is_dui_crash_party=is_dui_crash_party,
                         precinct=precinct,
                         sub_unit=sub_unit,
                         death_count=death_count,
@@ -1532,6 +1653,38 @@ async def import_crash_upload_batch(
             stats = {"total": len(df), "new": 0, "skipped": 0, "errors": 0, "updated": 0}
             coords_stats = {"with_gps": 0, "fallback": 0}
 
+            # Pre-pass：以 case_id 為單位 rollup 飲酒情形（同 web/batch import）
+            case_rollup: dict[str, dict] = {}
+            if data_format == "EIS":
+                _DRINKING_CODES = {"04", "05", "06", "07", "08", "4", "5", "6", "7", "8"}
+                for _, _row in df.iterrows():
+                    _rid = None
+                    for _c in ["總編號(案件編號)", "總編號（案件編號）", "案件編號", "總編號"]:
+                        if _c in _row.index and pd.notna(_row.get(_c)):
+                            _v = str(_row.get(_c)).strip()
+                            if _v:
+                                _rid = _v
+                                break
+                    if not _rid:
+                        continue
+                    _subtype = (_safe_eis_str(_row, "26.當事者區分(類別)子類別代碼(車種)") or "").strip()
+                    _drinking = (_safe_eis_str(_row, "32.飲酒情形代碼") or "").strip()
+                    _is_pedestrian = _subtype.startswith("H")
+                    _is_drinking = _drinking in _DRINKING_CODES
+                    _bucket = case_rollup.setdefault(_rid, {
+                        "has_drinking_party": False,
+                        "driver_subtype_code": None,
+                        "driver_drinking_code": None,
+                        "_picked_priority": 0,
+                    })
+                    if not _is_pedestrian and _is_drinking:
+                        _bucket["has_drinking_party"] = True
+                    _priority = 3 if (not _is_pedestrian and _is_drinking) else (2 if not _is_pedestrian else 1)
+                    if _priority > _bucket["_picked_priority"]:
+                        _bucket["_picked_priority"] = _priority
+                        _bucket["driver_subtype_code"] = _subtype[:10] if _subtype else None
+                        _bucket["driver_drinking_code"] = _drinking[:2] if _drinking else None
+
             for idx, row in df.iterrows():
                 try:
                     # 案件編號
@@ -1613,17 +1766,27 @@ async def import_crash_upload_batch(
                         weather = _safe_eis_str(row, "天候") or None
                         light = _safe_eis_str(row, "光線") or None
 
-                        suspected_alcohol = False
-                        alcohol_val = _safe_eis_str(row, "酒測值") or _safe_eis_str(row, "飲酒情形")
-                        if alcohol_val:
-                            if "飲酒" in alcohol_val or "酒後" in alcohol_val:
-                                suspected_alcohol = True
-                            else:
-                                try:
-                                    if float(alcohol_val) > 0:
-                                        suspected_alcohol = True
-                                except (ValueError, TypeError):
-                                    pass
+                        # 新邏輯：飲酒情形代碼（從 case_rollup 取）
+                        rollup = case_rollup.get(case_id, {})
+                        is_dui_crash_party = bool(rollup.get("has_drinking_party", False))
+                        drinking_code = rollup.get("driver_drinking_code")
+                        party_subtype_code = rollup.get("driver_subtype_code")
+                        suspected_alcohol = is_dui_crash_party
+
+                        # 舊邏輯 fallback
+                        if not is_dui_crash_party and (drinking_code is None and party_subtype_code is None):
+                            alcohol_val = _safe_eis_str(row, "酒測值") or _safe_eis_str(row, "飲酒情形")
+                            if alcohol_val:
+                                if "飲酒" in alcohol_val or "酒後" in alcohol_val:
+                                    suspected_alcohol = True
+                                    is_dui_crash_party = True
+                                else:
+                                    try:
+                                        if float(alcohol_val) > 0:
+                                            suspected_alcohol = True
+                                            is_dui_crash_party = True
+                                    except (ValueError, TypeError):
+                                        pass
                     else:
                         occurred_dt = None
                         for time_col in ["發生時間", "事故時間", "發生日期時間", "日期時間", "時間", "發生日期"]:
@@ -1677,6 +1840,11 @@ async def import_crash_upload_batch(
                                         suspected_alcohol = True
                                 except (ValueError, TypeError):
                                     pass
+
+                        # LEGACY 沒有結構化代碼，is_dui_crash_party 同步 suspected_alcohol
+                        drinking_code = None
+                        party_subtype_code = None
+                        is_dui_crash_party = suspected_alcohol
 
                     # 共用欄位
                     age_val = (
@@ -1753,6 +1921,9 @@ async def import_crash_upload_batch(
                         party_type=party_type,
                         cause=cause,
                         suspected_alcohol=suspected_alcohol,
+                        drinking_code=drinking_code,
+                        party_subtype_code=party_subtype_code,
+                        is_dui_crash_party=is_dui_crash_party,
                         precinct=precinct,
                         sub_unit=sub_unit,
                         death_count=death_count,
