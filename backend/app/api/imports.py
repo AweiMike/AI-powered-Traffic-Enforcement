@@ -634,6 +634,10 @@ async def import_crash_file(
         case_rollup: dict[str, dict] = {}
         if data_format == "EIS":
             DRINKING_CODES = {"04", "05", "06", "07", "08", "4", "5", "6", "7", "8"}
+            # 補強信號：如果 飲酒情形代碼 漏填，但肇因 = '酒醉駕駛'(53) 或文字含關鍵字
+            ALCOHOL_CAUSE_CODES = {"53"}
+            ALCOHOL_KEYWORDS = ["酒醉", "酒後", "飲酒", "醉駕"]
+
             for _, row in df.iterrows():
                 # 取案件編號
                 rid = None
@@ -648,12 +652,22 @@ async def import_crash_file(
 
                 subtype = _safe_eis_str(row, "26.當事者區分(類別)子類別代碼(車種)") or ""
                 drinking = _safe_eis_str(row, "32.飲酒情形代碼") or ""
+                cause_code = _safe_eis_str(row, "34.初步分析研判-個別代碼") or ""
+                cause_text = _safe_eis_str(row, "34.初步分析研判子類別-主要") or ""
                 # 標準化（02 vs 2）
                 subtype = subtype.strip()
                 drinking = drinking.strip().lstrip("0") or drinking.strip()
+                cause_code = cause_code.strip().lstrip("0") or cause_code.strip()
 
                 is_pedestrian = subtype.startswith("H")
-                is_drinking = drinking in DRINKING_CODES or drinking in {"4", "5", "6", "7", "8"}
+                # 主信號：飲酒情形 4-8
+                is_drinking_primary = drinking in DRINKING_CODES or drinking in {"4", "5", "6", "7", "8"}
+                # 補強信號：肇因代碼 53 或文字含「酒醉/酒後/飲酒/醉駕」
+                is_drinking_secondary = (
+                    cause_code in ALCOHOL_CAUSE_CODES
+                    or any(kw in cause_text for kw in ALCOHOL_KEYWORDS)
+                )
+                is_drinking = is_drinking_primary or is_drinking_secondary
 
                 bucket = case_rollup.setdefault(rid, {
                     "has_drinking_party": False,
@@ -671,6 +685,7 @@ async def import_crash_file(
                 if priority > bucket["_picked_priority"]:
                     bucket["_picked_priority"] = priority
                     bucket["driver_subtype_code"] = subtype[:10] if subtype else None
+                    # 駕駛代碼優先取真實飲酒值；若僅靠補強信號才被標記，drinking 為空字串時不寫入
                     bucket["driver_drinking_code"] = drinking[:2] if drinking else None
 
         for idx, row in df.iterrows():
@@ -1114,6 +1129,8 @@ def _do_batch_import(txt_files: list, db):
             case_rollup: dict[str, dict] = {}
             if data_format == "EIS":
                 _DRINKING_CODES = {"04", "05", "06", "07", "08", "4", "5", "6", "7", "8"}
+                _ALCOHOL_CAUSE_CODES = {"53"}
+                _ALCOHOL_KEYWORDS = ["酒醉", "酒後", "飲酒", "醉駕"]
                 for _, _row in df.iterrows():
                     _rid = None
                     for _c in ["總編號(案件編號)", "總編號（案件編號）", "案件編號", "總編號"]:
@@ -1126,8 +1143,15 @@ def _do_batch_import(txt_files: list, db):
                         continue
                     _subtype = (_safe_eis_str(_row, "26.當事者區分(類別)子類別代碼(車種)") or "").strip()
                     _drinking = (_safe_eis_str(_row, "32.飲酒情形代碼") or "").strip()
+                    _cause_code = (_safe_eis_str(_row, "34.初步分析研判-個別代碼") or "").strip().lstrip("0")
+                    _cause_text = _safe_eis_str(_row, "34.初步分析研判子類別-主要") or ""
                     _is_pedestrian = _subtype.startswith("H")
-                    _is_drinking = _drinking in _DRINKING_CODES
+                    _is_drinking_primary = _drinking in _DRINKING_CODES
+                    _is_drinking_secondary = (
+                        _cause_code in _ALCOHOL_CAUSE_CODES
+                        or any(kw in _cause_text for kw in _ALCOHOL_KEYWORDS)
+                    )
+                    _is_drinking = _is_drinking_primary or _is_drinking_secondary
                     _bucket = case_rollup.setdefault(_rid, {
                         "has_drinking_party": False,
                         "driver_subtype_code": None,
@@ -1657,6 +1681,8 @@ async def import_crash_upload_batch(
             case_rollup: dict[str, dict] = {}
             if data_format == "EIS":
                 _DRINKING_CODES = {"04", "05", "06", "07", "08", "4", "5", "6", "7", "8"}
+                _ALCOHOL_CAUSE_CODES = {"53"}
+                _ALCOHOL_KEYWORDS = ["酒醉", "酒後", "飲酒", "醉駕"]
                 for _, _row in df.iterrows():
                     _rid = None
                     for _c in ["總編號(案件編號)", "總編號（案件編號）", "案件編號", "總編號"]:
@@ -1669,8 +1695,15 @@ async def import_crash_upload_batch(
                         continue
                     _subtype = (_safe_eis_str(_row, "26.當事者區分(類別)子類別代碼(車種)") or "").strip()
                     _drinking = (_safe_eis_str(_row, "32.飲酒情形代碼") or "").strip()
+                    _cause_code = (_safe_eis_str(_row, "34.初步分析研判-個別代碼") or "").strip().lstrip("0")
+                    _cause_text = _safe_eis_str(_row, "34.初步分析研判子類別-主要") or ""
                     _is_pedestrian = _subtype.startswith("H")
-                    _is_drinking = _drinking in _DRINKING_CODES
+                    _is_drinking_primary = _drinking in _DRINKING_CODES
+                    _is_drinking_secondary = (
+                        _cause_code in _ALCOHOL_CAUSE_CODES
+                        or any(kw in _cause_text for kw in _ALCOHOL_KEYWORDS)
+                    )
+                    _is_drinking = _is_drinking_primary or _is_drinking_secondary
                     _bucket = case_rollup.setdefault(_rid, {
                         "has_drinking_party": False,
                         "driver_subtype_code": None,
