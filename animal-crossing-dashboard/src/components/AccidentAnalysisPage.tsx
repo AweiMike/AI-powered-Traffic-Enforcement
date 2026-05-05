@@ -303,43 +303,48 @@ const AccidentAnalysisPage: React.FC = () => {
                         <strong>舉發單（攔舉-肇事 + 關鍵字）</strong>= 已開單酒駕肇事。差距即為黑數。
                     </div>
 
-                    {/* 黑數警示卡：事故表側真實涉酒事故 vs 舉發單側已開單肇事 */}
+                    {/* Subtype 標記品質警示卡：Crash ground truth vs Ticket subtype 標記
+                        說明：法律上每件酒駕事故都會開 §35 單，所以 Ticket 與 Crash 應同數；
+                        若 Ticket UNION (subtype/關鍵字) 抓到的少於 Crash 側，代表同仁有 4 件
+                        應標 攔舉-肇事 卻標成 攔舉-一般，是「subtype 標記漏失」非真黑數。 */}
                     {hotspots?.summary && (
                       (() => {
                         const real = (hotspots.summary as any).crash_dui_real_total ?? 0;
                         const cited = hotspots.summary.dui_crash_total ?? 0;
-                        const gap = (hotspots.summary as any).dui_dark_figure ?? Math.max(0, real - cited);
+                        const gap = Math.max(0, real - cited);
                         if (real === 0 && cited === 0) return null;
                         return (
-                          <div className={`rounded-2xl p-4 border-2 ${gap > 0 ? 'bg-rose-50 border-rose-400' : 'bg-emerald-50 border-emerald-400'}`}>
+                          <div className={`rounded-2xl p-4 border-2 ${gap > 0 ? 'bg-amber-50 border-amber-400' : 'bg-emerald-50 border-emerald-400'}`}>
                             <div className="flex items-center justify-between gap-4 flex-wrap">
                               <div>
                                 <h4 className="font-bold text-nook-text mb-1">
-                                  {gap > 0 ? '⚠️ 酒駕執法黑數揭露' : '✅ 涉酒事故已全數對應舉發'}
+                                  {gap > 0 ? '⚠️ Ticket subtype 標記品質追蹤' : '✅ subtype 標記與事故表一致'}
                                 </h4>
                                 <p className="text-xs text-nook-text/60">
-                                  事故表記載涉酒事故 vs 舉發單實際開出的酒駕肇事；差距代表事故發生但未開單的潛在缺口。
+                                  事故表 (飲酒情形 4-8) vs 舉發單 subtype 標記為「攔舉-肇事」者；
+                                  差距代表同仁未將肇事案件正確勾選 subtype，
+                                  <strong>非真實漏單</strong>（依 §35 法定都會開單）。
                                 </p>
                               </div>
                               <div className="flex items-center gap-3">
                                 <div className="text-center px-3">
                                   <p className="text-2xl font-bold text-rose-700 tabular-nums">{real}</p>
-                                  <p className="text-[11px] text-rose-600">🚗 事故涉酒</p>
-                                  <p className="text-[10px] text-nook-text/40">飲酒情形 4-8</p>
+                                  <p className="text-[11px] text-rose-600">🚗 酒駕事故</p>
+                                  <p className="text-[10px] text-nook-text/40">事故表 ground truth</p>
                                 </div>
-                                <span className="text-2xl text-nook-text/40">→</span>
+                                <span className="text-2xl text-nook-text/40">↔</span>
                                 <div className="text-center px-3">
                                   <p className="text-2xl font-bold text-amber-700 tabular-nums">{cited}</p>
-                                  <p className="text-[11px] text-amber-600">📋 舉發肇事</p>
-                                  <p className="text-[10px] text-nook-text/40">攔舉-肇事+關鍵字</p>
+                                  <p className="text-[11px] text-amber-600">📋 subtype 標肇事</p>
+                                  <p className="text-[10px] text-nook-text/40">攔舉-肇事 (officer 標)</p>
                                 </div>
-                                <span className="text-2xl text-nook-text/40">=</span>
-                                <div className="text-center px-3 border-l-2 border-rose-300">
-                                  <p className={`text-2xl font-bold tabular-nums ${gap > 0 ? 'text-rose-800' : 'text-emerald-700'}`}>{gap}</p>
-                                  <p className={`text-[11px] font-bold ${gap > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
-                                    {gap > 0 ? '⚠ 黑數' : '✓ 無黑數'}
+                                <span className="text-2xl text-nook-text/40">差</span>
+                                <div className="text-center px-3 border-l-2 border-amber-300">
+                                  <p className={`text-2xl font-bold tabular-nums ${gap > 0 ? 'text-amber-800' : 'text-emerald-700'}`}>{gap}</p>
+                                  <p className={`text-[11px] font-bold ${gap > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                                    {gap > 0 ? '⚠ 待補標' : '✓ 一致'}
                                   </p>
-                                  <p className="text-[10px] text-nook-text/40">未對應到舉發</p>
+                                  <p className="text-[10px] text-nook-text/40">subtype 漏標</p>
                                 </div>
                               </div>
                             </div>
