@@ -302,13 +302,13 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
         });
 
         const topicCount: Record<string, number> = { DUI: 0, RED_LIGHT: 0, DANGEROUS_DRIVING: 0, OTHER: 0 };
-        // 圈內酒駕中含肇事的件數（UNION 信號，含黑數修復）
-        let duiCrashCountInCircle = 0;
         ticketsIn.forEach(t => {
             if (t.topic && t.topic in topicCount) topicCount[t.topic]++;
             else topicCount.OTHER++;
-            if (t.topic === 'DUI' && t.is_dui_crash) duiCrashCountInCircle++;
         });
+        // 圈內含肇事件數：用 Crash 側 ground truth（is_dui_crash_party），與 §35 法律規定一致
+        // 不再用 Ticket UNION 的 is_dui_crash 旗標（那是 subtype 標記，會低估）
+        const duiCrashCountInCircle = crashesIn.filter(c => c.is_dui).length;
 
         const unitCount: Record<string, number> = {};
         [...crashesIn, ...ticketsIn].forEach(p => {
@@ -708,19 +708,11 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                         <span className="text-purple-600 text-xs">🍺 酒駕</span>
                                         <span className="font-medium text-purple-700 text-xs">
                                             {data.summary.dui_tickets}
-                                            {(data.summary.dui_crash_tickets ?? 0) > 0 && (
+                                            {(data.summary.dui_real_crashes ?? 0) > 0 && (
                                                 <span className="ml-1 text-red-600">
-                                                    （含肇事舉發 {data.summary.dui_crash_tickets}）
+                                                    （含肇事舉發 {data.summary.dui_real_crashes}）
                                                 </span>
                                             )}
-                                        </span>
-                                    </div>
-                                )}
-                                {(data.summary.dui_real_crashes ?? 0) > 0 && (
-                                    <div className="flex justify-between pl-2 border-t border-nook-cream/40 pt-1 mt-1">
-                                        <span className="text-red-700 text-xs font-semibold">🚗 涉酒事故</span>
-                                        <span className="font-bold text-red-700 text-xs">
-                                            {data.summary.dui_real_crashes} 件
                                         </span>
                                     </div>
                                 )}

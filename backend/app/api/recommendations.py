@@ -653,18 +653,19 @@ async def get_accident_peak_times(
         Ticket.topic_dui == True
     ).group_by(Ticket.shift_id).all()
 
-    # 酒駕肇事舉發（UNION：subtype 攔舉-肇事 OR violation_name 含肇事關鍵字）
-    # 修復同仁誤標「攔舉-一般」的黑數
+    # 酒駕肇事 per shift：改用 Crash 側 ground truth (is_dui_crash_party)
+    # 因 §35 法律規定酒駕事故必開單，Crash 側計數即為真實肇事舉發數。
+    # 注意：此處 group by Crash.shift_id (= 事故發生時段)，
+    # 跟 Ticket.shift_id (= 違規舉發時段) 通常一致，但分析角度更準確。
     dui_crash_by_shift = db.query(
-        Ticket.shift_id,
-        func.count(Ticket.id).label('count')
+        Crash.shift_id,
+        func.count(Crash.id).label('count')
     ).filter(
-        Ticket.violation_date >= start_date,
-        Ticket.violation_date <= end_date,
-        Ticket.district.in_(district_variants),
-        Ticket.topic_dui == True,
-        dui_crash_filter(),
-    ).group_by(Ticket.shift_id).all()
+        Crash.occurred_date >= start_date,
+        Crash.occurred_date <= end_date,
+        Crash.district.in_(district_variants),
+        Crash.is_dui_crash_party == True,
+    ).group_by(Crash.shift_id).all()
 
     crash_dict = {s.shift_id: s.count for s in crash_by_shift}
     violation_dict = {s.shift_id: s.count for s in violation_by_shift}
