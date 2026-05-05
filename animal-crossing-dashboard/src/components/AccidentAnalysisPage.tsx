@@ -460,7 +460,7 @@ const AccidentAnalysisPage: React.FC = () => {
                             </div>
                             {selectedDistrict && peakTimes ? (
                                 <div className="bg-white/80 rounded-2xl p-4 nook-shadow">
-                                    <h5 className="font-bold text-nook-text mb-2">{peakTimes.district} 酒駕告發時段分布</h5>
+                                    <h5 className="font-bold text-nook-text mb-2">{peakTimes.district} 酒駕案件時段分布</h5>
                                     {/* 圖例 */}
                                     <div className="flex items-center gap-4 mb-3 text-[11px] text-nook-text/70">
                                         <span className="flex items-center gap-1">
@@ -471,18 +471,22 @@ const AccidentAnalysisPage: React.FC = () => {
                                             <span className="inline-block w-3 h-3 rounded bg-violet-700"></span>
                                             <strong className="text-violet-700">含肇事</strong>
                                         </span>
-                                        <span className="ml-auto text-nook-text/40">資料源：舉發單</span>
+                                        <span className="ml-auto text-nook-text/40">資料源：舉發單 + 事故表</span>
                                     </div>
                                     <div className="space-y-2">
                                         {peakTimes.shifts
-                                            // 只顯示有酒駕告發的時段，或如果該時段是建議時段也顯示
-                                            .filter(s => (s.dui_citations || 0) > 0 || ['10', '11', '12', '01', '02'].includes(s.shift_id))
+                                            // 只顯示有酒駕事件（告發或事故）或建議時段
+                                            .filter(s => (s.dui_citations || 0) > 0 || (s.dui_crash_citations || 0) > 0 || ['10', '11', '12', '01', '02'].includes(s.shift_id))
                                             .sort((a, b) => parseInt(a.shift_id) < 5 ? parseInt(a.shift_id) + 24 : parseInt(a.shift_id) - (parseInt(b.shift_id) < 5 ? parseInt(b.shift_id) + 24 : parseInt(b.shift_id)))
                                             .map((shift) => {
-                                                const duiCount = shift.dui_citations || 0;
+                                                // dui_citations 是 Ticket.shift_id 計數；dui_crash_citations 是 Crash.shift_id 計數
+                                                // 兩者來源不同，per-shift 不一定對齊。取較大值當作該時段的酒駕案件總數，
+                                                // 確保 含肇事 ≤ 總件數（math 一致）。
+                                                const ticketCount = shift.dui_citations || 0;
                                                 const crashCount = shift.dui_crash_citations || 0;
+                                                const duiCount = Math.max(ticketCount, crashCount);
                                                 const noCrashCount = Math.max(0, duiCount - crashCount);
-                                                const maxV = Math.max(...peakTimes.shifts.map(s => s.dui_citations || 0)) || 1;
+                                                const maxV = Math.max(...peakTimes.shifts.map(s => Math.max(s.dui_citations || 0, s.dui_crash_citations || 0))) || 1;
                                                 const totalWidth = (duiCount / maxV) * 100;
                                                 const crashWidth = duiCount > 0 ? (crashCount / duiCount) * totalWidth : 0;
                                                 const noCrashWidth = totalWidth - crashWidth;
@@ -541,9 +545,9 @@ const AccidentAnalysisPage: React.FC = () => {
                                     <div className="mt-4 p-3 bg-red-50 rounded-lg border border-red-200 text-xs">
                                         <p className="font-bold text-red-800 mb-1">📊 分析洞察</p>
                                         <ul className="list-disc pl-4 space-y-1 text-red-700/80">
-                                            <li><span className="bg-violet-700 text-white px-1 rounded">深紅段</span> 為「攔舉-肇事」舉發數，代表<strong>該時段確實發生酒駕事故</strong>。</li>
+                                            <li><span className="bg-violet-700 text-white px-1 rounded">紫色段</span> 為事故表 ground truth (飲酒情形 4-8) 的肇事件數。</li>
                                             <li><span className="bg-red-100 px-1 rounded text-red-600">重點時段</span> 為建議加強攔檢時間 (20:00-04:00)。</li>
-                                            <li>若重點時段告發數低、肇事數卻高 → <strong>明顯執法缺口</strong>。</li>
+                                            <li>每段「總件數」= max(舉發單同時段, 事故同時段)；兩來源時段可能不對齊，取大者為該時段的酒駕活動量。</li>
                                         </ul>
                                     </div>
                                 </div>
