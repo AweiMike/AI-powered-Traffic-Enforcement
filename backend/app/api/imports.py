@@ -722,6 +722,27 @@ async def import_crash_file(
                 existing = db.query(Crash).filter(Crash.case_id == case_id).first()
                 if existing:
                     seen_case_ids.add(case_id)
+                    # 回補新加入的酒駕欄位（drinking_code / party_subtype_code / is_dui_crash_party）
+                    # 若舊資料尚未填寫，從 case_rollup 取得最新值補上
+                    if data_format == "EIS":
+                        rollup = case_rollup.get(case_id, {})
+                        new_is_dui = bool(rollup.get("has_drinking_party", False))
+                        new_drinking = rollup.get("driver_drinking_code")
+                        new_subtype = rollup.get("driver_subtype_code")
+                        # 只在尚未標記為 True 或欄位空時才更新（保守覆寫）
+                        changed = False
+                        if not existing.is_dui_crash_party and new_is_dui:
+                            existing.is_dui_crash_party = True
+                            existing.suspected_alcohol = True
+                            changed = True
+                        if not existing.drinking_code and new_drinking:
+                            existing.drinking_code = new_drinking
+                            changed = True
+                        if not existing.party_subtype_code and new_subtype:
+                            existing.party_subtype_code = new_subtype
+                            changed = True
+                        if changed:
+                            stats["updated"] = stats.get("updated", 0) + 1
                     stats["skipped"] += 1
                     continue
 
@@ -1204,6 +1225,20 @@ def _do_batch_import(txt_files: list, db):
                                 if new_sub and new_sub != existing.sub_unit:
                                     existing.sub_unit = new_sub[:100]
                                     stats["updated"] += 1
+                        # 回補新加入的酒駕欄位
+                        if data_format == "EIS":
+                            rollup = case_rollup.get(case_id, {})
+                            new_is_dui = bool(rollup.get("has_drinking_party", False))
+                            new_drinking = rollup.get("driver_drinking_code")
+                            new_subtype = rollup.get("driver_subtype_code")
+                            if not existing.is_dui_crash_party and new_is_dui:
+                                existing.is_dui_crash_party = True
+                                existing.suspected_alcohol = True
+                                stats["updated"] += 1
+                            if not existing.drinking_code and new_drinking:
+                                existing.drinking_code = new_drinking
+                            if not existing.party_subtype_code and new_subtype:
+                                existing.party_subtype_code = new_subtype
                         stats["skipped"] += 1
                         continue
 
@@ -1755,6 +1790,20 @@ async def import_crash_upload_batch(
                                 if new_sub and new_sub != existing.sub_unit:
                                     existing.sub_unit = new_sub[:100]
                                     stats["updated"] += 1
+                        # 回補新加入的酒駕欄位
+                        if data_format == "EIS":
+                            rollup = case_rollup.get(case_id, {})
+                            new_is_dui = bool(rollup.get("has_drinking_party", False))
+                            new_drinking = rollup.get("driver_drinking_code")
+                            new_subtype = rollup.get("driver_subtype_code")
+                            if not existing.is_dui_crash_party and new_is_dui:
+                                existing.is_dui_crash_party = True
+                                existing.suspected_alcohol = True
+                                stats["updated"] += 1
+                            if not existing.drinking_code and new_drinking:
+                                existing.drinking_code = new_drinking
+                            if not existing.party_subtype_code and new_subtype:
+                                existing.party_subtype_code = new_subtype
                         stats["skipped"] += 1
                         continue
 

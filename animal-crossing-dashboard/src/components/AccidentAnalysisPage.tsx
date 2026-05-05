@@ -350,33 +350,33 @@ const AccidentAnalysisPage: React.FC = () => {
 
                     {/* 酒駕統計概要 - 純 DUI 指標 */}
                     <div className="grid grid-cols-5 gap-4">
-                        {/* 核心：酒駕肇事 */}
+                        {/* 核心：酒駕肇事（事故表 ground truth，含未開到單的黑數） */}
                         <div className="bg-red-50 rounded-2xl p-4 nook-shadow text-center border-l-4 border-red-600">
                             <p className="text-3xl font-bold text-red-700">
-                                {hotspots?.summary?.dui_crash_total || 0}
+                                {(hotspots?.summary as any)?.crash_dui_real_total ?? hotspots?.summary?.dui_crash_total ?? 0}
                             </p>
                             <p className="text-sm text-red-600 font-medium">🚨 酒駕肇事</p>
-                            <p className="text-xs text-red-400">（核心：降低事故）</p>
+                            <p className="text-xs text-red-400">（事故表真實涉酒）</p>
                         </div>
-                        {/* 酒駕肇事率（取代原 A1 死亡卡）*/}
+                        {/* 酒駕肇事率（事故表 / 取締總數） */}
                         <div className="bg-orange-50 rounded-2xl p-4 nook-shadow text-center border-l-4 border-orange-500">
                             <p className="text-3xl font-bold text-orange-600">
                                 {(() => {
                                     const total = hotspots?.summary?.total_dui_violations || 0;
-                                    const crash = hotspots?.summary?.dui_crash_total || 0;
+                                    const crash = (hotspots?.summary as any)?.crash_dui_real_total ?? hotspots?.summary?.dui_crash_total ?? 0;
                                     return total > 0 ? `${((crash / total) * 100).toFixed(1)}%` : '—';
                                 })()}
                             </p>
                             <p className="text-sm text-orange-500">📈 酒駕肇事率</p>
-                            <p className="text-xs text-orange-400">肇事 ÷ 總取締</p>
+                            <p className="text-xs text-orange-400">事故 ÷ 總取締</p>
                         </div>
-                        {/* 輔助：酒駕無肇事 */}
+                        {/* 輔助：酒駕無肇事（取締但未對應事故，Ticket-side） */}
                         <div className="bg-amber-50 rounded-2xl p-4 nook-shadow text-center border-l-4 border-amber-400">
                             <p className="text-3xl font-bold text-amber-600">
-                                {(hotspots?.summary?.total_dui_violations || 0) - (hotspots?.summary?.dui_crash_total || 0)}
+                                {Math.max(0, (hotspots?.summary?.total_dui_violations || 0) - (hotspots?.summary?.dui_crash_total || 0))}
                             </p>
                             <p className="text-sm text-amber-500">📋 酒駕無肇事</p>
-                            <p className="text-xs text-amber-400">（輔助：執法績效）</p>
+                            <p className="text-xs text-amber-400">（取締未肇事）</p>
                         </div>
                         {/* 告發總數 */}
                         <div className="bg-gray-50 rounded-2xl p-4 nook-shadow text-center border-l-4 border-gray-400">
