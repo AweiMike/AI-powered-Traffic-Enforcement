@@ -513,11 +513,14 @@ async def get_accident_hotspots(
             Ticket.district.in_(district_variants)  # 匹配兩種格式
         ).first()
 
-        # 真實酒駕肇事 = 攔舉-肇事 件數（覆寫 Crash 表的 dui_crashes，因 Crash.suspected_alcohol 系統性低估）
-        dui_crash_real = int(violation_stats.dui_crash_derived or 0)
+        # Per-district 酒駕肇事顯示採 Crash 側 ground truth (= dui_crashes from crash_stats)
+        # 因為 §35 法律規定酒駕事故必開單，所以「肇事舉發」應等於「酒駕事故」。
+        # 但 dui_crash_total summary 仍累加 Ticket UNION 作為 banner「subtype 品質」對照。
         dui_total_for_district = int(violation_stats.dui or 0)
+        dui_crash_real = int(dui_crashes)  # Crash 側：per-district 顯示用
+        dui_crash_subtype = int(violation_stats.dui_crash_derived or 0)  # Ticket UNION：summary 用
         dui_no_crash_real = max(0, dui_total_for_district - dui_crash_real)
-        dui_crash_total += dui_crash_real  # 全縣加總用真實計數
+        dui_crash_total += dui_crash_subtype  # summary 累加 Ticket UNION (給 banner 顯示 subtype 標記漏標)
 
         violation_counts = {
             'DUI': dui_total_for_district,
