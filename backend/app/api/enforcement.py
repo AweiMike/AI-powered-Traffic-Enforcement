@@ -291,14 +291,15 @@ async def get_dui_performance(
         bucket["a3_crashes"] += r["a3_crashes"]
 
     for bucket in group_agg.values():
-        bucket["tickets_excl_crash"] = bucket["tickets_total"] - bucket["tickets_crash_derived"]
+        # crashes_total = Crash 側 ground truth (is_dui_crash_party 加總，亦即 a1+a2+a3)
         bucket["crashes_total"] = bucket["a1_crashes"] + bucket["a2_crashes"] + bucket["a3_crashes"]
+        # 肇事舉發 採 Crash 側為準（法律規定酒駕事故必開單，Ticket 應與 Crash 等量）
+        bucket["tickets_excl_crash"] = bucket["tickets_total"] - bucket["crashes_total"]
 
-        # 酒駕肇事率：以舉發單「攔舉-肇事」/ 總取締（比 Crash.A1A2A3 可靠，因事故表常被避免填寫嚴重度）
-        # ⚠️ 此處用 group_total 而非 total，避免覆寫外層的 total 合計 dict
+        # 酒駕肇事率：以事故表 ground truth / 總取締
         group_total = bucket["tickets_total"]
         bucket["dui_crash_rate"] = (
-            bucket["tickets_crash_derived"] / group_total if group_total > 0 else 0.0
+            bucket["crashes_total"] / group_total if group_total > 0 else 0.0
         )
         bucket["proactive_rate"] = (
             bucket["tickets_proactive"] / group_total if group_total > 0 else 0.0

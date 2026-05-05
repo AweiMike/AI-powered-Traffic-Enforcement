@@ -23,20 +23,30 @@ function DiffBadge({ value }: { value: number }) {
 
 /** 增減顯示：上方主動取締、下方肇事，分別與去年同期比較
  *  主動 invert=false（增加=綠=好）；肇事 invert=true（增加=紅=壞）
+ *  肇事採 Crash 側 ground truth（若有提供 crashOverride）
  */
 function ProactiveVsCrashDiff({
   breakdown, prevBreakdown,
+  crashOverride, crashPrevOverride,
+  totalOverride, totalPrevOverride,
 }: {
   breakdown?: TicketBreakdown;
   prevBreakdown?: TicketBreakdown;
+  crashOverride?: number;
+  crashPrevOverride?: number;
+  totalOverride?: number;
+  totalPrevOverride?: number;
 }) {
   if (!breakdown || !prevBreakdown) return <span className="text-gray-400 text-xs">—</span>;
-  const refusal = breakdown.refusal ?? 0;
-  const prevRefusal = prevBreakdown.refusal ?? 0;
-  const proactiveCur = breakdown.proactive + refusal + breakdown.other;
-  const proactivePrev = prevBreakdown.proactive + prevRefusal + prevBreakdown.other;
+  const crashCur = crashOverride ?? breakdown.crash_derived;
+  const crashPrev = crashPrevOverride ?? prevBreakdown.crash_derived;
+  const totalCur = totalOverride ?? (breakdown.proactive + breakdown.crash_derived + (breakdown.refusal ?? 0) + breakdown.citizen + breakdown.other);
+  const totalPrev = totalPrevOverride ?? (prevBreakdown.proactive + prevBreakdown.crash_derived + (prevBreakdown.refusal ?? 0) + prevBreakdown.citizen + prevBreakdown.other);
+  // 主動 = 取締總數 − 肇事舉發 − 民檢
+  const proactiveCur = Math.max(0, totalCur - crashCur - breakdown.citizen);
+  const proactivePrev = Math.max(0, totalPrev - crashPrev - prevBreakdown.citizen);
   const proactiveDiff = proactiveCur - proactivePrev;
-  const crashDiff = breakdown.crash_derived - prevBreakdown.crash_derived;
+  const crashDiff = crashCur - crashPrev;
 
   return (
     <div className="inline-flex flex-col items-end gap-0.5 text-[11px]">
@@ -85,28 +95,42 @@ function DiffArrow({ diff, invert = false, size = 'xs' }: {
 }
 
 function TicketBreakdownLine({
-  breakdown, prevBreakdown, align = 'right'
+  breakdown, prevBreakdown, align = 'right',
+  crashOverride, crashPrevOverride,
+  totalOverride, totalPrevOverride,
 }: {
   breakdown?: TicketBreakdown;
   prevBreakdown?: TicketBreakdown;
   align?: 'right' | 'left';
+  /** 用 Crash 側 ground truth 覆寫「肇事舉發」桶（因法律規定酒駕事故必開單，兩者應相等）*/
+  crashOverride?: number;
+  crashPrevOverride?: number;
+  /** 取締總數（用於主動桶 residual 計算） */
+  totalOverride?: number;
+  totalPrevOverride?: number;
 }) {
   if (!breakdown) return null;
 
-  // 主動 = 一般攔舉 + 拒檢 + 慢車（皆為警方主動出擊取締）
-  // 肇事 = 等事故發生後才舉發（執法缺口指標）
-  // 民檢 = 民眾通報
+  // 「肇事舉發」採 Crash 側 ground truth（事故表飲酒情形 4-8）
+  // 法律規定：酒駕事故必開單。所以 肇事舉發 = 酒駕事故 = 14（Crash 側）
+  // 主動 = 取締總數 − 肇事舉發 − 民檢（residual 算法）
+  const crashCount = crashOverride ?? breakdown.crash_derived;
+  const crashPrev = crashPrevOverride ?? prevBreakdown?.crash_derived ?? 0;
   const refusal = breakdown.refusal ?? 0;
-  const proactiveTotal = breakdown.proactive + refusal + breakdown.other;
-  const prevProactiveTotal = prevBreakdown
-    ? prevBreakdown.proactive + (prevBreakdown.refusal ?? 0) + prevBreakdown.other
-    : 0;
+  const ticketsTotal = totalOverride ?? (breakdown.proactive + breakdown.crash_derived + refusal + breakdown.citizen + breakdown.other);
+  const ticketsPrev = totalPrevOverride ?? (
+    prevBreakdown
+      ? prevBreakdown.proactive + prevBreakdown.crash_derived + (prevBreakdown.refusal ?? 0) + prevBreakdown.citizen + prevBreakdown.other
+      : 0
+  );
+
+  const proactiveTotal = Math.max(0, ticketsTotal - crashCount - breakdown.citizen);
+  const prevProactiveTotal = Math.max(0, ticketsPrev - crashPrev - (prevBreakdown?.citizen ?? 0));
 
   const mainItems: { label: string; value: number; prev: number; color: string; invert: boolean }[] = [
     { label: '主動', value: proactiveTotal, prev: prevProactiveTotal, color: 'text-green-700', invert: false },
-    // 「肇事舉發」 = Ticket subtype 攔舉-肇事 + 關鍵字 UNION，是已開單的酒駕肇事；
-    // 與 Crash 側「涉酒事故」(is_dui_crash_party) 為不同來源不同數字（Ticket vs Crash）。
-    { label: '肇事舉發', value: breakdown.crash_derived, prev: prevBreakdown?.crash_derived ?? 0, color: 'text-red-500', invert: true },
+    // 肇事舉發 = 酒駕事故（Crash 側）。法律規定酒駕事故必開單，所以兩者數字相等。
+    { label: '肇事舉發', value: crashCount, prev: crashPrev, color: 'text-red-500', invert: true },
     { label: '民檢', value: breakdown.citizen, prev: prevBreakdown?.citizen ?? 0, color: 'text-gray-500', invert: false },
   ];
 
@@ -129,7 +153,8 @@ function TicketBreakdownLine({
           </span>
         ))}
       </div>
-      {subItems.length > 0 && proactiveTotal > 0 && (
+      {/* 子細分只在沒用 Crash override 時顯示（用 Crash override 時主動桶為 residual，sub-bucket 不再對應） */}
+      {subItems.length > 0 && proactiveTotal > 0 && crashOverride === undefined && (
         <div className={`text-[9px] text-nook-text/40 flex flex-wrap items-center gap-x-1 gap-y-0.5 ${justify}`}>
           <span>主動內</span>
           {subItems.map((s, i) => (
@@ -199,6 +224,10 @@ const DuiPerformancePage: React.FC = () => {
               color="purple"
               breakdown={data.total.tickets_breakdown}
               prevBreakdown={data.total.tickets_prev_breakdown}
+              crashOverride={crashTotal}
+              crashPrevOverride={crashTotalPrev}
+              totalOverride={data.total.tickets}
+              totalPrevOverride={data.total.tickets_prev}
             />
             <SummaryCard
               title="去年同期取締"
@@ -250,6 +279,10 @@ const DuiPerformancePage: React.FC = () => {
                       <TicketBreakdownLine
                         breakdown={row.tickets_breakdown}
                         prevBreakdown={row.tickets_prev_breakdown}
+                        crashOverride={(row.a1_crashes ?? 0) + (row.a2_crashes ?? 0) + (row.a3_crashes ?? 0)}
+                        crashPrevOverride={(row.a1_crashes_prev ?? 0) + (row.a2_crashes_prev ?? 0) + (row.a3_crashes_prev ?? 0)}
+                        totalOverride={row.tickets}
+                        totalPrevOverride={row.tickets_prev}
                       />
                     </td>
                     <td className="px-4 py-2.5 text-right">
@@ -260,6 +293,10 @@ const DuiPerformancePage: React.FC = () => {
                       <ProactiveVsCrashDiff
                         breakdown={row.tickets_breakdown}
                         prevBreakdown={row.tickets_prev_breakdown}
+                        crashOverride={(row.a1_crashes ?? 0) + (row.a2_crashes ?? 0) + (row.a3_crashes ?? 0)}
+                        crashPrevOverride={(row.a1_crashes_prev ?? 0) + (row.a2_crashes_prev ?? 0) + (row.a3_crashes_prev ?? 0)}
+                        totalOverride={row.tickets}
+                        totalPrevOverride={row.tickets_prev}
                       />
                     </td>
                     <td className="px-4 py-2.5 text-right font-bold text-red-600">{row.a1_crashes}</td>
@@ -278,6 +315,10 @@ const DuiPerformancePage: React.FC = () => {
                     <TicketBreakdownLine
                       breakdown={data.total.tickets_breakdown}
                       prevBreakdown={data.total.tickets_prev_breakdown}
+                      crashOverride={(data.total.a1_crashes ?? 0) + (data.total.a2_crashes ?? 0) + (data.total.a3_crashes ?? 0)}
+                      crashPrevOverride={(data.total.a1_crashes_prev ?? 0) + (data.total.a2_crashes_prev ?? 0) + (data.total.a3_crashes_prev ?? 0)}
+                      totalOverride={data.total.tickets}
+                      totalPrevOverride={data.total.tickets_prev}
                     />
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -288,6 +329,10 @@ const DuiPerformancePage: React.FC = () => {
                     <ProactiveVsCrashDiff
                       breakdown={data.total.tickets_breakdown}
                       prevBreakdown={data.total.tickets_prev_breakdown}
+                      crashOverride={(data.total.a1_crashes ?? 0) + (data.total.a2_crashes ?? 0) + (data.total.a3_crashes ?? 0)}
+                      crashPrevOverride={(data.total.a1_crashes_prev ?? 0) + (data.total.a2_crashes_prev ?? 0) + (data.total.a3_crashes_prev ?? 0)}
+                      totalOverride={data.total.tickets}
+                      totalPrevOverride={data.total.tickets_prev}
                     />
                   </td>
                   <td className="px-4 py-3 text-right text-red-600">{data.total.a1_crashes}</td>
@@ -340,7 +385,7 @@ const DuiPerformancePage: React.FC = () => {
                     <td className="px-4 py-2.5 text-right">
                       <span className="text-lg font-bold text-green-700 tabular-nums">{g.tickets_excl_crash}</span>
                     </td>
-                    <td className="px-4 py-2.5 text-right text-red-500 tabular-nums">{g.tickets_crash_derived}</td>
+                    <td className="px-4 py-2.5 text-right text-red-500 tabular-nums">{g.crashes_total}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">
                       <CrashRate rate={g.dui_crash_rate} />
                     </td>
@@ -459,7 +504,7 @@ function CrashSummaryCard({ current, prev, a1, a2, a3, a1p, a2p, a3p }: {
 }
 
 /** 摘要卡片 */
-function SummaryCard({ title, current, prev, icon, color, invertDiff, breakdown, prevBreakdown }: {
+function SummaryCard({ title, current, prev, icon, color, invertDiff, breakdown, prevBreakdown, crashOverride, crashPrevOverride, totalOverride, totalPrevOverride }: {
   title: string;
   current: number;
   prev?: number;
@@ -468,6 +513,10 @@ function SummaryCard({ title, current, prev, icon, color, invertDiff, breakdown,
   invertDiff?: boolean;
   breakdown?: TicketBreakdown;
   prevBreakdown?: TicketBreakdown;
+  crashOverride?: number;
+  crashPrevOverride?: number;
+  totalOverride?: number;
+  totalPrevOverride?: number;
 }) {
   const diff = prev !== undefined ? current - prev : undefined;
   const colorMap: Record<string, string> = {
@@ -489,7 +538,17 @@ function SummaryCard({ title, current, prev, icon, color, invertDiff, breakdown,
           <DiffArrow diff={diff} invert={!!invertDiff} size="sm" />
         )}
       </div>
-      {breakdown && <TicketBreakdownLine breakdown={breakdown} prevBreakdown={prevBreakdown} align="left" />}
+      {breakdown && (
+        <TicketBreakdownLine
+          breakdown={breakdown}
+          prevBreakdown={prevBreakdown}
+          align="left"
+          crashOverride={crashOverride}
+          crashPrevOverride={crashPrevOverride}
+          totalOverride={totalOverride}
+          totalPrevOverride={totalPrevOverride}
+        />
+      )}
     </div>
   );
 }
