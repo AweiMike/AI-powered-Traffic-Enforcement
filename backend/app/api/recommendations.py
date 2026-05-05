@@ -1180,6 +1180,7 @@ async def get_map_points(
             Crash.shift_id,
             Crash.is_elderly,
             Crash.suspected_alcohol,
+            Crash.is_dui_crash_party,  # ground truth (飲酒情形 4-8)
             Crash.party_type,
             Crash.sub_unit,
             Crash.death_count,    # 實際死亡人數（不是件數）
@@ -1217,7 +1218,15 @@ async def get_map_points(
         crashes = crash_query.all()
         result['summary']['total_crashes'] = len(crashes)
 
+        # 涉酒事故計數（Crash 側 ground truth：is_dui_crash_party）
+        dui_real_crash_count = 0
+
         for c in crashes:
+            # 用 is_dui_crash_party (ground truth, 飲酒情形 4-8 + 排除行人)
+            # 為相容歷史資料，若 is_dui_crash_party 為 False/None 則 fallback 到 suspected_alcohol
+            is_dui_crash = bool(getattr(c, 'is_dui_crash_party', None) or c.suspected_alcohol)
+            if is_dui_crash:
+                dui_real_crash_count += 1
             if c.latitude and c.longitude:
                 result['crash_points'].append({
                     'id': c.id,
@@ -1230,13 +1239,14 @@ async def get_map_points(
                     'time': c.occurred_time.strftime('%H:%M') if c.occurred_time else None,
                     'shift': c.shift_id,
                     'is_elderly': c.is_elderly,
-                    'is_dui': c.suspected_alcohol,
+                    'is_dui': is_dui_crash,
                     'vehicle_type': c.party_type,
                     'unit': c.sub_unit,
                     'death_count': c.death_count or 0,        # 實際死亡人數
                     'injury_count': c.injury_count or 0,       # 實際受傷人數
                 })
         result['summary']['crashes_with_coords'] = len(result['crash_points'])
+        result['summary']['dui_real_crashes'] = dui_real_crash_count  # Crash 側真實涉酒事故
     
     # 取得違規點位
     if point_type in ['all', 'ticket']:

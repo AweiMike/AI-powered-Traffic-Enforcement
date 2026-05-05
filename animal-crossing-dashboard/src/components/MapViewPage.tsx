@@ -56,8 +56,10 @@ interface MapData {
         tickets_with_coords: number;
         /** 全部酒駕舉發件數（不限是否有座標） */
         dui_tickets?: number;
-        /** 全部酒駕中含肇事件數（UNION 信號，含黑數修復） */
+        /** 已開單酒駕肇事舉發件數（Ticket UNION） */
         dui_crash_tickets?: number;
+        /** 事故表 ground truth：涉酒事故總數（飲酒情形 4-8 + 排除行人） */
+        dui_real_crashes?: number;
     };
 }
 
@@ -708,9 +710,17 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                             {data.summary.dui_tickets}
                                             {(data.summary.dui_crash_tickets ?? 0) > 0 && (
                                                 <span className="ml-1 text-red-600">
-                                                    （含肇事 {data.summary.dui_crash_tickets}）
+                                                    （含肇事舉發 {data.summary.dui_crash_tickets}）
                                                 </span>
                                             )}
+                                        </span>
+                                    </div>
+                                )}
+                                {(data.summary.dui_real_crashes ?? 0) > 0 && (
+                                    <div className="flex justify-between pl-2 border-t border-nook-cream/40 pt-1 mt-1">
+                                        <span className="text-red-700 text-xs font-semibold">🚗 涉酒事故</span>
+                                        <span className="font-bold text-red-700 text-xs">
+                                            {data.summary.dui_real_crashes} 件
                                         </span>
                                     </div>
                                 )}
@@ -961,7 +971,7 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                                     {selectionStats.topic.DUI}
                                                     {selectionStats.duiCrashCount > 0 && (
                                                         <span className="ml-1 text-red-600">
-                                                            （含肇事 {selectionStats.duiCrashCount}）
+                                                            （含肇事舉發 {selectionStats.duiCrashCount}）
                                                         </span>
                                                     )}
                                                 </span>

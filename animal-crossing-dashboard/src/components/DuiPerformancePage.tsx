@@ -104,7 +104,9 @@ function TicketBreakdownLine({
 
   const mainItems: { label: string; value: number; prev: number; color: string; invert: boolean }[] = [
     { label: '主動', value: proactiveTotal, prev: prevProactiveTotal, color: 'text-green-700', invert: false },
-    { label: '肇事', value: breakdown.crash_derived, prev: prevBreakdown?.crash_derived ?? 0, color: 'text-red-500', invert: true },
+    // 「肇事舉發」 = Ticket subtype 攔舉-肇事 + 關鍵字 UNION，是已開單的酒駕肇事；
+    // 與 Crash 側「涉酒事故」(is_dui_crash_party) 為不同來源不同數字（Ticket vs Crash）。
+    { label: '肇事舉發', value: breakdown.crash_derived, prev: prevBreakdown?.crash_derived ?? 0, color: 'text-red-500', invert: true },
     { label: '民檢', value: breakdown.citizen, prev: prevBreakdown?.citizen ?? 0, color: 'text-gray-500', invert: false },
   ];
 
@@ -178,50 +180,42 @@ const DuiPerformancePage: React.FC = () => {
       </div>
 
       {/* 摘要卡片 */}
-      {data && (
-        <div className="grid grid-cols-5 gap-4 mb-6">
-          <SummaryCard
-            title="取締件數"
-            current={data.total.tickets}
-            prev={data.total.tickets_prev}
-            icon={<Shield className="w-5 h-5 text-sky-700" />}
-            color="purple"
-            breakdown={data.total.tickets_breakdown}
-            prevBreakdown={data.total.tickets_prev_breakdown}
-          />
-          <SummaryCard
-            title="去年同期取締"
-            current={data.total.tickets_prev}
-            icon={<Shield className="w-5 h-5 text-gray-500" />}
-            color="gray"
-            breakdown={data.total.tickets_prev_breakdown}
-          />
-          <SummaryCard
-            title="A1 酒駕事故"
-            current={data.total.a1_crashes}
-            prev={data.total.a1_crashes_prev}
-            icon={<AlertTriangle className="w-5 h-5 text-red-600" />}
-            color="red"
-            invertDiff
-          />
-          <SummaryCard
-            title="A2 酒駕事故"
-            current={data.total.a2_crashes}
-            prev={data.total.a2_crashes_prev}
-            icon={<AlertTriangle className="w-5 h-5 text-orange-600" />}
-            color="orange"
-            invertDiff
-          />
-          <SummaryCard
-            title="A3 酒駕事故"
-            current={data.total.a3_crashes}
-            prev={data.total.a3_crashes_prev}
-            icon={<AlertTriangle className="w-5 h-5 text-amber-600" />}
-            color="amber"
-            invertDiff
-          />
-        </div>
-      )}
+      {data && (() => {
+        const a1 = data.total.a1_crashes || 0;
+        const a2 = data.total.a2_crashes || 0;
+        const a3 = data.total.a3_crashes || 0;
+        const a1p = data.total.a1_crashes_prev || 0;
+        const a2p = data.total.a2_crashes_prev || 0;
+        const a3p = data.total.a3_crashes_prev || 0;
+        const crashTotal = a1 + a2 + a3;
+        const crashTotalPrev = a1p + a2p + a3p;
+        return (
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <SummaryCard
+              title="取締件數"
+              current={data.total.tickets}
+              prev={data.total.tickets_prev}
+              icon={<Shield className="w-5 h-5 text-sky-700" />}
+              color="purple"
+              breakdown={data.total.tickets_breakdown}
+              prevBreakdown={data.total.tickets_prev_breakdown}
+            />
+            <SummaryCard
+              title="去年同期取締"
+              current={data.total.tickets_prev}
+              icon={<Shield className="w-5 h-5 text-gray-500" />}
+              color="gray"
+              breakdown={data.total.tickets_prev_breakdown}
+            />
+            <CrashSummaryCard
+              current={crashTotal}
+              prev={crashTotalPrev}
+              a1={a1} a2={a2} a3={a3}
+              a1p={a1p} a2p={a2p} a3p={a3p}
+            />
+          </div>
+        );
+      })()}
 
       {/* 各派出所明細表 */}
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl nook-shadow overflow-hidden">
@@ -425,6 +419,43 @@ function RankBadge({ rank, total }: { rank: number; total: number }) {
     return <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-700 font-bold text-sm">{rank}</span>;
   }
   return <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-700 font-bold text-sm">{rank}</span>;
+}
+
+/** 酒駕事故摘要卡（Crash 側 ground truth：A1+A2+A3 = is_dui_crash_party 總計） */
+function CrashSummaryCard({ current, prev, a1, a2, a3, a1p, a2p, a3p }: {
+  current: number; prev: number;
+  a1: number; a2: number; a3: number;
+  a1p: number; a2p: number; a3p: number;
+}) {
+  const diff = current - prev;
+  return (
+    <div className="bg-gradient-to-br from-red-50 to-red-100/50 border border-red-200 rounded-2xl p-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm text-nook-text/70">🚗 酒駕事故</span>
+        <AlertTriangle className="w-5 h-5 text-red-600" />
+      </div>
+      <div className="text-2xl font-bold text-nook-text flex items-baseline gap-2">
+        <span>{current}</span>
+        <DiffArrow diff={diff} invert={true} size="sm" />
+      </div>
+      {/* A1/A2/A3 子細分（小字） */}
+      <div className="mt-1 text-[10px] flex flex-wrap items-center gap-x-1.5">
+        <span className="text-red-700 font-semibold">
+          A1<span className="ml-0.5 font-bold tabular-nums">{a1}</span>
+          <DiffArrow diff={a1 - a1p} invert={true} />
+        </span>
+        <span className="text-orange-600 font-semibold">
+          A2<span className="ml-0.5 font-bold tabular-nums">{a2}</span>
+          <DiffArrow diff={a2 - a2p} invert={true} />
+        </span>
+        <span className="text-amber-600 font-semibold">
+          A3<span className="ml-0.5 font-bold tabular-nums">{a3}</span>
+          <DiffArrow diff={a3 - a3p} invert={true} />
+        </span>
+      </div>
+      <p className="text-[10px] text-red-400/80 mt-0.5">事故表 ground truth（飲酒情形 4-8）</p>
+    </div>
+  );
 }
 
 /** 摘要卡片 */
