@@ -28,7 +28,8 @@ import {
   Target,
   Bot,
   PersonStanding,
-  Gauge
+  Gauge,
+  Pill
 } from 'lucide-react';
 
 // Import custom components
@@ -47,6 +48,7 @@ import MapViewPage from './components/MapViewPage';
 import AIReportPage from './components/AIReportPage';
 import EVehicleAnalysisPage from './components/EVehicleAnalysisPage';
 import DuiPerformancePage from './components/DuiPerformancePage';
+import DrugDrivePage from './components/DrugDrivePage';
 import HeavyVehiclePerformancePage from './components/HeavyVehiclePerformancePage';
 import SpeedPerformancePage from './components/SpeedPerformancePage';
 import PedestrianAnalysisPage from './components/PedestrianAnalysisPage';
@@ -119,6 +121,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, readOnly, o
         { id: 'pedestrian', icon: PersonStanding, label: '行人事故', description: '行人事故發生率與熱點' },
         { id: 'evehicle', icon: Zap, label: '青少年微電車', description: '青少年微電車/電輔車事故分析' },
         { id: 'dui', icon: Wine, label: '酒駕成效', description: '各派出所酒駕取締與事故統計' },
+        { id: 'drug', icon: Pill, label: '毒駕分析', description: '毒品駕駛取締、時段與區域分析' },
         { id: 'speed', icon: Gauge, label: '速度管理', description: '超速取締與嚴重度分級' },
         { id: 'heavy-vehicle', icon: Truck, label: '大型車成效', description: '各派出所大型車取締與事故統計' },
       ],
@@ -1106,6 +1109,8 @@ const App: React.FC = () => {
         return <EVehicleAnalysisPage />;
       case 'dui':
         return <DuiPerformancePage />;
+      case 'drug':
+        return <DrugDrivePage />;
       case 'heavy-vehicle':
         return <HeavyVehiclePerformancePage />;
       case 'speed':

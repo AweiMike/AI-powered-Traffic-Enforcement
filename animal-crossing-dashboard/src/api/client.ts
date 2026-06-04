@@ -857,6 +857,10 @@ class APIClient {
     return this.request(`/enforcement/dui?start_date=${startDate}&end_date=${endDate}`);
   }
 
+  async getDrugPerformance(startDate: string, endDate: string): Promise<any> {
+    return this.request(`/enforcement/drug?start_date=${startDate}&end_date=${endDate}`);
+  }
+
   async getHeavyVehiclePerformance(startDate: string, endDate: string): Promise<any> {
     return this.request(`/enforcement/heavy-vehicle?start_date=${startDate}&end_date=${endDate}`);
   }

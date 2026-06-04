@@ -1,4 +1,4 @@
-﻿"""
+"""
 推薦系統 API - Top 5 精準執法建議
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -11,6 +11,7 @@ from app.database import get_db
 from app.models.core import Ticket, Crash
 from app.models.dimension import Site
 from app.utils.dui_crash import dui_crash_filter, crash_dui_real_filter
+from app.utils.drug_drive import drug_drive_filter, drug_crash_filter, not_drug_filter
 
 router = APIRouter()
 
@@ -496,15 +497,19 @@ async def get_accident_hotspots(
         
         violation_stats = db.query(
             func.count(Ticket.id).label('total_violations'),
-            func.sum(case((Ticket.topic_dui == True, 1), else_=0)).label('dui'),
+            # 酒駕 = topic_dui AND NOT 毒駕（排除 §35 I-2/IV 毒品案件）
+            func.sum(case(((Ticket.topic_dui == True) & not_drug_filter(), 1), else_=0)).label('dui'),
             # 酒駕肇事舉發（UNION：subtype = '攔舉-肇事' OR violation_name 含肇事關鍵字）
             # 修復同仁將肇事誤標為「攔舉-一般」的黑數，實測較舊版多抓約 44%
             func.sum(
                 case(
-                    ((Ticket.topic_dui == True) & dui_crash_filter(), 1),
+                    ((Ticket.topic_dui == True) & not_drug_filter() & dui_crash_filter(), 1),
                     else_=0,
                 )
             ).label('dui_crash_derived'),
+            # 毒駕舉發數（per-district，給地圖/毒駕專區用）
+            func.sum(case((drug_drive_filter(), 1), else_=0)).label('drug'),
+            func.sum(case((drug_drive_filter() & drug_crash_filter(), 1), else_=0)).label('drug_crash'),
             func.sum(case((Ticket.topic_red_light == True, 1), else_=0)).label('red_light'),
             func.sum(case((Ticket.topic_dangerous == True, 1), else_=0)).label('dangerous')
         ).filter(
@@ -650,7 +655,8 @@ async def get_accident_peak_times(
         Ticket.violation_date >= start_date,
         Ticket.violation_date <= end_date,
         Ticket.district.in_(district_variants),
-        Ticket.topic_dui == True
+        Ticket.topic_dui == True,
+        not_drug_filter(),  # 排除毒駕
     ).group_by(Ticket.shift_id).all()
 
     # 酒駕肇事 per shift：改用 Crash 側 ground truth (is_dui_crash_party)
@@ -1255,11 +1261,14 @@ async def get_map_points(
     # 取得違規點位
     if point_type in ['all', 'ticket']:
         # is_dui_crash: 採 UNION 信號（subtype=攔舉-肇事 OR violation_name 含肇事/致人/重傷等關鍵字）
-        # 修復同仁將肇事誤標為「攔舉-一般」的黑數
+        # 注意：排除毒駕（not_drug_filter），酒駕肇事只算純酒精
         is_dui_crash_expr = case(
-            ((Ticket.topic_dui == True) & dui_crash_filter(), 1),
+            ((Ticket.topic_dui == True) & not_drug_filter() & dui_crash_filter(), 1),
             else_=0,
         )
+        # is_drug: 毒駕標記（§35 I-2 吸食毒品 / §35 IV 毒品拒檢）
+        is_drug_expr = case((drug_drive_filter(), 1), else_=0)
+        is_drug_crash_expr = case((drug_drive_filter() & drug_crash_filter(), 1), else_=0)
         ticket_query = db.query(
             Ticket.id,
             Ticket.latitude,
@@ -1278,6 +1287,8 @@ async def get_map_points(
             Ticket.enforcement_subtype,
             Ticket.unit_code,
             is_dui_crash_expr.label('is_dui_crash'),
+            is_drug_expr.label('is_drug'),
+            is_drug_crash_expr.label('is_drug_crash'),
         ).filter(
             Ticket.violation_date >= start_date,
             Ticket.violation_date <= end_date
@@ -1285,7 +1296,10 @@ async def get_map_points(
 
         if topic:
             if topic == 'DUI':
-                ticket_query = ticket_query.filter(Ticket.topic_dui == True)
+                # 酒駕：排除毒駕
+                ticket_query = ticket_query.filter(Ticket.topic_dui == True, not_drug_filter())
+            elif topic == 'DRUG':
+                ticket_query = ticket_query.filter(drug_drive_filter())
             elif topic == 'RED_LIGHT':
                 ticket_query = ticket_query.filter(Ticket.topic_red_light == True)
             elif topic == 'DANGEROUS_DRIVING':
@@ -1297,15 +1311,20 @@ async def get_map_points(
         tickets = ticket_query.all()
         result['summary']['total_tickets'] = len(tickets)
 
-        # DUI 統計：總酒駕 + 含肇事（UNION 信號）
+        # DUI / 毒駕 統計
         dui_total_count = 0
         dui_crash_count = 0
+        drug_total_count = 0
+        drug_crash_count = 0
 
         for t in tickets:
             if t.latitude and t.longitude:
-                # 判斷主題
+                is_drug_flag = bool(getattr(t, 'is_drug', 0))
+                # 判斷主題（毒駕優先，因毒品案件 topic_dui 也是 True）
                 topic_name = None
-                if t.topic_dui:
+                if is_drug_flag:
+                    topic_name = 'DRUG'
+                elif t.topic_dui:
                     topic_name = 'DUI'
                 elif t.topic_red_light:
                     topic_name = 'RED_LIGHT'
@@ -1313,7 +1332,12 @@ async def get_map_points(
                     topic_name = 'DANGEROUS_DRIVING'
 
                 is_crash_flag = bool(getattr(t, 'is_dui_crash', 0))
-                if t.topic_dui:
+                is_drug_crash_flag = bool(getattr(t, 'is_drug_crash', 0))
+                if is_drug_flag:
+                    drug_total_count += 1
+                    if is_drug_crash_flag:
+                        drug_crash_count += 1
+                elif t.topic_dui:
                     dui_total_count += 1
                     if is_crash_flag:
                         dui_crash_count += 1
@@ -1334,10 +1358,14 @@ async def get_map_points(
                     'enforcement_type': t.enforcement_subtype,
                     'unit': t.unit_code,
                     'is_dui_crash': is_crash_flag,
+                    'is_drug': is_drug_flag,
+                    'is_drug_crash': is_drug_crash_flag,
                 })
         result['summary']['tickets_with_coords'] = len(result['ticket_points'])
         result['summary']['dui_tickets'] = dui_total_count
         result['summary']['dui_crash_tickets'] = dui_crash_count
+        result['summary']['drug_tickets'] = drug_total_count
+        result['summary']['drug_crash_tickets'] = drug_crash_count
     
     result['note'] = '點位資料已去識別化，座標僅供執法分析使用'
     return result

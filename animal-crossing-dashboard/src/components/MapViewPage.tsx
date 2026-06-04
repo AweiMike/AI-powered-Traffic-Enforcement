@@ -31,6 +31,10 @@ interface MapPoint {
     is_dui?: boolean;
     /** 違規點位專用：是否為酒駕肇事舉發（UNION 信號，含黑數修復） */
     is_dui_crash?: boolean;
+    /** 違規點位專用：是否為毒品駕駛（§35 I-2/IV） */
+    is_drug?: boolean;
+    /** 違規點位專用：是否為毒駕肇事 */
+    is_drug_crash?: boolean;
     vehicle_type?: string;
     violation_name?: string;
     enforcement_type?: string;
@@ -60,6 +64,10 @@ interface MapData {
         dui_crash_tickets?: number;
         /** 事故表 ground truth：涉酒事故總數（飲酒情形 4-8 + 排除行人） */
         dui_real_crashes?: number;
+        /** 毒駕舉發件數 */
+        drug_tickets?: number;
+        /** 毒駕肇事件數 */
+        drug_crash_tickets?: number;
     };
 }
 
@@ -301,10 +309,12 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
             injuryTotal += c.injury_count || 0;
         });
 
-        const topicCount: Record<string, number> = { DUI: 0, RED_LIGHT: 0, DANGEROUS_DRIVING: 0, OTHER: 0 };
+        const topicCount: Record<string, number> = { DUI: 0, DRUG: 0, RED_LIGHT: 0, DANGEROUS_DRIVING: 0, OTHER: 0 };
+        let drugCrashCountInCircle = 0;
         ticketsIn.forEach(t => {
             if (t.topic && t.topic in topicCount) topicCount[t.topic]++;
             else topicCount.OTHER++;
+            if (t.is_drug_crash) drugCrashCountInCircle++;
         });
         // 圈內含肇事件數：用 Crash 側 ground truth（is_dui_crash_party），與 §35 法律規定一致
         // 不再用 Ticket UNION 的 is_dui_crash 旗標（那是 subtype 標記，會低估）
@@ -323,6 +333,7 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
             injuryTotal,      // 圈內實際受傷人數
             topic: topicCount,
             duiCrashCount: duiCrashCountInCircle,  // 圈內酒駕中含肇事件數
+            drugCrashCount: drugCrashCountInCircle,  // 圈內毒駕中含肇事件數
             units: Object.entries(unitCount).sort((a, b) => b[1] - a[1]),
         };
     }, [selectionCircle, data]);
@@ -508,10 +519,12 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                     const lat = pendingUpdate?.lat ?? point.lat;
                     const lng = pendingUpdate?.lng ?? point.lng;
 
-                    const color = point.topic === 'DUI' ? '#7C3AED' :
+                    const color = point.topic === 'DRUG' ? '#DB2777' :
+                        point.topic === 'DUI' ? '#7C3AED' :
                         point.topic === 'RED_LIGHT' ? '#2563EB' : '#0891B2';
 
-                    const topicName = point.topic === 'DUI' ? '酒駕' :
+                    const topicName = point.topic === 'DRUG' ? '毒駕' :
+                        point.topic === 'DUI' ? '酒駕' :
                         point.topic === 'RED_LIGHT' ? '闖紅燈' :
                             point.topic === 'DANGEROUS_DRIVING' ? '危險駕駛' : '';
                     const violationDesc = point.violation_name || topicName || '一般違規';
@@ -711,6 +724,19 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                             {(data.summary.dui_real_crashes ?? 0) > 0 && (
                                                 <span className="ml-1 text-red-600">
                                                     （含肇事舉發 {data.summary.dui_real_crashes}）
+                                                </span>
+                                            )}
+                                        </span>
+                                    </div>
+                                )}
+                                {(data.summary.drug_tickets ?? 0) > 0 && (
+                                    <div className="flex justify-between pl-2">
+                                        <span className="text-pink-600 text-xs">💊 毒駕</span>
+                                        <span className="font-medium text-pink-700 text-xs">
+                                            {data.summary.drug_tickets}
+                                            {(data.summary.drug_crash_tickets ?? 0) > 0 && (
+                                                <span className="ml-1 text-red-600">
+                                                    （含肇事 {data.summary.drug_crash_tickets}）
                                                 </span>
                                             )}
                                         </span>
@@ -969,6 +995,19 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                                 </span>
                                             </div>
                                         )}
+                                        {selectionStats.topic.DRUG > 0 && (
+                                            <div className="flex justify-between text-[11px] pl-2">
+                                                <span className="text-pink-600">💊 毒駕</span>
+                                                <span className="font-medium">
+                                                    {selectionStats.topic.DRUG}
+                                                    {selectionStats.drugCrashCount > 0 && (
+                                                        <span className="ml-1 text-red-600">
+                                                            （含肇事 {selectionStats.drugCrashCount}）
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </div>
+                                        )}
                                         {selectionStats.topic.RED_LIGHT > 0 && (
                                             <div className="flex justify-between text-[11px] pl-2">
                                                 <span className="text-blue-600">🚦 闖紅燈</span>
@@ -1021,6 +1060,7 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                 {[
                                     { value: 'all', label: '全部', color: 'bg-gray-100 text-gray-700' },
                                     { value: 'DUI', label: '🍺 酒駕', color: 'bg-purple-100 text-purple-700' },
+                                    { value: 'DRUG', label: '💊 毒駕', color: 'bg-pink-100 text-pink-700' },
                                     { value: 'RED_LIGHT', label: '🚦 闘紅燈', color: 'bg-blue-100 text-blue-700' },
                                     { value: 'DANGEROUS_DRIVING', label: '⚡ 危駕', color: 'bg-cyan-100 text-cyan-700' },
                                 ].map(opt => (

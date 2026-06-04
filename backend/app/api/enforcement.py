@@ -12,6 +12,7 @@ from datetime import datetime, date
 from app.database import get_db
 from app.models.core import Ticket, Crash
 from app.utils.dui_crash import dui_crash_filter, dui_refusal_filter, crash_dui_real_filter
+from app.utils.drug_drive import drug_drive_filter, drug_crash_filter, not_drug_filter
 
 router = APIRouter()
 
@@ -118,6 +119,7 @@ async def get_dui_performance(
             Ticket.violation_date >= s,
             Ticket.violation_date <= e,
             Ticket.topic_dui == True,
+            not_drug_filter(),  # 排除毒駕（§35 I-2/IV），酒駕成效頁只算純酒精
         ).group_by(
             Ticket.unit_code, Ticket.enforcement_subtype,
             is_crash_expr, is_refusal_expr,
@@ -784,4 +786,150 @@ async def get_pedestrian_analysis(
         "current": curr_stats,
         "previous": prev_stats,
         "hotspots": hotspots,
+    }
+
+
+# ============================================
+# 毒品駕駛防制分析（取締側；事故側受限於 EIS 無毒品欄位）
+# ============================================
+# shift_id → (duty_order 派出所勤務班序, 時段標籤)
+_DRUG_SHIFT_MAP = {
+    "05": (1, "08-10"), "06": (2, "10-12"), "07": (3, "12-14"), "08": (4, "14-16"),
+    "09": (5, "16-18"), "10": (6, "18-20"), "11": (7, "20-22"), "12": (8, "22-24"),
+    "01": (9, "00-02"), "02": (10, "02-04"), "03": (11, "04-06"), "04": (12, "06-08"),
+}
+
+
+@router.get("/drug")
+async def get_drug_performance(
+    start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """毒品駕駛防制分析（取締側）
+
+    資料來源：Ticket 法條代碼 §35 I-2 吸食毒品 / §35 IV 毒品拒檢。
+    ⚠️ 事故側受限：EIS 事故調查表無毒品專屬欄位，故本端點僅做取締分析。
+    回傳：總取締/含肇事/去年同期 + 各派出所 + 4管區排名 + 區域分析 + 時段分析。
+    """
+    sd = parse_date(start_date)
+    ed = parse_date(end_date)
+    if not sd or not ed:
+        return {"error": "日期格式錯誤"}
+
+    cmp_sd = shift_year(sd, -1)
+    cmp_ed = shift_year(ed, -1)
+
+    def query_drug(s, e):
+        """回傳 (unit, district, shift_id, is_crash, count) tuples"""
+        is_crash_expr = case((drug_crash_filter(), 1), else_=0)
+        return db.query(
+            Ticket.unit_code.label("unit"),
+            Ticket.district.label("district"),
+            Ticket.shift_id.label("shift_id"),
+            is_crash_expr.label("is_crash"),
+            func.count(Ticket.id).label("count"),
+        ).filter(
+            Ticket.violation_date >= s,
+            Ticket.violation_date <= e,
+            drug_drive_filter(),
+        ).group_by(
+            Ticket.unit_code, Ticket.district, Ticket.shift_id, is_crash_expr,
+        ).all()
+
+    curr = query_drug(sd, ed)
+    prev = query_drug(cmp_sd, cmp_ed)
+
+    # --- 各派出所明細 ---
+    def agg_by_unit(rows):
+        d = {}
+        for r in rows:
+            unit = r.unit or "未知"
+            if unit not in d:
+                d[unit] = {"tickets": 0, "crash": 0}
+            d[unit]["tickets"] += r.count
+            if r.is_crash == 1:
+                d[unit]["crash"] += r.count
+        return d
+
+    curr_unit = agg_by_unit(curr)
+    prev_unit = agg_by_unit(prev)
+
+    all_units = sorted(set(list(curr_unit.keys()) + list(prev_unit.keys())))
+    rows_out = []
+    for unit in all_units:
+        if unit == "未知":
+            continue
+        c = curr_unit.get(unit, {"tickets": 0, "crash": 0})
+        p = prev_unit.get(unit, {"tickets": 0, "crash": 0})
+        rows_out.append({
+            "unit": unit,
+            "tickets": c["tickets"],
+            "tickets_prev": p["tickets"],
+            "tickets_diff": c["tickets"] - p["tickets"],
+            "crash": c["crash"],
+            "crash_prev": p["crash"],
+        })
+
+    total = {
+        "tickets": sum(r["tickets"] for r in rows_out),
+        "tickets_prev": sum(r["tickets_prev"] for r in rows_out),
+        "crash": sum(r["crash"] for r in rows_out),
+        "crash_prev": sum(r["crash_prev"] for r in rows_out),
+    }
+    total["tickets_diff"] = total["tickets"] - total["tickets_prev"]
+    total["crash_diff"] = total["crash"] - total["crash_prev"]
+
+    # --- 4 管區排名（依取締數）---
+    group_agg = {g["display"]: {"group": g["display"], "tickets": 0, "crash": 0}
+                 for g in DUI_STATION_GROUPS}
+    for r in rows_out:
+        g = classify_to_group(r["unit"])
+        if g is None:
+            continue
+        group_agg[g]["tickets"] += r["tickets"]
+        group_agg[g]["crash"] += r["crash"]
+    unit_group_ranking = sorted(group_agg.values(), key=lambda b: -b["tickets"])
+    for i, b in enumerate(unit_group_ranking, 1):
+        b["rank"] = i
+
+    # --- 區域分析（依行政區）---
+    district_agg = {}
+    for r in curr:
+        dist = r.district or "未知"
+        if dist not in district_agg:
+            district_agg[dist] = {"district": dist, "tickets": 0, "crash": 0}
+        district_agg[dist]["tickets"] += r.count
+        if r.is_crash == 1:
+            district_agg[dist]["crash"] += r.count
+    by_district = sorted(
+        [v for v in district_agg.values() if v["district"] != "未知"],
+        key=lambda x: -x["tickets"],
+    )
+
+    # --- 時段分析（依 shift_id，附 duty_order）---
+    shift_agg = {}
+    for r in curr:
+        sid = r.shift_id or "未知"
+        if sid not in shift_agg:
+            duty, label = _DRUG_SHIFT_MAP.get(sid, (99, sid))
+            shift_agg[sid] = {"shift_id": sid, "duty_order": duty,
+                              "time_range": label, "tickets": 0, "crash": 0}
+        shift_agg[sid]["tickets"] += r.count
+        if r.is_crash == 1:
+            shift_agg[sid]["crash"] += r.count
+    by_shift = sorted(
+        [v for v in shift_agg.values() if v["shift_id"] != "未知"],
+        key=lambda x: x["duty_order"],
+    )
+
+    return {
+        "period": {"start_date": start_date, "end_date": end_date},
+        "compare_period": {"start_date": cmp_sd.isoformat(), "end_date": cmp_ed.isoformat()},
+        "total": total,
+        "rows": rows_out,
+        "unit_group_ranking": unit_group_ranking,
+        "by_district": by_district,
+        "by_shift": by_shift,
+        "note": "毒駕事故側資料受限於 EIS 無毒品專屬欄位，本分析僅涵蓋取締(舉發)資料",
     }
