@@ -59,17 +59,20 @@ DRUG_CRASH_NAME_KEYWORDS = [
 def drug_drive_filter():
     """SQL expression: True 表示「毒品駕駛」案件。
 
-    用法條代碼精確識別（不依賴 topic_dui，因毒品法條本身即毒駕）：
+    用法條代碼 + 條款文字精確識別（不依賴 topic_dui，因毒品法條本身即毒駕）：
     - 350102 = §35 I-2 吸食毒品
-    - 350402 = §35 IV 毒品拒檢
-    - violation_name 含「吸食毒品」（保險，涵蓋肇事致傷亡含毒品條款）
+    - violation_name 含「吸食毒品」（最可靠；涵蓋肇事致傷亡含毒品條款 3503xx）
+
+    ⚠️ 重要更正（2026-06-05）：代碼 350402 = 「拒絕接受酒精濃度測試之檢定」(酒測拒檢)，
+    **不是毒品拒檢**！當初誤把 350402 當毒品，導致 5 件酒測拒檢被誤判為毒駕。
+    酒測拒檢屬「酒駕」範疇（由 dui_refusal_filter 處理），不可納入毒駕。
+    毒駕拒測若存在，其 violation_name 會明確含「毒品」字樣，靠關鍵字即可涵蓋。
 
     範例:
         db.query(Ticket).filter(drug_drive_filter())
     """
     return or_(
         Ticket.violation_code.like('350102%'),
-        Ticket.violation_code.like('350402%'),
         Ticket.violation_name.like('%吸食毒品%'),
     )
 
