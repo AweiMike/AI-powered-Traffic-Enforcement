@@ -1106,19 +1106,18 @@ async def get_map_units(
     ticket_units = set(ticket_counts.keys())
     all_units = sorted(crash_units | ticket_units)
 
+    # 幕僚/統籌單位：不處理事故（交通組、警備隊是幕僚單位，只製違規單，無事故轄區）
+    # 交通分隊雖也是統籌，但仍有舊資料殘留未回補轄區，保留其原始 sub_unit 計數
+    STAFF_UNITS_NO_CRASH = ("交通組", "警備隊")
+
     units_with_count = []
     for unit in all_units:
-        if "交通分隊" in unit or "交通組" in unit or "警備隊" in unit:
-            # 催化型單位：事故數 = 其涵蓋的所有 district 內屬於交通分隊的事故總和
-            crash_count = sum(
-                district_crash_counts.get(d, 0)
-                for d in STATION_TO_DISTRICTS.get(unit, [])
-            )
+        if any(kw in unit for kw in STAFF_UNITS_NO_CRASH):
+            # 幕僚單位：事故恆為 0（不做 district fallback 亂塞）
+            crash_count = 0
         else:
-            # 一般派出所：直接 match + 舊資料 fallback（所在行政區內的交通分隊案件）
+            # 派出所 + 交通分隊：直接用 sub_unit 計數
             crash_count = crash_counts_raw.get(unit, 0)
-            for district in STATION_TO_DISTRICTS.get(unit, []):
-                crash_count += district_crash_counts.get(district, 0)
 
         ticket_count = ticket_counts.get(unit, 0)
         units_with_count.append({

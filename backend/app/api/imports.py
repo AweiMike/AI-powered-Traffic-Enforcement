@@ -417,10 +417,14 @@ def extract_eis_district(row) -> str:
 
 
 def clean_precinct_name(raw) -> Optional[str]:
-    """清除分局全稱前綴，只保留如『新化分局』"""
+    """清除分局全稱前綴，只保留如『新化分局』；並正規化罕見異體字。"""
     if pd.isna(raw) or not raw:
         return None
-    return str(raw).replace("臺南市政府警察局", "").strip() or None
+    name = str(raw).replace("臺南市政府警察局", "").strip()
+    # 那拔派出所異體字正規化：EIS 事故表用罕見字 U+26C61（𦰡），違規表用正常「那」
+    # 統一成「那拔」，避免地圖/統計把同一派出所拆成兩個
+    name = name.replace(chr(0x26C61) + "拔", "那拔")
+    return name or None
 
 
 def derive_eis_severity(row) -> str:
