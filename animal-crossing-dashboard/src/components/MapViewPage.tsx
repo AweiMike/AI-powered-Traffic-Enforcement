@@ -519,7 +519,7 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                     const lat = pendingUpdate?.lat ?? point.lat;
                     const lng = pendingUpdate?.lng ?? point.lng;
 
-                    const color = point.topic === 'DRUG' ? '#DB2777' :
+                    const color = point.topic === 'DRUG' ? '#D97706' :
                         point.topic === 'DUI' ? '#7C3AED' :
                         point.topic === 'RED_LIGHT' ? '#2563EB' : '#0891B2';
 
@@ -731,8 +731,8 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                 )}
                                 {(data.summary.drug_tickets ?? 0) > 0 && (
                                     <div className="flex justify-between pl-2">
-                                        <span className="text-pink-600 text-xs">💊 毒駕</span>
-                                        <span className="font-medium text-pink-700 text-xs">
+                                        <span className="text-amber-600 text-xs">💊 毒駕</span>
+                                        <span className="font-medium text-amber-700 text-xs">
                                             {data.summary.drug_tickets}
                                             {(data.summary.drug_crash_tickets ?? 0) > 0 && (
                                                 <span className="ml-1 text-red-600">
@@ -997,7 +997,7 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                         )}
                                         {selectionStats.topic.DRUG > 0 && (
                                             <div className="flex justify-between text-[11px] pl-2">
-                                                <span className="text-pink-600">💊 毒駕</span>
+                                                <span className="text-amber-600">💊 毒駕</span>
                                                 <span className="font-medium">
                                                     {selectionStats.topic.DRUG}
                                                     {selectionStats.drugCrashCount > 0 && (
@@ -1060,7 +1060,7 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                 {[
                                     { value: 'all', label: '全部', color: 'bg-gray-100 text-gray-700' },
                                     { value: 'DUI', label: '🍺 酒駕', color: 'bg-purple-100 text-purple-700' },
-                                    { value: 'DRUG', label: '💊 毒駕', color: 'bg-pink-100 text-pink-700' },
+                                    { value: 'DRUG', label: '💊 毒駕', color: 'bg-amber-100 text-amber-700' },
                                     { value: 'RED_LIGHT', label: '🚦 闘紅燈', color: 'bg-blue-100 text-blue-700' },
                                     { value: 'DANGEROUS_DRIVING', label: '⚡ 危駕', color: 'bg-cyan-100 text-cyan-700' },
                                 ].map(opt => (
