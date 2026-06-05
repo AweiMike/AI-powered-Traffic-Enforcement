@@ -20,7 +20,7 @@ function defaultRange(): DateRange {
 function DiffArrow({ diff, invert = false }: { diff: number; invert?: boolean }) {
   if (diff === 0) return <span className="text-[10px] text-gray-400 ml-0.5">±0</span>;
   const isBad = invert ? diff > 0 : diff < 0;
-  const color = isBad ? 'text-red-600' : 'text-emerald-600';
+  const color = isBad ? 'text-red-600' : 'text-teal-600';
   const sign = diff > 0 ? `↑+${diff}` : `↓${diff}`;
   return <span className={`text-[11px] font-bold ${color} ml-0.5 tabular-nums`}>{sign}</span>;
 }
@@ -53,7 +53,7 @@ const DrugDrivePage: React.FC = () => {
       {/* 標題 */}
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-nook-text flex items-center gap-2">
-          <Pill className="w-6 h-6 text-amber-600" />
+          <Pill className="w-6 h-6 text-teal-600" />
           毒品駕駛防制分析
         </h2>
         <p className="text-nook-text/60 mt-1">§35 吸食毒品 / 毒品拒檢取締分析、時段與區域精準執法建議</p>
@@ -78,16 +78,16 @@ const DrugDrivePage: React.FC = () => {
         <>
           {/* KPI 卡片 */}
           <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-4">
+            <div className="bg-gradient-to-br from-teal-50 to-teal-100/50 border border-teal-200 rounded-2xl p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-nook-text/70">毒駕取締</span>
-                <Pill className="w-5 h-5 text-amber-600" />
+                <Pill className="w-5 h-5 text-teal-600" />
               </div>
               <div className="text-2xl font-bold text-nook-text flex items-baseline gap-2">
                 <span>{total.tickets}</span>
                 <DiffArrow diff={total.tickets_diff} invert={false} />
               </div>
-              <p className="text-[10px] text-amber-400/80 mt-1">§35 I-2 吸食毒品 + IV 毒品拒檢</p>
+              <p className="text-[10px] text-teal-400/80 mt-1">§35 I-2 吸食毒品 + IV 毒品拒檢</p>
             </div>
 
             <div className="bg-gradient-to-br from-red-50 to-red-100/50 border border-red-200 rounded-2xl p-4">
@@ -123,7 +123,7 @@ const DrugDrivePage: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-amber-50 text-nook-text/80">
+                    <tr className="bg-teal-50 text-nook-text/80">
                       <th className="px-4 py-3 text-center font-medium w-16">排名</th>
                       <th className="px-4 py-3 text-left font-medium">管區</th>
                       <th className="px-4 py-3 text-right font-medium">取締件數</th>
@@ -132,12 +132,12 @@ const DrugDrivePage: React.FC = () => {
                   </thead>
                   <tbody>
                     {data.unit_group_ranking.map((g: any, i: number) => (
-                      <tr key={g.group} className={i % 2 === 0 ? 'bg-white' : 'bg-amber-50/30'}>
+                      <tr key={g.group} className={i % 2 === 0 ? 'bg-white' : 'bg-teal-50/30'}>
                         <td className="px-4 py-2.5 text-center">
                           <RankBadge rank={g.rank} />
                         </td>
                         <td className="px-4 py-2.5 font-medium text-nook-text">{g.group}</td>
-                        <td className="px-4 py-2.5 text-right font-bold text-amber-700 tabular-nums">{g.tickets}</td>
+                        <td className="px-4 py-2.5 text-right font-bold text-teal-700 tabular-nums">{g.tickets}</td>
                         <td className="px-4 py-2.5 text-right text-red-600 tabular-nums">{g.crash}</td>
                       </tr>
                     ))}
@@ -151,7 +151,7 @@ const DrugDrivePage: React.FC = () => {
             {/* 區域分析 */}
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl nook-shadow overflow-hidden">
               <div className="p-4 border-b border-nook-cream/50 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-amber-600" />
+                <MapPin className="w-5 h-5 text-teal-600" />
                 <h3 className="font-bold text-nook-text">毒駕高發區域</h3>
                 <span className="text-xs text-nook-text/50 ml-2">建議攔檢地點</span>
               </div>
@@ -161,12 +161,12 @@ const DrugDrivePage: React.FC = () => {
                     <div className="flex justify-between text-xs">
                       <span className="font-medium text-nook-text">{d.district}</span>
                       <span className="tabular-nums">
-                        <span className="font-bold text-amber-700">{d.tickets}</span>
+                        <span className="font-bold text-teal-700">{d.tickets}</span>
                         {d.crash > 0 && <span className="text-red-600 ml-1">（肇事 {d.crash}）</span>}
                       </span>
                     </div>
                     <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full"
+                      <div className="h-full bg-gradient-to-r from-teal-400 to-teal-600 rounded-full"
                         style={{ width: `${(d.tickets / maxDistrict) * 100}%` }} />
                     </div>
                   </div>
@@ -177,7 +177,7 @@ const DrugDrivePage: React.FC = () => {
             {/* 時段分析 */}
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl nook-shadow overflow-hidden">
               <div className="p-4 border-b border-nook-cream/50 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-amber-600" />
+                <Clock className="w-5 h-5 text-teal-600" />
                 <h3 className="font-bold text-nook-text">毒駕高發時段</h3>
                 <span className="text-xs text-nook-text/50 ml-2">建議攔檢時間（派出所勤務班）</span>
               </div>
@@ -189,12 +189,12 @@ const DrugDrivePage: React.FC = () => {
                         第{s.duty_order}班 <span className="text-nook-text/50">{s.time_range}</span>
                       </span>
                       <span className="tabular-nums">
-                        <span className="font-bold text-amber-700">{s.tickets}</span>
+                        <span className="font-bold text-teal-700">{s.tickets}</span>
                         {s.crash > 0 && <span className="text-red-600 ml-1">（肇事 {s.crash}）</span>}
                       </span>
                     </div>
                     <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full"
+                      <div className="h-full bg-gradient-to-r from-teal-400 to-teal-600 rounded-full"
                         style={{ width: `${(s.tickets / maxShift) * 100}%` }} />
                     </div>
                   </div>
@@ -212,7 +212,7 @@ const DrugDrivePage: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-amber-50 text-nook-text/80">
+                    <tr className="bg-teal-50 text-nook-text/80">
                       <th className="px-4 py-3 text-left font-medium">單位</th>
                       <th className="px-4 py-3 text-right font-medium">取締件數</th>
                       <th className="px-4 py-3 text-right font-medium">去年同期</th>
@@ -222,9 +222,9 @@ const DrugDrivePage: React.FC = () => {
                   </thead>
                   <tbody>
                     {data.rows.map((row: any, i: number) => (
-                      <tr key={row.unit} className={i % 2 === 0 ? 'bg-white' : 'bg-amber-50/30'}>
+                      <tr key={row.unit} className={i % 2 === 0 ? 'bg-white' : 'bg-teal-50/30'}>
                         <td className="px-4 py-2.5 font-medium text-nook-text">{row.unit}</td>
-                        <td className="px-4 py-2.5 text-right font-bold text-amber-700 tabular-nums">{row.tickets}</td>
+                        <td className="px-4 py-2.5 text-right font-bold text-teal-700 tabular-nums">{row.tickets}</td>
                         <td className="px-4 py-2.5 text-right text-nook-text/60 tabular-nums">{row.tickets_prev}</td>
                         <td className="px-4 py-2.5 text-right"><DiffBadge value={row.tickets_diff} /></td>
                         <td className="px-4 py-2.5 text-right text-red-600 tabular-nums">{row.crash}</td>

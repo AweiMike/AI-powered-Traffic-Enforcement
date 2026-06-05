@@ -519,7 +519,7 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                     const lat = pendingUpdate?.lat ?? point.lat;
                     const lng = pendingUpdate?.lng ?? point.lng;
 
-                    const color = point.topic === 'DRUG' ? '#D97706' :
+                    const color = point.topic === 'DRUG' ? '#0D9488' :
                         point.topic === 'DUI' ? '#7C3AED' :
                         point.topic === 'RED_LIGHT' ? '#2563EB' : '#0891B2';
 
@@ -575,21 +575,21 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
 
                         markersRef.current.push(marker);
                     } else {
-                        // 一般模式 — 酒駕肇事用深紅外圈強調
-                        const isDuiCrash = !!point.is_dui_crash;
+                        // 一般模式 — 酒駕/毒駕肇事用深紅外圈強調
+                        const isCrashHighlight = !!point.is_dui_crash || !!point.is_drug_crash;
                         const marker = L.circleMarker([lat, lng], {
-                            radius: isDuiCrash ? 7 : 5,
-                            color: isDuiCrash ? '#B91C1C' : color,
+                            radius: isCrashHighlight ? 7 : 5,
+                            color: isCrashHighlight ? '#B91C1C' : color,
                             fillColor: color,
-                            fillOpacity: isDuiCrash ? 0.85 : 0.6,
-                            weight: isDuiCrash ? 3 : 1,
+                            fillOpacity: isCrashHighlight ? 0.85 : 0.6,
+                            weight: isCrashHighlight ? 3 : 1,
                         }).addTo(map);
 
                         marker.bindPopup(`
                             <div style="font-size: 13px; min-width: 220px;">
                                 <div style="font-weight: bold; color: ${color}; margin-bottom: 6px; border-bottom: 1px solid #eee; padding-bottom: 4px;">
                                     📋 ${violationDesc}
-                                    ${isDuiCrash ? '<span style="margin-left: 6px; background: #B91C1C; color: white; padding: 1px 6px; border-radius: 4px; font-size: 11px;">🚨 含肇事</span>' : ''}
+                                    ${isCrashHighlight ? '<span style="margin-left: 6px; background: #B91C1C; color: white; padding: 1px 6px; border-radius: 4px; font-size: 11px;">🚨 含肇事</span>' : ''}
                                 </div>
                                 <table style="width: 100%; font-size: 12px;">
                                     <tr><td style="color: #666;">位置</td><td style="text-align: right;">${point.district} ${point.location || ''}</td></tr>
@@ -731,8 +731,8 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                 )}
                                 {(data.summary.drug_tickets ?? 0) > 0 && (
                                     <div className="flex justify-between pl-2">
-                                        <span className="text-amber-600 text-xs">💊 毒駕</span>
-                                        <span className="font-medium text-amber-700 text-xs">
+                                        <span className="text-teal-600 text-xs">💊 毒駕</span>
+                                        <span className="font-medium text-teal-700 text-xs">
                                             {data.summary.drug_tickets}
                                             {(data.summary.drug_crash_tickets ?? 0) > 0 && (
                                                 <span className="ml-1 text-red-600">
@@ -997,7 +997,7 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                         )}
                                         {selectionStats.topic.DRUG > 0 && (
                                             <div className="flex justify-between text-[11px] pl-2">
-                                                <span className="text-amber-600">💊 毒駕</span>
+                                                <span className="text-teal-600">💊 毒駕</span>
                                                 <span className="font-medium">
                                                     {selectionStats.topic.DRUG}
                                                     {selectionStats.drugCrashCount > 0 && (
@@ -1060,7 +1060,7 @@ const MapViewPage: React.FC<MapViewPageProps> = ({ readOnly = false }) => {
                                 {[
                                     { value: 'all', label: '全部', color: 'bg-gray-100 text-gray-700' },
                                     { value: 'DUI', label: '🍺 酒駕', color: 'bg-purple-100 text-purple-700' },
-                                    { value: 'DRUG', label: '💊 毒駕', color: 'bg-amber-100 text-amber-700' },
+                                    { value: 'DRUG', label: '💊 毒駕', color: 'bg-teal-100 text-teal-700' },
                                     { value: 'RED_LIGHT', label: '🚦 闘紅燈', color: 'bg-blue-100 text-blue-700' },
                                     { value: 'DANGEROUS_DRIVING', label: '⚡ 危駕', color: 'bg-cyan-100 text-cyan-700' },
                                 ].map(opt => (
