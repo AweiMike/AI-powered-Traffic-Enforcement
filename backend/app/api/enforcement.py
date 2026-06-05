@@ -364,19 +364,45 @@ async def get_heavy_vehicle_performance(
         vehicle_conds = [Ticket.vehicle_type.ilike(f"%{kw}%") for kw in HEAVY_VEHICLE_KEYWORDS]
         return or_(*vehicle_conds)
 
-    # --- 取締件數（各派出所 × 法條分類）---
+    # --- 取締件數（各派出所 × enforcement_subtype 子類細分）---
     def query_heavy_tickets(s, e):
         return db.query(
             Ticket.unit_code.label("unit"),
+            Ticket.enforcement_subtype.label("subtype"),
             func.count(Ticket.id).label("count"),
         ).filter(
             Ticket.violation_date >= s,
             Ticket.violation_date <= e,
             heavy_ticket_filter(),
-        ).group_by(Ticket.unit_code).all()
+        ).group_by(Ticket.unit_code, Ticket.enforcement_subtype).all()
 
-    curr_tickets = {r.unit or "未知": r.count for r in query_heavy_tickets(sd, ed)}
-    prev_tickets = {r.unit or "未知": r.count for r in query_heavy_tickets(cmp_sd, cmp_ed)}
+    def aggregate_tickets(rows):
+        """依 enforcement_subtype 拆 主動/肇事/民檢/其他
+
+        - 主動 = 攔舉-一般（警方主動攔停）
+        - 肇事 = 攔舉-肇事（事故後舉發）
+        - 民檢 = 逕舉_民眾檢舉
+        - 其他 = 逕舉_一般/標示單/拖吊等
+        """
+        result = {}
+        for r in rows:
+            unit = r.unit or "未知"
+            if unit not in result:
+                result[unit] = {"total": 0, "proactive": 0, "crash_derived": 0, "citizen": 0, "other": 0}
+            result[unit]["total"] += r.count
+            st = r.subtype or ""
+            if st == "攔舉-肇事":
+                result[unit]["crash_derived"] += r.count
+            elif st == "攔舉-一般":
+                result[unit]["proactive"] += r.count
+            elif st == "逕舉_民眾檢舉":
+                result[unit]["citizen"] += r.count
+            else:
+                result[unit]["other"] += r.count
+        return result
+
+    curr_tickets = aggregate_tickets(query_heavy_tickets(sd, ed))
+    prev_tickets = aggregate_tickets(query_heavy_tickets(cmp_sd, cmp_ed))
 
     # --- 大型車 A1/A2 事故（各派出所）---
     def query_heavy_crashes(s, e):
@@ -397,8 +423,8 @@ async def get_heavy_vehicle_performance(
         for r in rows:
             unit = r.unit or "未知"
             if unit not in result:
-                result[unit] = {"A1": 0, "A2": 0}
-            if r.severity in ("A1", "A2"):
+                result[unit] = {"A1": 0, "A2": 0, "A3": 0}
+            if r.severity in ("A1", "A2", "A3"):
                 result[unit][r.severity] += r.count
         return result
 
@@ -411,32 +437,58 @@ async def get_heavy_vehicle_performance(
         list(curr_crashes.keys()) + list(prev_crashes.keys())
     ))
 
+    EMPTY_T = {"total": 0, "proactive": 0, "crash_derived": 0, "citizen": 0, "other": 0}
+
     rows = []
     for unit in all_units:
         if unit == "未知":
             continue
-        ct = curr_tickets.get(unit, 0)
-        pt = prev_tickets.get(unit, 0)
-        cc = curr_crashes.get(unit, {"A1": 0, "A2": 0})
-        pc = prev_crashes.get(unit, {"A1": 0, "A2": 0})
+        ct = curr_tickets.get(unit, EMPTY_T)
+        pt = prev_tickets.get(unit, EMPTY_T)
+        cc = curr_crashes.get(unit, {"A1": 0, "A2": 0, "A3": 0})
+        pc = prev_crashes.get(unit, {"A1": 0, "A2": 0, "A3": 0})
         rows.append({
             "unit": unit,
-            "tickets": ct,
-            "tickets_prev": pt,
-            "tickets_diff": ct - pt,
+            "tickets": ct["total"],
+            "tickets_prev": pt["total"],
+            "tickets_diff": ct["total"] - pt["total"],
+            "tickets_breakdown": {
+                "proactive": ct["proactive"], "crash_derived": ct["crash_derived"],
+                "citizen": ct["citizen"], "other": ct["other"],
+            },
+            "tickets_prev_breakdown": {
+                "proactive": pt["proactive"], "crash_derived": pt["crash_derived"],
+                "citizen": pt["citizen"], "other": pt["other"],
+            },
             "a1_crashes": cc["A1"],
             "a1_crashes_prev": pc["A1"],
             "a2_crashes": cc["A2"],
             "a2_crashes_prev": pc["A2"],
+            "a3_crashes": cc["A3"],
+            "a3_crashes_prev": pc["A3"],
         })
 
     total = {
         "tickets": sum(r["tickets"] for r in rows),
         "tickets_prev": sum(r["tickets_prev"] for r in rows),
+        "tickets_breakdown": {
+            "proactive": sum(r["tickets_breakdown"]["proactive"] for r in rows),
+            "crash_derived": sum(r["tickets_breakdown"]["crash_derived"] for r in rows),
+            "citizen": sum(r["tickets_breakdown"]["citizen"] for r in rows),
+            "other": sum(r["tickets_breakdown"]["other"] for r in rows),
+        },
+        "tickets_prev_breakdown": {
+            "proactive": sum(r["tickets_prev_breakdown"]["proactive"] for r in rows),
+            "crash_derived": sum(r["tickets_prev_breakdown"]["crash_derived"] for r in rows),
+            "citizen": sum(r["tickets_prev_breakdown"]["citizen"] for r in rows),
+            "other": sum(r["tickets_prev_breakdown"]["other"] for r in rows),
+        },
         "a1_crashes": sum(r["a1_crashes"] for r in rows),
         "a1_crashes_prev": sum(r["a1_crashes_prev"] for r in rows),
         "a2_crashes": sum(r["a2_crashes"] for r in rows),
         "a2_crashes_prev": sum(r["a2_crashes_prev"] for r in rows),
+        "a3_crashes": sum(r["a3_crashes"] for r in rows),
+        "a3_crashes_prev": sum(r["a3_crashes_prev"] for r in rows),
     }
     total["tickets_diff"] = total["tickets"] - total["tickets_prev"]
 

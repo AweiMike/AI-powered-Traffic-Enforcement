@@ -1,6 +1,6 @@
 /**
  * HeavyVehiclePerformancePage - 大型車事故防制成效
- * 各派出所取締件數（含法條細項）+ A1/A2 事故數 + 去年同期比較
+ * 各派出所取締件數（含主動/肇事/民檢/其他子類細分）+ A1/A2/A3 事故數 + 去年同期比較
  */
 
 import React, { useState, useEffect } from 'react';
@@ -58,19 +58,21 @@ const HeavyVehiclePerformancePage: React.FC = () => {
 
       {/* 摘要卡片 */}
       {data && (
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-5 gap-4 mb-6">
           <SummaryCard
             title="取締件數"
             current={data.total.tickets}
             prev={data.total.tickets_prev}
             icon={<Shield className="w-5 h-5 text-amber-600" />}
             color="amber"
+            breakdown={data.total.tickets_breakdown}
           />
           <SummaryCard
             title="去年同期取締"
             current={data.total.tickets_prev}
             icon={<Shield className="w-5 h-5 text-gray-500" />}
             color="gray"
+            breakdown={data.total.tickets_prev_breakdown}
           />
           <SummaryCard
             title="A1 大型車事故"
@@ -86,6 +88,14 @@ const HeavyVehiclePerformancePage: React.FC = () => {
             prev={data.total.a2_crashes_prev}
             icon={<AlertTriangle className="w-5 h-5 text-orange-600" />}
             color="orange"
+            invertDiff
+          />
+          <SummaryCard
+            title="A3 大型車事故"
+            current={data.total.a3_crashes}
+            prev={data.total.a3_crashes_prev}
+            icon={<AlertTriangle className="w-5 h-5 text-amber-600" />}
+            color="amber"
             invertDiff
           />
         </div>
@@ -111,6 +121,8 @@ const HeavyVehiclePerformancePage: React.FC = () => {
                   <th className="px-4 py-3 text-right font-medium">A1 去年</th>
                   <th className="px-4 py-3 text-right font-medium">A2 事故</th>
                   <th className="px-4 py-3 text-right font-medium">A2 去年</th>
+                  <th className="px-4 py-3 text-right font-medium">A3 事故</th>
+                  <th className="px-4 py-3 text-right font-medium">A3 去年</th>
                 </tr>
               </thead>
               <tbody>
@@ -124,6 +136,8 @@ const HeavyVehiclePerformancePage: React.FC = () => {
                     <td className="px-4 py-2.5 text-right text-nook-text/60">{row.a1_crashes_prev}</td>
                     <td className="px-4 py-2.5 text-right font-bold text-orange-600">{row.a2_crashes}</td>
                     <td className="px-4 py-2.5 text-right text-nook-text/60">{row.a2_crashes_prev}</td>
+                    <td className="px-4 py-2.5 text-right font-bold text-amber-600">{row.a3_crashes}</td>
+                    <td className="px-4 py-2.5 text-right text-nook-text/60">{row.a3_crashes_prev}</td>
                   </tr>
                 ))}
                 {/* 合計列 */}
@@ -136,6 +150,8 @@ const HeavyVehiclePerformancePage: React.FC = () => {
                   <td className="px-4 py-3 text-right text-nook-text/60">{data.total.a1_crashes_prev}</td>
                   <td className="px-4 py-3 text-right text-orange-600">{data.total.a2_crashes}</td>
                   <td className="px-4 py-3 text-right text-nook-text/60">{data.total.a2_crashes_prev}</td>
+                  <td className="px-4 py-3 text-right text-amber-600">{data.total.a3_crashes}</td>
+                  <td className="px-4 py-3 text-right text-nook-text/60">{data.total.a3_crashes_prev}</td>
                 </tr>
               </tbody>
             </table>
@@ -177,13 +193,14 @@ const HeavyVehiclePerformancePage: React.FC = () => {
   );
 };
 
-function SummaryCard({ title, current, prev, icon, color, invertDiff }: {
+function SummaryCard({ title, current, prev, icon, color, invertDiff, breakdown }: {
   title: string;
   current: number;
   prev?: number;
   icon: React.ReactNode;
   color: string;
   invertDiff?: boolean;
+  breakdown?: { proactive: number; crash_derived: number; citizen: number; other: number };
 }) {
   const diff = prev !== undefined ? current - prev : undefined;
   const colorMap: Record<string, string> = {
@@ -199,6 +216,14 @@ function SummaryCard({ title, current, prev, icon, color, invertDiff }: {
         {icon}
       </div>
       <div className="text-2xl font-bold text-nook-text">{current}</div>
+      {breakdown && (
+        <div className="mt-0.5 text-[10px] flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+          <span className="text-green-700">主動<span className="ml-0.5 font-semibold tabular-nums">{breakdown.proactive}</span></span>
+          <span className="text-red-500">肇事<span className="ml-0.5 font-semibold tabular-nums">{breakdown.crash_derived}</span></span>
+          <span className="text-gray-500">民檢<span className="ml-0.5 font-semibold tabular-nums">{breakdown.citizen}</span></span>
+          <span className="text-gray-400">其他<span className="ml-0.5 font-semibold tabular-nums">{breakdown.other}</span></span>
+        </div>
+      )}
       {diff !== undefined && (
         <div className="mt-1">
           {invertDiff ? (
