@@ -421,9 +421,11 @@ def clean_precinct_name(raw) -> Optional[str]:
     if pd.isna(raw) or not raw:
         return None
     name = str(raw).replace("臺南市政府警察局", "").strip()
-    # 那拔派出所異體字正規化：EIS 事故表用罕見字 U+26C61（𦰡），違規表用正常「那」
-    # 統一成「那拔」，避免地圖/統計把同一派出所拆成兩個
-    name = name.replace(chr(0x26C61) + "拔", "那拔")
+    # 那拔派出所異體字正規化：EIS 事故表用罕見字 U+26C61（𦰡，BMP 外字元），違規表用正常「那」。
+    # 直接 str.replace 對不上（編碼/正規化差異），改用逐字元重建：
+    # 凡是 BMP 外的罕見字（ord > 0xFFFF）一律換成「那」，這樣「𦰡拔」→「那拔」。
+    if any(ord(ch) > 0xFFFF for ch in name):
+        name = "".join("那" if ord(ch) > 0xFFFF else ch for ch in name)
     return name or None
 
 
