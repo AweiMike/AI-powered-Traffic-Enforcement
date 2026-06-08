@@ -618,6 +618,10 @@ async def import_crash_file(
 
         # 檢查 EIS 檔是否含「所轄單位名稱」欄位（缺則事故會 fallback 成交通分隊，派出所統計失準）
         has_subunit_col = data_format == "EIS" and any("所轄單位名稱" in str(c) for c in df.columns)
+        # 檢查是否含「事故類別」欄位（缺則 A1/A2/A3 只能靠死傷人數推導，可能失準）
+        has_severity_col = data_format == "EIS" and any(
+            ("事故類別" in str(c)) or ("交通事故類別" in str(c)) for c in df.columns
+        )
 
         batch_id = f"WEB_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
@@ -1047,6 +1051,13 @@ async def import_crash_file(
                 "⚠️ 此檔缺「所轄單位名稱」欄位，事故將歸入處理單位（多為交通分隊），"
                 "派出所層級統計會失準。建議回 EIS 重新匯出並勾選「所轄單位名稱」欄位後重匯入。"
             )
+        # 缺「事故類別」欄位警示（A1/A2/A3 只能靠死傷人數推導，可能失準）
+        severity_warning = None
+        if data_format == "EIS" and not has_severity_col:
+            severity_warning = (
+                "⚠️ 此檔缺「事故類別」欄位，A1/A2/A3 嚴重度改用死傷人數推導，"
+                "若受傷人數欄位未填完整會誤判（A2↔A3）。建議匯出時勾選「事故類別」欄位。"
+            )
 
         return {
             "success": True,
@@ -1055,11 +1066,13 @@ async def import_crash_file(
                 f"新增 {stats['new']} 筆，略過 {stats['skipped']} 筆（重複），"
                 f"錯誤 {stats['errors']} 筆"
                 + (f"｜{subunit_warning}" if subunit_warning else "")
+                + (f"｜{severity_warning}" if severity_warning else "")
             ),
             "batch_id": batch_id,
             "data_format": data_format,
             "stats": stats,
             "subunit_warning": subunit_warning,
+            "severity_warning": severity_warning,
             "coordinates": coords_stats if data_format == "EIS" else None,
             "errors": error_messages[:10] if error_messages else [],
             "database": {
@@ -1137,6 +1150,7 @@ def _do_batch_import(txt_files: list, db):
     all_errors = []
     skipped_files = []
     files_missing_subunit = []  # 缺「所轄單位名稱」欄位的檔（事故會 fallback 成交通分隊）
+    files_missing_severity = []  # 缺「事故類別」欄位的檔（A1/A2/A3 靠死傷推導）
     seen_case_ids: set = set()
 
     # 取得已匯入過的檔案名稱
@@ -1169,6 +1183,11 @@ def _do_batch_import(txt_files: list, db):
             # 缺「所轄單位名稱」欄位偵測
             if data_format == "EIS" and not any("所轄單位名稱" in str(c) for c in df.columns):
                 files_missing_subunit.append(fname)
+            # 缺「事故類別」欄位偵測
+            if data_format == "EIS" and not any(
+                ("事故類別" in str(c)) or ("交通事故類別" in str(c)) for c in df.columns
+            ):
+                files_missing_severity.append(fname)
 
             # Pre-pass：以 case_id 為單位 rollup 飲酒情形（同 web import 邏輯）
             case_rollup: dict[str, dict] = {}
@@ -1473,14 +1492,23 @@ def _do_batch_import(txt_files: list, db):
             f"事故將歸入交通分隊、派出所統計失準，建議重新匯出勾選該欄位："
             + "、".join(files_missing_subunit)
         )
+    severity_warning = None
+    if files_missing_severity:
+        severity_warning = (
+            f"⚠️ 以下 {len(files_missing_severity)} 個檔缺「事故類別」欄位，"
+            f"A1/A2/A3 改用死傷人數推導，受傷欄未填完整會誤判，建議匯出時勾選「事故類別」："
+            + "、".join(files_missing_severity)
+        )
 
     return {
         "success": True,
         "message": "批次匯入完成：" + "，".join(msg_parts)
-                   + (f"｜{subunit_warning}" if subunit_warning else ""),
+                   + (f"｜{subunit_warning}" if subunit_warning else "")
+                   + (f"｜{severity_warning}" if severity_warning else ""),
         "data_format": "EIS",
         "stats": total_stats,
         "subunit_warning": subunit_warning,
+        "severity_warning": severity_warning,
         "coordinates": coords_total,
         "skipped_files": skipped_files,
         "errors": all_errors[:20] if all_errors else [],
@@ -1702,6 +1730,7 @@ async def import_crash_upload_batch(
     coords_total = {"with_gps": 0, "fallback": 0}
     all_errors = []
     files_missing_subunit = []  # 缺「所轄單位名稱」欄位的檔
+    files_missing_severity = []  # 缺「事故類別」欄位的檔
     seen_case_ids: set = set()
 
     # 檢查是否需要回補 sub_unit（舊版匯入時未讀「所轄單位名稱」）
@@ -1747,6 +1776,11 @@ async def import_crash_upload_batch(
             # 缺「所轄單位名稱」欄位偵測
             if data_format == "EIS" and not any("所轄單位名稱" in str(c) for c in df.columns):
                 files_missing_subunit.append(file.filename)
+            # 缺「事故類別」欄位偵測
+            if data_format == "EIS" and not any(
+                ("事故類別" in str(c)) or ("交通事故類別" in str(c)) for c in df.columns
+            ):
+                files_missing_severity.append(file.filename)
 
             stats = {"total": len(df), "new": 0, "skipped": 0, "errors": 0, "updated": 0}
             coords_stats = {"with_gps": 0, "fallback": 0}
@@ -2110,13 +2144,22 @@ async def import_crash_upload_batch(
             f"事故將歸入交通分隊、派出所統計失準，建議重新匯出勾選該欄位："
             + "、".join(files_missing_subunit)
         )
+    severity_warning = None
+    if files_missing_severity:
+        severity_warning = (
+            f"⚠️ 以下 {len(files_missing_severity)} 個檔缺「事故類別」欄位，"
+            f"A1/A2/A3 改用死傷人數推導，受傷欄未填完整會誤判，建議匯出時勾選「事故類別」："
+            + "、".join(files_missing_severity)
+        )
 
     return {
         "success": True,
         "message": "批次上傳匯入完成：" + "，".join(msg_parts)
-                   + (f"｜{subunit_warning}" if subunit_warning else ""),
+                   + (f"｜{subunit_warning}" if subunit_warning else "")
+                   + (f"｜{severity_warning}" if severity_warning else ""),
         "stats": total_stats,
         "subunit_warning": subunit_warning,
+        "severity_warning": severity_warning,
         "coordinates": coords_total,
         "errors": all_errors[:20] if all_errors else [],
         "database": {
