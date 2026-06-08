@@ -527,6 +527,21 @@ def _read_eis_txt(file_path: str) -> pd.DataFrame:
     header_line = lines[header_idx].strip()
     columns = [c.strip() for c in header_line.split("@")]
 
+    # 去重欄位名：EIS 匯出偶爾有重複欄位（如「受傷」出現兩次），
+    # 會導致 row.get(col) 回傳 Series 而非單值，後續 if value 判斷時
+    # 觸發「The truth value of a Series is ambiguous」。重複者加 _2/_3 後綴，
+    # 保留第一個原名（後續解析都用原名取值，確保取到單一欄）。
+    seen_cols: dict[str, int] = {}
+    deduped_columns = []
+    for c in columns:
+        if c in seen_cols:
+            seen_cols[c] += 1
+            deduped_columns.append(f"{c}_{seen_cols[c]}")
+        else:
+            seen_cols[c] = 1
+            deduped_columns.append(c)
+    columns = deduped_columns
+
     # 解析資料列
     data_rows = []
     for line in lines[header_idx + 1:]:
