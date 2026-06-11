@@ -12,8 +12,46 @@ from app.models.core import Ticket, Crash
 from app.models.dimension import Site
 from app.utils.dui_crash import dui_crash_filter, crash_dui_real_filter
 from app.utils.drug_drive import drug_drive_filter, drug_crash_filter, not_drug_filter
+from app.utils.trend_engine import weekly_trend
 
 router = APIRouter()
+
+
+# ============================================
+# 週事故趨勢（總覽用）：A2/A3(primary) + A1 死亡(secondary)，higher_is_worse
+# ============================================
+@router.get("/accidents/trend")
+async def get_accident_weekly_trend(
+    start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """週事故趨勢：A2/A3 事故(primary) + A1 死亡事故(secondary)。
+
+    事故越多越糟（higher_is_worse=True → 判讀用「惡化/改善」、配色橙/紅）。
+    共用 trend_engine.weekly_trend：移動平均 / 環比 / Z-score 異常偵測 + 專業判讀。
+    """
+    try:
+        sd = datetime.strptime(start_date, "%Y-%m-%d").date()
+        ed = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return {"error": "日期格式錯誤"}
+
+    is_a1 = case((Crash.severity == "A1", 1), else_=0)
+    rows = db.query(
+        Crash.occurred_date.label("d"),
+        is_a1.label("is_a1"),
+        func.count(Crash.id).label("c"),
+    ).filter(
+        Crash.occurred_date >= sd,
+        Crash.occurred_date <= ed,
+    ).group_by(
+        Crash.occurred_date, is_a1,
+    ).all()
+
+    daily = [(r.d, r.c, r.c if r.is_a1 else 0) for r in rows]
+    result = weekly_trend(daily, sd, ed, window=4, metric_name="件", higher_is_worse=True)
+    return {"period": {"start_date": start_date, "end_date": end_date}, **result}
 
 
 def normalize_district(district: str) -> str:

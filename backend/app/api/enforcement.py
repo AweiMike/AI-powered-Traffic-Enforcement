@@ -7,12 +7,13 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_, case
 from typing import Optional
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 from app.database import get_db
 from app.models.core import Ticket, Crash
 from app.utils.dui_crash import dui_crash_filter, dui_refusal_filter, crash_dui_real_filter
 from app.utils.drug_drive import drug_drive_filter, drug_crash_filter, not_drug_filter
+from app.utils.trend_engine import compute_trend, weekly_trend
 
 router = APIRouter()
 
@@ -79,6 +80,145 @@ def _build_unit_list(db: Session) -> list:
         Ticket.unit_code != ""
     ).distinct().all()
     return sorted([u[0] for u in units if u[0]])
+
+
+# ============================================
+# 酒駕週趨勢（移動平均 / 環比 / Z-score 異常偵測 + 專業判讀）
+# ============================================
+@router.get("/dui/trend")
+async def get_dui_weekly_trend(
+    start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """酒駕週趨勢：將區間內酒駕取締依「週」彙總，拆主動 vs 肇事，
+    並計算 4 週移動平均、環比 (MoM)、Z-score 異常偵測與專業判讀。
+
+    - 肇事 (is_crash) 採 UNION 信號（subtype=攔舉-肇事 OR violation_name 關鍵字）
+    - 排除毒駕（not_drug_filter），與 /dui 口徑一致
+    - 補零連續週序，確保移動平均與異常基準完整
+    """
+    sd = parse_date(start_date)
+    ed = parse_date(end_date)
+    if not sd or not ed:
+        return {"error": "日期格式錯誤"}
+
+    # secondary = 肇事(UNION 信號)；primary(主動) = total - secondary
+    is_crash_expr = case((dui_crash_filter(), 1), else_=0)
+    rows = db.query(
+        Ticket.violation_date.label("d"),
+        is_crash_expr.label("is_crash"),
+        func.count(Ticket.id).label("c"),
+    ).filter(
+        Ticket.violation_date >= sd,
+        Ticket.violation_date <= ed,
+        Ticket.topic_dui == True,
+        not_drug_filter(),
+    ).group_by(
+        Ticket.violation_date, is_crash_expr,
+    ).all()
+
+    daily = [(r.d, r.c, r.c if r.is_crash else 0) for r in rows]
+    result = weekly_trend(daily, sd, ed, window=4, metric_name="件", higher_is_worse=False)
+    return {"period": {"start_date": start_date, "end_date": end_date}, **result}
+
+
+# ============================================
+# 毒駕週趨勢
+# ============================================
+@router.get("/drug/trend")
+async def get_drug_weekly_trend(
+    start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """毒駕週趨勢：取締(primary) vs 肇事(secondary)，移動平均/環比/異常偵測。"""
+    sd = parse_date(start_date)
+    ed = parse_date(end_date)
+    if not sd or not ed:
+        return {"error": "日期格式錯誤"}
+
+    is_crash_expr = case((drug_crash_filter(), 1), else_=0)
+    rows = db.query(
+        Ticket.violation_date.label("d"),
+        is_crash_expr.label("is_crash"),
+        func.count(Ticket.id).label("c"),
+    ).filter(
+        Ticket.violation_date >= sd,
+        Ticket.violation_date <= ed,
+        drug_drive_filter(),
+    ).group_by(
+        Ticket.violation_date, is_crash_expr,
+    ).all()
+
+    daily = [(r.d, r.c, r.c if r.is_crash else 0) for r in rows]
+    result = weekly_trend(daily, sd, ed, window=4, metric_name="件", higher_is_worse=False)
+    return {"period": {"start_date": start_date, "end_date": end_date}, **result}
+
+
+# ============================================
+# 大型車週趨勢
+# ============================================
+@router.get("/heavy-vehicle/trend")
+async def get_heavy_vehicle_weekly_trend(
+    start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """大型車週趨勢：取締(primary) vs 肇事舉發(secondary=攔舉-肇事)。"""
+    sd = parse_date(start_date)
+    ed = parse_date(end_date)
+    if not sd or not ed:
+        return {"error": "日期格式錯誤"}
+
+    vehicle_conds = [Ticket.vehicle_type.ilike(f"%{kw}%") for kw in HEAVY_VEHICLE_KEYWORDS]
+    is_crash_expr = case((Ticket.enforcement_subtype == "攔舉-肇事", 1), else_=0)
+    rows = db.query(
+        Ticket.violation_date.label("d"),
+        is_crash_expr.label("is_crash"),
+        func.count(Ticket.id).label("c"),
+    ).filter(
+        Ticket.violation_date >= sd,
+        Ticket.violation_date <= ed,
+        or_(*vehicle_conds),
+    ).group_by(
+        Ticket.violation_date, is_crash_expr,
+    ).all()
+
+    daily = [(r.d, r.c, r.c if r.is_crash else 0) for r in rows]
+    result = weekly_trend(daily, sd, ed, window=4, metric_name="件", higher_is_worse=False)
+    return {"period": {"start_date": start_date, "end_date": end_date}, **result}
+
+
+# ============================================
+# 超速週趨勢（無乾淨肇事子集 → 單序列總量）
+# ============================================
+@router.get("/speed/trend")
+async def get_speed_weekly_trend(
+    start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """超速週趨勢：總取締量(secondary=0)，移動平均/環比/異常偵測。"""
+    sd = parse_date(start_date)
+    ed = parse_date(end_date)
+    if not sd or not ed:
+        return {"error": "日期格式錯誤"}
+
+    rows = db.query(
+        Ticket.violation_date.label("d"),
+        func.count(Ticket.id).label("c"),
+    ).filter(
+        Ticket.violation_date >= sd,
+        Ticket.violation_date <= ed,
+        Ticket.violation_name.like("%超速%"),
+    ).group_by(
+        Ticket.violation_date,
+    ).all()
+
+    daily = [(r.d, r.c, 0) for r in rows]
+    result = weekly_trend(daily, sd, ed, window=4, metric_name="件", higher_is_worse=False)
+    return {"period": {"start_date": start_date, "end_date": end_date}, **result}
 
 
 # ============================================

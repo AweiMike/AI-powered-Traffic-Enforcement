@@ -54,6 +54,7 @@ import SpeedPerformancePage from './components/SpeedPerformancePage';
 import PedestrianAnalysisPage from './components/PedestrianAnalysisPage';
 import DateRangePicker, { type DateRange } from './components/DateRangePicker';
 import BrandLogo from './components/BrandLogo';
+import TrendCard from './components/TrendCard';
 
 // Import hooks
 import {
@@ -453,6 +454,17 @@ const DashboardView: React.FC = () => {
           loading={loading}
         />
       </div>
+
+      {/* 週事故趨勢與專業判讀（趨勢引擎 + Recharts）*/}
+      <TrendCard
+        range={dateRange}
+        title="週事故趨勢與專業判讀"
+        fetcher={(s, e) => apiClient.getAccidentTrend(s, e)}
+        primaryName="A2/A3 事故"
+        secondaryName="A1 死亡事故"
+        primaryColor="#D97706"
+        secondaryColor="#DC2626"
+      />
 
       {/* Main Content */}
       <div className="grid grid-cols-3 gap-6">

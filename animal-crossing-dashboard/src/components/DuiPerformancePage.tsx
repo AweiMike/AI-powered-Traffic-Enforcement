@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { Wine, TrendingUp, TrendingDown, Minus, AlertTriangle, Shield, Trophy } from 'lucide-react';
 import DateRangePicker, { type DateRange } from './DateRangePicker';
 import { apiClient } from '../api/client';
+import TrendCard from './TrendCard';
 
 function defaultRange(): DateRange {
   const now = new Date();
@@ -245,6 +246,15 @@ const DuiPerformancePage: React.FC = () => {
           </div>
         );
       })()}
+
+      {/* 酒駕週趨勢與專業判讀（趨勢引擎 + Recharts） */}
+      <TrendCard
+        range={range}
+        title="酒駕週趨勢與專業判讀"
+        fetcher={(s, e) => apiClient.getDuiTrend(s, e)}
+        primaryName="主動取締"
+        secondaryName="肇事舉發"
+      />
 
       {/* 各派出所明細表 */}
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl nook-shadow overflow-hidden">

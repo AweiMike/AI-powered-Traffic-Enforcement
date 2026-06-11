@@ -27,8 +27,26 @@ def step(msg):
     print(f"{'='*60}")
 
 
+def _find_build_node():
+    """找可用的 Node 來打包前端。
+
+    ⚠️ Node 25(current) + Vite 4 / Rollup 3 在 production build 的 rendering 階段
+    會原生 crash（exit 0xC0000409 STATUS_STACK_BUFFER_OVERRUN）。故優先用 scoop
+    安裝的 Node LTS（nodejs-lts，如 v24）來打包；找不到才退回系統 node。
+    安裝 LTS：scoop install nodejs-lts
+    """
+    userprofile = os.environ.get("USERPROFILE", "")
+    candidates = [
+        os.path.join(userprofile, "scoop", "apps", "nodejs-lts", "current", "node.exe"),
+    ]
+    for c in candidates:
+        if c and os.path.exists(c):
+            return c
+    return None
+
+
 def build_frontend():
-    """打包前端"""
+    """打包前端（優先用 Node LTS，避開 Node 25 + Vite 4 的 build crash）"""
     step("打包前端 (vite build)...")
     out_dir = os.path.join(BACKEND_SRC, "static")
 
@@ -36,11 +54,24 @@ def build_frontend():
     if os.path.exists(out_dir):
         shutil.rmtree(out_dir)
 
-    subprocess.check_call(
-        ["npx", "vite", "build", "--outDir", out_dir],
-        cwd=FRONTEND_DIR,
-        shell=True,
-    )
+    lts_node = _find_build_node()
+    vite_bin = os.path.join(FRONTEND_DIR, "node_modules", "vite", "bin", "vite.js")
+    if lts_node and os.path.exists(vite_bin):
+        print(f"  使用 Node LTS 打包: {lts_node}")
+        subprocess.check_call(
+            [lts_node, vite_bin, "build", "--outDir", out_dir],
+            cwd=FRONTEND_DIR,
+        )
+    else:
+        if not lts_node:
+            print("  [WARN] 找不到 Node LTS(nodejs-lts)，改用系統 node 打包。")
+            print("         若系統 node 為 v25，build 會在 rendering 階段 crash。")
+            print("         請先執行：scoop install nodejs-lts")
+        subprocess.check_call(
+            ["npx", "vite", "build", "--outDir", out_dir],
+            cwd=FRONTEND_DIR,
+            shell=True,
+        )
     print(f"  前端打包完成: {out_dir}")
 
 

@@ -143,7 +143,14 @@ goto done
 echo.
 echo 正在重新打包前端...
 cd /d %~dp0animal-crossing-dashboard
-call npx vite build --outDir ../backend/static
+set "LTS_NODE=%USERPROFILE%\scoop\apps\nodejs-lts\current\node.exe"
+if exist "%LTS_NODE%" (
+    echo 使用 Node LTS 打包，避開 Node 25 + Vite 4 的 build crash...
+    call "%LTS_NODE%" node_modules\vite\bin\vite.js build --outDir ../backend/static
+) else (
+    echo [WARN] 找不到 Node LTS，改用 npx；若 node 為 v25 會在 rendering 階段 crash，請先執行 scoop install nodejs-lts
+    call npx vite build --outDir ../backend/static
+)
 echo.
 echo 前端已重新打包完成！
 goto done

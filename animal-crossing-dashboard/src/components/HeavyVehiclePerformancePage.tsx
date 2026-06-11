@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { Truck, TrendingUp, TrendingDown, Minus, AlertTriangle, Shield } from 'lucide-react';
 import DateRangePicker, { type DateRange } from './DateRangePicker';
 import { apiClient } from '../api/client';
+import TrendCard from './TrendCard';
 
 function defaultRange(): DateRange {
   const now = new Date();
@@ -100,6 +101,15 @@ const HeavyVehiclePerformancePage: React.FC = () => {
           />
         </div>
       )}
+
+      {/* 大型車週趨勢 */}
+      <TrendCard
+        range={range}
+        title="大型車週趨勢與專業判讀"
+        fetcher={(s, e) => apiClient.getHeavyVehicleTrend(s, e)}
+        primaryName="主動取締"
+        secondaryName="肇事舉發"
+      />
 
       {/* 各派出所明細表 */}
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl nook-shadow overflow-hidden mb-6">

@@ -857,6 +857,31 @@ class APIClient {
     return this.request(`/enforcement/dui?start_date=${startDate}&end_date=${endDate}`);
   }
 
+  /** 酒駕週趨勢：移動平均 / 環比 / 異常偵測 + 專業判讀 */
+  async getDuiTrend(startDate: string, endDate: string): Promise<any> {
+    return this.request(`/enforcement/dui/trend?start_date=${startDate}&end_date=${endDate}`);
+  }
+
+  /** 毒駕週趨勢 */
+  async getDrugTrend(startDate: string, endDate: string): Promise<any> {
+    return this.request(`/enforcement/drug/trend?start_date=${startDate}&end_date=${endDate}`);
+  }
+
+  /** 大型車週趨勢 */
+  async getHeavyVehicleTrend(startDate: string, endDate: string): Promise<any> {
+    return this.request(`/enforcement/heavy-vehicle/trend?start_date=${startDate}&end_date=${endDate}`);
+  }
+
+  /** 超速週趨勢（單序列總量） */
+  async getSpeedTrend(startDate: string, endDate: string): Promise<any> {
+    return this.request(`/enforcement/speed/trend?start_date=${startDate}&end_date=${endDate}`);
+  }
+
+  /** 週事故趨勢（總覽用，Crash 側 A1/A2/A3） */
+  async getAccidentTrend(startDate: string, endDate: string): Promise<any> {
+    return this.request(`/recommendations/accidents/trend?start_date=${startDate}&end_date=${endDate}`);
+  }
+
   async getDrugPerformance(startDate: string, endDate: string): Promise<any> {
     return this.request(`/enforcement/drug?start_date=${startDate}&end_date=${endDate}`);
   }
