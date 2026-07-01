@@ -2,12 +2,13 @@
  * TrendCard - 泛用「週趨勢與專業判讀」卡（各執法主題共用）
  *
  * 資料來源：任一 `/enforcement/<topic>/trend` 端點，統一回傳：
- *   { weeks: [{label, total, primary, secondary}], trend: {...} }
- *   - primary   = 主動取締 / 取締（綠）
- *   - secondary = 肇事舉發（紅）；單序列主題（如超速）此值為 0
+ *   { weeks: [{label, total, primary, secondary, prev_total?}], trend: {...} }
+ *   - primary    = 主動取締 / 取締（綠）
+ *   - secondary  = 肇事舉發（紅）；單序列主題（如超速）此值為 0
+ *   - prev_total = 去年同期（52 週前，星期對齊）總量；後端有查才會出現
  *
  * 後端 trend_engine 提供 4 週移動平均 / 環比(MoM) / Z-score 異常偵測 / 專業判讀文字。
- * 視覺：Recharts ComposedChart（堆疊長條 + 移動平均線）+ 互動 tooltip。
+ * 視覺：Recharts ComposedChart（堆疊長條 + 移動平均線 + 去年同期虛線）+ 互動 tooltip。
  */
 import React, { useEffect, useState } from 'react';
 import {
@@ -20,13 +21,14 @@ import type { DateRange } from './DateRangePicker';
 const DEFAULT = {
   primary: '#059669',   // success 綠 — 主動 / 取締
   secondary: '#DC2626', // danger 紅 — 肇事舉發
-  ma: '#0369A1',        // accent 藍 — 移動平均
+  ma: '#0369A1',         // accent 藍 — 移動平均
+  prevYear: '#94A3B8',   // 中性灰 — 去年同期（比對用，非主指標故弱化）
   grid: '#E2E8F0',
   axis: '#64748B',
 };
 
 interface TrendData {
-  weeks: { week_start: string; label: string; total: number; primary: number; secondary: number }[];
+  weeks: { week_start: string; label: string; total: number; primary: number; secondary: number; prev_total?: number }[];
   trend: {
     points: { label: string; value: number; ma: number }[];
     window: number;
@@ -97,6 +99,7 @@ const TrendCard: React.FC<TrendCardProps> = ({
     ma: data?.trend.points[i]?.ma ?? null,
   }));
   const hasData = chartData.some((d) => d.total > 0);
+  const hasPrevYear = (data?.weeks || []).some((w) => w.prev_total !== undefined);
   const t = data?.trend;
 
   const Tip = ({ active, payload, label }: any) => {
@@ -130,6 +133,12 @@ const TrendCard: React.FC<TrendCardProps> = ({
           <span className="text-accent font-medium">— 移動平均</span>
           <span className="tabular-nums">{row.ma}</span>
         </div>
+        {row.prev_total !== undefined && (
+          <div className="flex items-center justify-between gap-6">
+            <span style={{ color: DEFAULT.prevYear }} className="font-medium">┄ 去年同期</span>
+            <span className="tabular-nums">{row.prev_total} {metricName}</span>
+          </div>
+        )}
       </div>
     );
   };
@@ -140,7 +149,8 @@ const TrendCard: React.FC<TrendCardProps> = ({
         <Activity className="w-5 h-5 text-accent" />
         <h3 className="font-bold text-nook-text">{title}</h3>
         <span className="text-xs text-text-subtle ml-2">
-          {dual ? `${primaryName} vs ${secondaryName} · ` : ''}{t?.window ?? 4} 週移動平均 · 異常偵測
+          {dual ? `${primaryName} vs ${secondaryName} · ` : ''}{t?.window ?? 4} 週移動平均
+          {hasPrevYear ? ' · 去年同期疊圖' : ''} · 異常偵測
         </span>
       </div>
 
@@ -201,6 +211,13 @@ const TrendCard: React.FC<TrendCardProps> = ({
                   type="monotone" dataKey="ma" name={`${t?.window ?? 4} 週移動平均`}
                   stroke={DEFAULT.ma} strokeWidth={2.5} dot={false} activeDot={{ r: 4 }}
                 />
+                {hasPrevYear && (
+                  <Line
+                    type="monotone" dataKey="prev_total" name="去年同期"
+                    stroke={DEFAULT.prevYear} strokeWidth={1.5} strokeDasharray="4 3"
+                    dot={false} activeDot={{ r: 3 }}
+                  />
+                )}
               </ComposedChart>
             </ResponsiveContainer>
           </div>

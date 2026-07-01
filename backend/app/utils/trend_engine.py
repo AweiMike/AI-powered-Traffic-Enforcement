@@ -141,11 +141,18 @@ def _week_start(d: date) -> date:
     return d - timedelta(days=d.weekday())
 
 
+#: 去年同期疊圖採 52 週（364 天）位移而非日曆年位移，
+#: 目的是保持「星期對齊」（週一還是週一），週分桶才能正確逐週比對。
+#: 代價是每年略漂移 1-2 天（365/366 天 vs 364 天），對週趨勢視覺化可接受。
+YOY_WEEK_OFFSET = timedelta(weeks=52)
+
+
 def weekly_trend(
     daily: Iterable[tuple],
     start: date,
     end: date,
     *,
+    daily_prev: Optional[Iterable[tuple]] = None,
     window: int = 4,
     z_threshold: float = 2.0,
     metric_name: str = "件",
@@ -158,9 +165,13 @@ def weekly_trend(
             total = 該日總取締；secondary = 子集合（如肇事舉發）。
             primary = total - secondary（如主動取締）。無子集的主題 secondary 傳 0。
         start, end: 查詢區間（含），用來產生連續週序（補零）。
+        daily_prev: 選填，去年同期（52 週前）的每日計數，格式同 daily
+            （僅需 total，secondary 不使用）。提供時每週會多一個 prev_total 欄位
+            供前端疊圖比較；省略則不含此欄位。
 
     Returns:
-        {"weeks": [...], "trend": {...}}。weeks 每筆含 week_start/label/total/primary/secondary。
+        {"weeks": [...], "trend": {...}}。weeks 每筆含 week_start/label/total/primary/secondary
+        （若提供 daily_prev 則另含 prev_total）。
         會剔除尾端「未完整」的週（空週或進行中的當週），避免最新週 0 件 / 環比 -100%
         / 假性「改善」等誤導。
     """
@@ -200,6 +211,15 @@ def weekly_trend(
                 weeks.pop()
             else:
                 break
+
+    if daily_prev is not None:
+        prev_buckets: dict = {}
+        for d, total, _secondary in daily_prev:
+            ws = _week_start(d)
+            prev_buckets[ws] = prev_buckets.get(ws, 0) + total
+        for w in weeks:
+            prev_ws = date.fromisoformat(w["week_start"]) - YOY_WEEK_OFFSET
+            w["prev_total"] = prev_buckets.get(prev_ws, 0)
 
     labels = [w["label"] for w in weeks]
     totals = [w["total"] for w in weeks]

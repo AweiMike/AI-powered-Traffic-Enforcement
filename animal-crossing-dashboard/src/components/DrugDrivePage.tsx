@@ -8,7 +8,10 @@ import React, { useState, useEffect } from 'react';
 import { Pill, TrendingUp, TrendingDown, Minus, AlertTriangle, MapPin, Clock, Trophy } from 'lucide-react';
 import DateRangePicker, { type DateRange } from './DateRangePicker';
 import { apiClient } from '../api/client';
-import TrendCard from './TrendCard';
+import TrendCardSkeleton from './TrendCardSkeleton';
+
+// recharts 依賴較重，動態載入讓它獨立成 chunk，不灌進主 bundle
+const TrendCard = React.lazy(() => import('./TrendCard'));
 
 function defaultRange(): DateRange {
   const now = new Date();
@@ -114,13 +117,15 @@ const DrugDrivePage: React.FC = () => {
           </div>
 
           {/* 毒駕週趨勢 */}
-          <TrendCard
-            range={range}
-            title="毒駕週趨勢與專業判讀"
-            fetcher={(s, e) => apiClient.getDrugTrend(s, e)}
-            primaryName="主動取締"
-            secondaryName="肇事舉發"
-          />
+          <React.Suspense fallback={<TrendCardSkeleton title="毒駕週趨勢與專業判讀" />}>
+            <TrendCard
+              range={range}
+              title="毒駕週趨勢與專業判讀"
+              fetcher={(s, e) => apiClient.getDrugTrend(s, e)}
+              primaryName="主動取締"
+              secondaryName="肇事舉發"
+            />
+          </React.Suspense>
 
           {/* 管區排名 */}
           {data.unit_group_ranking?.length > 0 && (

@@ -7,7 +7,10 @@ import React, { useState, useEffect } from 'react';
 import { Gauge, TrendingUp, TrendingDown, Minus, AlertTriangle, Zap, MapPin } from 'lucide-react';
 import DateRangePicker, { type DateRange } from './DateRangePicker';
 import { apiClient } from '../api/client';
-import TrendCard from './TrendCard';
+import TrendCardSkeleton from './TrendCardSkeleton';
+
+// recharts 依賴較重，動態載入讓它獨立成 chunk，不灌進主 bundle
+const TrendCard = React.lazy(() => import('./TrendCard'));
 
 function defaultRange(): DateRange {
     const now = new Date();
@@ -133,12 +136,14 @@ const SpeedPerformancePage: React.FC = () => {
                     </div>
 
                     {/* 超速週趨勢 */}
-                    <TrendCard
-                        range={range}
-                        title="超速週趨勢與專業判讀"
-                        fetcher={(s, e) => apiClient.getSpeedTrend(s, e)}
-                        primaryName="超速取締"
-                    />
+                    <React.Suspense fallback={<TrendCardSkeleton title="超速週趨勢與專業判讀" />}>
+                        <TrendCard
+                            range={range}
+                            title="超速週趨勢與專業判讀"
+                            fetcher={(s, e) => apiClient.getSpeedTrend(s, e)}
+                            primaryName="超速取締"
+                        />
+                    </React.Suspense>
 
                     {/* 嚴重度分級 + 速限分布 */}
                     <div className="grid grid-cols-2 gap-4 mb-6">

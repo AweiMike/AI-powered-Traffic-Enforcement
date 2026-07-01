@@ -54,7 +54,10 @@ import SpeedPerformancePage from './components/SpeedPerformancePage';
 import PedestrianAnalysisPage from './components/PedestrianAnalysisPage';
 import DateRangePicker, { type DateRange } from './components/DateRangePicker';
 import BrandLogo from './components/BrandLogo';
-import TrendCard from './components/TrendCard';
+import TrendCardSkeleton from './components/TrendCardSkeleton';
+
+// recharts 依賴較重，動態載入讓它獨立成 chunk，不灌進主 bundle
+const TrendCard = React.lazy(() => import('./components/TrendCard'));
 
 // Import hooks
 import {
@@ -456,15 +459,17 @@ const DashboardView: React.FC = () => {
       </div>
 
       {/* 週事故趨勢與專業判讀（趨勢引擎 + Recharts）*/}
-      <TrendCard
-        range={dateRange}
-        title="週事故趨勢與專業判讀"
-        fetcher={(s, e) => apiClient.getAccidentTrend(s, e)}
-        primaryName="A2/A3 事故"
-        secondaryName="A1 死亡事故"
-        primaryColor="#D97706"
-        secondaryColor="#DC2626"
-      />
+      <React.Suspense fallback={<TrendCardSkeleton title="週事故趨勢與專業判讀" />}>
+        <TrendCard
+          range={dateRange}
+          title="週事故趨勢與專業判讀"
+          fetcher={(s, e) => apiClient.getAccidentTrend(s, e)}
+          primaryName="A2/A3 事故"
+          secondaryName="A1 死亡事故"
+          primaryColor="#D97706"
+          secondaryColor="#DC2626"
+        />
+      </React.Suspense>
 
       {/* Main Content */}
       <div className="grid grid-cols-3 gap-6">

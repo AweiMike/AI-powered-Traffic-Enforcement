@@ -105,21 +105,25 @@ async def get_dui_weekly_trend(
 
     # secondary = 肇事(UNION 信號)；primary(主動) = total - secondary
     is_crash_expr = case((dui_crash_filter(), 1), else_=0)
-    rows = db.query(
-        Ticket.violation_date.label("d"),
-        is_crash_expr.label("is_crash"),
-        func.count(Ticket.id).label("c"),
-    ).filter(
-        Ticket.violation_date >= sd,
-        Ticket.violation_date <= ed,
-        Ticket.topic_dui == True,
-        not_drug_filter(),
-    ).group_by(
-        Ticket.violation_date, is_crash_expr,
-    ).all()
 
-    daily = [(r.d, r.c, r.c if r.is_crash else 0) for r in rows]
-    result = weekly_trend(daily, sd, ed, window=4, metric_name="件", higher_is_worse=False)
+    def query_daily(s, e):
+        rows = db.query(
+            Ticket.violation_date.label("d"),
+            is_crash_expr.label("is_crash"),
+            func.count(Ticket.id).label("c"),
+        ).filter(
+            Ticket.violation_date >= s,
+            Ticket.violation_date <= e,
+            Ticket.topic_dui == True,
+            not_drug_filter(),
+        ).group_by(
+            Ticket.violation_date, is_crash_expr,
+        ).all()
+        return [(r.d, r.c, r.c if r.is_crash else 0) for r in rows]
+
+    daily = query_daily(sd, ed)
+    daily_prev = query_daily(sd - timedelta(weeks=52), ed - timedelta(weeks=52))
+    result = weekly_trend(daily, sd, ed, daily_prev=daily_prev, window=4, metric_name="件", higher_is_worse=False)
     return {"period": {"start_date": start_date, "end_date": end_date}, **result}
 
 
@@ -139,20 +143,24 @@ async def get_drug_weekly_trend(
         return {"error": "日期格式錯誤"}
 
     is_crash_expr = case((drug_crash_filter(), 1), else_=0)
-    rows = db.query(
-        Ticket.violation_date.label("d"),
-        is_crash_expr.label("is_crash"),
-        func.count(Ticket.id).label("c"),
-    ).filter(
-        Ticket.violation_date >= sd,
-        Ticket.violation_date <= ed,
-        drug_drive_filter(),
-    ).group_by(
-        Ticket.violation_date, is_crash_expr,
-    ).all()
 
-    daily = [(r.d, r.c, r.c if r.is_crash else 0) for r in rows]
-    result = weekly_trend(daily, sd, ed, window=4, metric_name="件", higher_is_worse=False)
+    def query_daily(s, e):
+        rows = db.query(
+            Ticket.violation_date.label("d"),
+            is_crash_expr.label("is_crash"),
+            func.count(Ticket.id).label("c"),
+        ).filter(
+            Ticket.violation_date >= s,
+            Ticket.violation_date <= e,
+            drug_drive_filter(),
+        ).group_by(
+            Ticket.violation_date, is_crash_expr,
+        ).all()
+        return [(r.d, r.c, r.c if r.is_crash else 0) for r in rows]
+
+    daily = query_daily(sd, ed)
+    daily_prev = query_daily(sd - timedelta(weeks=52), ed - timedelta(weeks=52))
+    result = weekly_trend(daily, sd, ed, daily_prev=daily_prev, window=4, metric_name="件", higher_is_worse=False)
     return {"period": {"start_date": start_date, "end_date": end_date}, **result}
 
 
@@ -173,20 +181,24 @@ async def get_heavy_vehicle_weekly_trend(
 
     vehicle_conds = [Ticket.vehicle_type.ilike(f"%{kw}%") for kw in HEAVY_VEHICLE_KEYWORDS]
     is_crash_expr = case((Ticket.enforcement_subtype == "攔舉-肇事", 1), else_=0)
-    rows = db.query(
-        Ticket.violation_date.label("d"),
-        is_crash_expr.label("is_crash"),
-        func.count(Ticket.id).label("c"),
-    ).filter(
-        Ticket.violation_date >= sd,
-        Ticket.violation_date <= ed,
-        or_(*vehicle_conds),
-    ).group_by(
-        Ticket.violation_date, is_crash_expr,
-    ).all()
 
-    daily = [(r.d, r.c, r.c if r.is_crash else 0) for r in rows]
-    result = weekly_trend(daily, sd, ed, window=4, metric_name="件", higher_is_worse=False)
+    def query_daily(s, e):
+        rows = db.query(
+            Ticket.violation_date.label("d"),
+            is_crash_expr.label("is_crash"),
+            func.count(Ticket.id).label("c"),
+        ).filter(
+            Ticket.violation_date >= s,
+            Ticket.violation_date <= e,
+            or_(*vehicle_conds),
+        ).group_by(
+            Ticket.violation_date, is_crash_expr,
+        ).all()
+        return [(r.d, r.c, r.c if r.is_crash else 0) for r in rows]
+
+    daily = query_daily(sd, ed)
+    daily_prev = query_daily(sd - timedelta(weeks=52), ed - timedelta(weeks=52))
+    result = weekly_trend(daily, sd, ed, daily_prev=daily_prev, window=4, metric_name="件", higher_is_worse=False)
     return {"period": {"start_date": start_date, "end_date": end_date}, **result}
 
 
@@ -205,19 +217,22 @@ async def get_speed_weekly_trend(
     if not sd or not ed:
         return {"error": "日期格式錯誤"}
 
-    rows = db.query(
-        Ticket.violation_date.label("d"),
-        func.count(Ticket.id).label("c"),
-    ).filter(
-        Ticket.violation_date >= sd,
-        Ticket.violation_date <= ed,
-        Ticket.violation_name.like("%超速%"),
-    ).group_by(
-        Ticket.violation_date,
-    ).all()
+    def query_daily(s, e):
+        rows = db.query(
+            Ticket.violation_date.label("d"),
+            func.count(Ticket.id).label("c"),
+        ).filter(
+            Ticket.violation_date >= s,
+            Ticket.violation_date <= e,
+            Ticket.violation_name.like("%超速%"),
+        ).group_by(
+            Ticket.violation_date,
+        ).all()
+        return [(r.d, r.c, 0) for r in rows]
 
-    daily = [(r.d, r.c, 0) for r in rows]
-    result = weekly_trend(daily, sd, ed, window=4, metric_name="件", higher_is_worse=False)
+    daily = query_daily(sd, ed)
+    daily_prev = query_daily(sd - timedelta(weeks=52), ed - timedelta(weeks=52))
+    result = weekly_trend(daily, sd, ed, daily_prev=daily_prev, window=4, metric_name="件", higher_is_worse=False)
     return {"period": {"start_date": start_date, "end_date": end_date}, **result}
 
 

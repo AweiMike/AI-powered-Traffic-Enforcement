@@ -7,7 +7,10 @@ import React, { useState, useEffect } from 'react';
 import { Wine, TrendingUp, TrendingDown, Minus, AlertTriangle, Shield, Trophy } from 'lucide-react';
 import DateRangePicker, { type DateRange } from './DateRangePicker';
 import { apiClient } from '../api/client';
-import TrendCard from './TrendCard';
+import TrendCardSkeleton from './TrendCardSkeleton';
+
+// recharts 依賴較重，動態載入讓它獨立成 chunk，不灌進主 bundle
+const TrendCard = React.lazy(() => import('./TrendCard'));
 
 function defaultRange(): DateRange {
   const now = new Date();
@@ -248,13 +251,15 @@ const DuiPerformancePage: React.FC = () => {
       })()}
 
       {/* 酒駕週趨勢與專業判讀（趨勢引擎 + Recharts） */}
-      <TrendCard
-        range={range}
-        title="酒駕週趨勢與專業判讀"
-        fetcher={(s, e) => apiClient.getDuiTrend(s, e)}
-        primaryName="主動取締"
-        secondaryName="肇事舉發"
-      />
+      <React.Suspense fallback={<TrendCardSkeleton title="酒駕週趨勢與專業判讀" />}>
+        <TrendCard
+          range={range}
+          title="酒駕週趨勢與專業判讀"
+          fetcher={(s, e) => apiClient.getDuiTrend(s, e)}
+          primaryName="主動取締"
+          secondaryName="肇事舉發"
+        />
+      </React.Suspense>
 
       {/* 各派出所明細表 */}
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl nook-shadow overflow-hidden">

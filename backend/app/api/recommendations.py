@@ -38,19 +38,23 @@ async def get_accident_weekly_trend(
         return {"error": "日期格式錯誤"}
 
     is_a1 = case((Crash.severity == "A1", 1), else_=0)
-    rows = db.query(
-        Crash.occurred_date.label("d"),
-        is_a1.label("is_a1"),
-        func.count(Crash.id).label("c"),
-    ).filter(
-        Crash.occurred_date >= sd,
-        Crash.occurred_date <= ed,
-    ).group_by(
-        Crash.occurred_date, is_a1,
-    ).all()
 
-    daily = [(r.d, r.c, r.c if r.is_a1 else 0) for r in rows]
-    result = weekly_trend(daily, sd, ed, window=4, metric_name="件", higher_is_worse=True)
+    def query_daily(s, e):
+        rows = db.query(
+            Crash.occurred_date.label("d"),
+            is_a1.label("is_a1"),
+            func.count(Crash.id).label("c"),
+        ).filter(
+            Crash.occurred_date >= s,
+            Crash.occurred_date <= e,
+        ).group_by(
+            Crash.occurred_date, is_a1,
+        ).all()
+        return [(r.d, r.c, r.c if r.is_a1 else 0) for r in rows]
+
+    daily = query_daily(sd, ed)
+    daily_prev = query_daily(sd - timedelta(weeks=52), ed - timedelta(weeks=52))
+    result = weekly_trend(daily, sd, ed, daily_prev=daily_prev, window=4, metric_name="件", higher_is_worse=True)
     return {"period": {"start_date": start_date, "end_date": end_date}, **result}
 
 
