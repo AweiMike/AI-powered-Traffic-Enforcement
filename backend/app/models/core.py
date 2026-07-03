@@ -106,6 +106,21 @@ class Crash(Base):
     death_count = Column(Integer, default=0, comment="24小時內死亡人數")
     injury_count = Column(Integer, default=0, comment="受傷人數")
 
+    # === 道路工程分析欄位（Phase 1 擴充，來源=全選條件 EIS 匯出）===
+    speed_limit = Column(Integer, index=True, comment="速限 km/h（7.速限-第1當事者）")
+    crash_type = Column(String(50), index=True, comment="事故類型及型態（側撞/追撞/路口交岔撞…）")
+    road_type = Column(String(50), index=True, comment="道路型態（直路/四岔路/三岔路…）")
+    signal_type = Column(String(50), index=True, comment="號誌種類（12-1.）")
+    road_lighting = Column(String(50), index=True, comment="道路照明設備（有照明未開啟或故障/有照明且開啟/無照明）")
+    route_name = Column(String(50), index=True, comment="公路路線（台20線等，2-2. 國道/省道/縣道/鄉道）")
+    route_km = Column(Float, comment="路線公里處（公里+公尺合成，線性分析用）")
+
+    # === 當事者深化欄位（代表駕駛列，與 driver_* 同語意）===
+    license_status = Column(String(30), index=True, comment="駕照狀態（有適當之駕照/無照-已達考照年齡…）")
+    protective_gear = Column(String(30), comment="保護裝備（安全帽/安全帶使用情形）")
+    is_hit_and_run = Column(Boolean, default=False, index=True, comment="是否肇事逃逸（35. 任一當事者=是）")
+    delivery_platform = Column(String(50), comment="共享經濟或外送平台（37. 任一當事者非空）")
+
     # === 慢車/微電車分析欄位 ===
     evehicle_type = Column(
         String(50), index=True,

@@ -899,6 +899,16 @@ class APIClient {
     return this.request(`/recommendations/accidents/trend?start_date=${startDate}&end_date=${endDate}`);
   }
 
+  /** 道路照明故障事故清冊（通報養工處修燈） */
+  async getRoadLightingIssues(startDate: string, endDate: string): Promise<any> {
+    return this.request(`/recommendations/road-lighting-issues?start_date=${startDate}&end_date=${endDate}`);
+  }
+
+  /** 資料品質總覽 */
+  async getDataQuality(): Promise<any> {
+    return this.request('/admin/data-quality');
+  }
+
   async getDrugPerformance(startDate: string, endDate: string): Promise<any> {
     return this.request(`/enforcement/drug?start_date=${startDate}&end_date=${endDate}`);
   }

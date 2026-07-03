@@ -58,6 +58,81 @@ async def get_accident_weekly_trend(
     return {"period": {"start_date": start_date, "end_date": end_date}, **result}
 
 
+# ============================================
+# 道路照明故障事故清單（Phase 1 快贏：通報養工處修燈）
+# ============================================
+@router.get("/road-lighting-issues")
+async def get_road_lighting_issues(
+    start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """「有照明未開啟或故障」的事故清冊 + 分區統計。
+
+    資料源：EIS「5.道路照明設備」（全選條件匯出）。
+    用途：一鍵產出含 GPS 的修燈通報清單給養工處，並附死傷佐證。
+    夜間定義：18:00-05:59（shift 10-12、01-03），照明故障於此時段最具改善急迫性。
+    """
+    try:
+        sd = datetime.strptime(start_date, "%Y-%m-%d").date()
+        ed = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return {"error": "日期格式錯誤"}
+
+    NIGHT_SHIFTS = {"10", "11", "12", "01", "02", "03"}
+
+    rows = db.query(Crash).filter(
+        Crash.road_lighting == "有照明未開啟或故障",
+        Crash.occurred_date >= sd,
+        Crash.occurred_date <= ed,
+    ).order_by(Crash.occurred_date.desc(), Crash.occurred_time.desc()).all()
+
+    items = []
+    night = 0
+    deaths = 0
+    injuries = 0
+    by_district: dict = {}
+    for c in rows:
+        is_night = c.shift_id in NIGHT_SHIFTS
+        if is_night:
+            night += 1
+        deaths += c.death_count or 0
+        injuries += c.injury_count or 0
+        d = c.district or "未知"
+        by_district[d] = by_district.get(d, 0) + 1
+        items.append({
+            "date": c.occurred_date.isoformat(),
+            "time": c.occurred_time.strftime("%H:%M") if c.occurred_time else "",
+            "is_night": is_night,
+            "district": d,
+            "sub_unit": c.sub_unit,
+            "location": c.location_desc,
+            "route": (f"{c.route_name} {c.route_km}K" if c.route_name and c.route_km is not None
+                      else (c.route_name or "")),
+            "latitude": c.latitude,
+            "longitude": c.longitude,
+            "severity": c.severity,
+            "deaths": c.death_count or 0,
+            "injuries": c.injury_count or 0,
+        })
+
+    return {
+        "period": {"start_date": start_date, "end_date": end_date},
+        "summary": {
+            "total": len(items),
+            "night": night,
+            "night_pct": round(night * 100 / len(items), 1) if items else 0,
+            "deaths": deaths,
+            "injuries": injuries,
+        },
+        "by_district": sorted(
+            [{"district": k, "count": v} for k, v in by_district.items()],
+            key=lambda x: -x["count"],
+        ),
+        "items": items,
+    }
+
+
 def normalize_district(district: str) -> str:
     """標準化區域名稱，移除「市」前綴"""
     if district and district.startswith('市'):

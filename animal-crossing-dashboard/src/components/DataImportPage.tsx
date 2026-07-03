@@ -678,6 +678,75 @@ const BatchImportCard: React.FC<BatchImportProps> = ({
 // ============================================
 // 主頁面元件
 // ============================================
+/** 資料品質總覽（Phase 1 C4）：匯入後一眼看出資料健康度 */
+const DataQualityCard: React.FC<{ refreshTrigger: number }> = ({ refreshTrigger }) => {
+  const [q, setQ] = useState<any>(null);
+
+  useEffect(() => {
+    let alive = true;
+    apiClient.getDataQuality().then((r) => { if (alive) setQ(r); }).catch(() => {});
+    return () => { alive = false; };
+  }, [refreshTrigger]);
+
+  if (!q) return null;
+  const c = q.crash;
+
+  const RateBar = ({ label, rate, invert = false }: { label: string; rate: number; invert?: boolean }) => {
+    const good = invert ? rate <= 10 : rate >= 90;
+    const warn = invert ? rate <= 30 : rate >= 60;
+    const color = good ? 'bg-success' : warn ? 'bg-warning' : 'bg-danger';
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-text-muted w-32">{label}</span>
+        <div className="flex-1 h-2.5 bg-surface-3 rounded-full overflow-hidden">
+          <div className={`h-full ${color} rounded-full`} style={{ width: `${Math.min(100, rate)}%` }} />
+        </div>
+        <span className="text-xs font-bold tabular-nums w-12 text-right">{rate}%</span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="mt-8 bg-white/80 backdrop-blur-sm rounded-3xl p-6 nook-shadow">
+      <h3 className="text-lg font-bold text-nook-text mb-1">📊 資料品質總覽</h3>
+      <p className="text-xs text-text-subtle mb-4">
+        事故 {c.total.toLocaleString()} 件（{c.date_range?.[0]} ~ {c.date_range?.[1]}）·
+        舉發 {q.ticket.total.toLocaleString()} 張（{q.ticket.date_range?.[0]} ~ {q.ticket.date_range?.[1]}）
+      </p>
+
+      {q.coverage_gap_days > 3 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 mb-4">
+          ⚠️ 舉發資料落後事故資料 <strong>{q.coverage_gap_days} 天</strong>——建議回 EIS 補匯出最新舉發檔，
+          否則趨勢卡與成效比較的近期取締數會偏低。
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+        <RateBar label="GPS 座標率" rate={c.gps_rate} />
+        <RateBar label="轄區派出所完整率" rate={c.sub_unit_rate} />
+        <RateBar label="性別完整率" rate={c.gender_rate} />
+        <RateBar label="天候完整率" rate={c.weather_rate} />
+        <RateBar label="地點未知率（越低越好）" rate={c.location_unknown_rate} invert />
+        <RateBar label="年齡未知率（越低越好）" rate={c.age_unknown_rate} invert />
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-surface-3">
+        <p className="text-xs text-text-muted mb-2">
+          道路工程欄位入庫率（需「全選條件」匯出檔；低 = 該期間檔案為舊版部分欄位匯出）
+        </p>
+        <div className="grid grid-cols-4 gap-2">
+          {Object.entries(q.phase1_road_fields || {}).map(([name, v]: [string, any]) => (
+            <div key={name} className="bg-surface-2 rounded-lg px-2.5 py-1.5 flex items-center justify-between">
+              <span className="text-[10px] text-text-subtle font-mono">{name}</span>
+              <span className="text-xs font-bold tabular-nums">{v.rate}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DataImportPage: React.FC = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -760,6 +829,9 @@ const DataImportPage: React.FC = () => {
 
       {/* 資料庫狀態 */}
       <DatabaseStatusCard refreshTrigger={refreshTrigger} />
+
+      {/* 資料品質總覽（Phase 1）*/}
+      <DataQualityCard refreshTrigger={refreshTrigger} />
 
       {/* 系統維護區 */}
       <div className="mt-8 border-t border-nook-text/10 pt-8">

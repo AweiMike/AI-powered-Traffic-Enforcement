@@ -77,6 +77,18 @@ def _migrate_eis_columns():
         "drinking_code": "VARCHAR(2)",
         "party_subtype_code": "VARCHAR(10)",
         "is_dui_crash_party": "BOOLEAN DEFAULT 0",
+        # 道路工程分析欄位（Phase 1，全選條件匯出）
+        "speed_limit": "INTEGER",
+        "crash_type": "VARCHAR(50)",
+        "road_type": "VARCHAR(50)",
+        "signal_type": "VARCHAR(50)",
+        "road_lighting": "VARCHAR(50)",
+        "route_name": "VARCHAR(50)",
+        "route_km": "FLOAT",
+        "license_status": "VARCHAR(30)",
+        "protective_gear": "VARCHAR(30)",
+        "is_hit_and_run": "BOOLEAN DEFAULT 0",
+        "delivery_platform": "VARCHAR(50)",
     })
 
     # core_ticket 表可能缺少的欄位

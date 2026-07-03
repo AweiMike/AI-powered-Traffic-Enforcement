@@ -28,6 +28,7 @@ import {
   Target,
   Bot,
   PersonStanding,
+  Construction,
   Gauge,
   Pill
 } from 'lucide-react';
@@ -52,6 +53,7 @@ import DrugDrivePage from './components/DrugDrivePage';
 import HeavyVehiclePerformancePage from './components/HeavyVehiclePerformancePage';
 import SpeedPerformancePage from './components/SpeedPerformancePage';
 import PedestrianAnalysisPage from './components/PedestrianAnalysisPage';
+import RoadEngineeringPage from './components/RoadEngineeringPage';
 import DateRangePicker, { type DateRange } from './components/DateRangePicker';
 import BrandLogo from './components/BrandLogo';
 import TrendCardSkeleton from './components/TrendCardSkeleton';
@@ -116,6 +118,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, readOnly, o
         { id: 'accidents', icon: Target, label: '執法缺口', description: '事故與違規綜合分析' },
         { id: 'map', icon: MapPin, label: '地圖視覺化', description: '精準座標點位分布' },
         { id: 'monthly', icon: BarChart3, label: '綜合執法成效', description: '數據總覽·趨勢·A1清單' },
+        { id: 'road-eng', icon: Construction, label: '道路工程改善', description: '照明故障通報·會勘佐證資料' },
       ],
     },
     {
@@ -1139,6 +1142,8 @@ const App: React.FC = () => {
         return <DrugDrivePage />;
       case 'heavy-vehicle':
         return <HeavyVehiclePerformancePage />;
+      case 'road-eng':
+        return <RoadEngineeringPage />;
       case 'speed':
         return <SpeedPerformancePage />;
       case 'pedestrian':

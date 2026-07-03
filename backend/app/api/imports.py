@@ -510,6 +510,69 @@ def backfill_official_severity(existing, row, stats) -> None:
             existing.injury_count = ni
 
 
+def backfill_road_fields(existing, row, rollup) -> None:
+    """回補道路工程欄位：既有案件欄位為空、且新檔（全選條件匯出）有值時補上。
+
+    與 backfill_official_severity 同場景：舊檔先匯入建案、全選檔後到被去重略過，
+    新欄位（速限/事故型態/照明/路線/駕照…）若不回補會永遠是 NULL。
+    只補空值、不覆寫既有值。
+    """
+    rf = extract_road_engineering_fields(row)
+    for k, v in rf.items():
+        if v is not None and getattr(existing, k, None) is None:
+            setattr(existing, k, v)
+    if rollup:
+        if existing.license_status is None and rollup.get("driver_license_status"):
+            existing.license_status = rollup["driver_license_status"]
+        if existing.protective_gear is None and rollup.get("driver_protective_gear"):
+            existing.protective_gear = rollup["driver_protective_gear"]
+        if not existing.is_hit_and_run and rollup.get("any_hit_and_run"):
+            existing.is_hit_and_run = True
+        if existing.delivery_platform is None and rollup.get("delivery_platform"):
+            existing.delivery_platform = rollup["delivery_platform"]
+
+
+def extract_road_engineering_fields(row) -> dict:
+    """案件級道路工程欄位（Phase 1 擴充；全選條件匯出才有值，欄位缺時皆為 None）。
+
+    對應 Crash model 的 speed_limit / crash_type / road_type / signal_type /
+    road_lighting / route_name / route_km 七欄。這些為 EIS 案件級屬性
+    （同案各當事者列相同），取當前列即可。
+    """
+    speed_limit = None
+    sl = _safe_eis_str(row, "7.速限(第1當事者)")
+    if sl:
+        try:
+            v = int(float(sl))
+            if 0 < v <= 130:
+                speed_limit = v
+        except (ValueError, TypeError):
+            pass
+
+    route_km = None
+    km = (_safe_eis_str(row, "2-2.發生-路線-公里處 (國道/省道/縣道/鄉道)")
+          or _safe_eis_str(row, "2-2.發生-路線-公里處(國道/省道/縣道/鄉道)"))
+    m = _safe_eis_str(row, "2-2.發生-路線-公尺處(國道/省道/縣道/鄉道)")
+    if km:
+        try:
+            route_km = float(km) + (float(m) / 1000.0 if m else 0.0)
+        except (ValueError, TypeError):
+            pass
+
+    route = _safe_eis_str(row, "2-2.發生-路線-公路(國道/省道/縣道/鄉道)")
+    lighting = (_safe_eis_str(row, "5.道路照明設備(11207新增)")
+                or _safe_eis_str(row, "5.道路照明設備"))
+    return {
+        "speed_limit": speed_limit,
+        "crash_type": (_safe_eis_str(row, "15.事故類型及型態") or None),
+        "road_type": (_safe_eis_str(row, "8.道路型態") or None),
+        "signal_type": (_safe_eis_str(row, "12-1.號誌-號誌種類") or None),
+        "road_lighting": lighting or None,
+        "route_name": route if route and route != "無" else None,
+        "route_km": route_km,
+    }
+
+
 def derive_eis_severity(row) -> str:
     """
     從 EIS 資料推導事故嚴重度。
@@ -782,12 +845,25 @@ async def import_crash_file(
                     "has_drinking_party": False,
                     "driver_subtype_code": None,
                     "driver_drinking_code": None,
+                    "driver_license_status": None,
+                    "driver_protective_gear": None,
+                    "any_hit_and_run": False,
+                    "delivery_platform": None,
                     "_picked_priority": 0,  # 內部用：1=肇事駕駛飲酒, 2=非行人, 3=fallback
                 })
 
                 # 旗標：只要有任何非行人飲酒就標記
                 if not is_pedestrian and is_drinking:
                     bucket["has_drinking_party"] = True
+
+                # 案件級聚合：任一當事者肇逃=是；外送平台取第一個有效值
+                if _safe_eis_str(row, "35.肇事逃逸(是否肇逃)") == "是":
+                    bucket["any_hit_and_run"] = True
+                if not bucket["delivery_platform"]:
+                    _dp = _safe_eis_str(row, "37.共享經濟或外送平台")
+                    # 值域含「其他(非共享經濟與外送平台)」「非駕駛人」等雜訊，僅收真外送/共享
+                    if _dp and ("外送" in _dp or "共享" in _dp) and "非共享" not in _dp:
+                        bucket["delivery_platform"] = _dp[:50]
 
                 # 駕駛代表 row 選擇（priority 越高越佳，3>2>1）
                 priority = 3 if (not is_pedestrian and is_drinking) else (2 if not is_pedestrian else 1)
@@ -796,6 +872,8 @@ async def import_crash_file(
                     bucket["driver_subtype_code"] = subtype[:10] if subtype else None
                     # 駕駛代碼優先取真實飲酒值；若僅靠補強信號才被標記，drinking 為空字串時不寫入
                     bucket["driver_drinking_code"] = drinking[:2] if drinking else None
+                    bucket["driver_license_status"] = (_safe_eis_str(row, "30.駕照狀態") or None)
+                    bucket["driver_protective_gear"] = (_safe_eis_str(row, "24.保護裝備") or None)
 
         for idx, row in df.iterrows():
             try:
@@ -854,6 +932,7 @@ async def import_crash_file(
                             stats["updated"] = stats.get("updated", 0) + 1
                         # 官方 severity / 死傷回補（較新匯出檔為準）
                         backfill_official_severity(existing, row, stats)
+                        backfill_road_fields(existing, row, rollup)
                     stats["skipped"] += 1
                     continue
 
@@ -927,6 +1006,13 @@ async def import_crash_file(
                     party_subtype_code = rollup.get("driver_subtype_code")
                     # suspected_alcohol 與新欄位同步維護（沿用舊查詢）
                     suspected_alcohol = is_dui_crash_party
+
+                    # 道路工程分析欄位（Phase 1：案件級 + 代表駕駛級）
+                    road_fields = extract_road_engineering_fields(row)
+                    license_status = rollup.get("driver_license_status")
+                    protective_gear = rollup.get("driver_protective_gear")
+                    is_hit_and_run = bool(rollup.get("any_hit_and_run", False))
+                    delivery_platform = rollup.get("delivery_platform")
 
                     # 舊邏輯 fallback（若資料未含新欄位，例如歷史檔）
                     if not is_dui_crash_party and (drinking_code is None and party_subtype_code is None):
@@ -1011,6 +1097,12 @@ async def import_crash_file(
                     drinking_code = None
                     party_subtype_code = None
                     is_dui_crash_party = suspected_alcohol
+                    # LEGACY 無道路工程欄位
+                    road_fields = {}
+                    license_status = None
+                    protective_gear = None
+                    is_hit_and_run = False
+                    delivery_platform = None
 
                 # ============================
                 # 共用欄位（兩種格式皆走此路徑）
@@ -1121,6 +1213,12 @@ async def import_crash_file(
                     evehicle_type=evehicle_type,
                     is_youth=is_youth,
                     is_underage_14=is_underage_14_riding,
+                    # 道路工程分析欄位（Phase 1）
+                    license_status=license_status,
+                    protective_gear=protective_gear,
+                    is_hit_and_run=is_hit_and_run,
+                    delivery_platform=delivery_platform,
+                    **road_fields,
                 )
 
                 db.add(crash)
@@ -1323,15 +1421,29 @@ def _do_batch_import(txt_files: list, db):
                         "has_drinking_party": False,
                         "driver_subtype_code": None,
                         "driver_drinking_code": None,
+                        "driver_license_status": None,
+                        "driver_protective_gear": None,
+                        "any_hit_and_run": False,
+                        "delivery_platform": None,
                         "_picked_priority": 0,
                     })
                     if not _is_pedestrian and _is_drinking:
                         _bucket["has_drinking_party"] = True
+                    # 案件級聚合：任一當事者肇逃=是；外送平台取第一個有效值
+                    if _safe_eis_str(_row, "35.肇事逃逸(是否肇逃)") == "是":
+                        _bucket["any_hit_and_run"] = True
+                    if not _bucket["delivery_platform"]:
+                        _dp = _safe_eis_str(_row, "37.共享經濟或外送平台")
+                        # 僅收真外送/共享（排除「其他(非共享經濟與外送平台)」「非駕駛人」雜訊）
+                        if _dp and ("外送" in _dp or "共享" in _dp) and "非共享" not in _dp:
+                            _bucket["delivery_platform"] = _dp[:50]
                     _priority = 3 if (not _is_pedestrian and _is_drinking) else (2 if not _is_pedestrian else 1)
                     if _priority > _bucket["_picked_priority"]:
                         _bucket["_picked_priority"] = _priority
                         _bucket["driver_subtype_code"] = _subtype[:10] if _subtype else None
                         _bucket["driver_drinking_code"] = _drinking[:2] if _drinking else None
+                        _bucket["driver_license_status"] = (_safe_eis_str(_row, "30.駕照狀態") or None)
+                        _bucket["driver_protective_gear"] = (_safe_eis_str(_row, "24.保護裝備") or None)
 
             for idx, row in df.iterrows():
                 try:
@@ -1359,11 +1471,12 @@ def _do_batch_import(txt_files: list, db):
                     # 去重：先查 in-memory set（同批次多當事人），再查 DB（先前批次）
                     if case_id in seen_case_ids:
                         # 同批次重複（同案多當事者列 / 跨檔同案）：
-                        # 較新匯出檔帶官方事故類別時，仍要回補先寫入的 severity
-                        if data_format == "EIS" and _row_official_severity(row):
+                        # 較新匯出檔帶官方事故類別或工程欄位時，回補先寫入的案件
+                        if data_format == "EIS":
                             dup = db.query(Crash).filter(Crash.case_id == case_id).first()
                             if dup is not None:
                                 backfill_official_severity(dup, row, stats)
+                                backfill_road_fields(dup, row, case_rollup.get(case_id, {}))
                         stats["skipped"] += 1
                         continue
                     existing = db.query(Crash).filter(Crash.case_id == case_id).first()
@@ -1401,6 +1514,7 @@ def _do_batch_import(txt_files: list, db):
                                 existing.party_subtype_code = new_subtype
                             # 官方 severity / 死傷回補（較新匯出檔為準）
                             backfill_official_severity(existing, row, stats)
+                            backfill_road_fields(existing, row, rollup)
                         stats["skipped"] += 1
                         continue
 
@@ -1446,6 +1560,12 @@ def _do_batch_import(txt_files: list, db):
                         drinking_code = rollup.get("driver_drinking_code")
                         party_subtype_code = rollup.get("driver_subtype_code")
                         suspected_alcohol = is_dui_crash_party
+                        # 道路工程分析欄位（Phase 1：案件級 + 代表駕駛級）
+                        road_fields = extract_road_engineering_fields(row)
+                        license_status = rollup.get("driver_license_status")
+                        protective_gear = rollup.get("driver_protective_gear")
+                        is_hit_and_run = bool(rollup.get("any_hit_and_run", False))
+                        delivery_platform = rollup.get("delivery_platform")
 
                         # 舊邏輯 fallback
                         if not is_dui_crash_party and (drinking_code is None and party_subtype_code is None):
@@ -1560,6 +1680,12 @@ def _do_batch_import(txt_files: list, db):
                         evehicle_type=evehicle_type,
                         is_youth=is_youth,
                         is_underage_14=is_underage_14_riding,
+                        # 道路工程分析欄位（Phase 1）
+                        license_status=license_status,
+                        protective_gear=protective_gear,
+                        is_hit_and_run=is_hit_and_run,
+                        delivery_platform=delivery_platform,
+                        **road_fields,
                     )
                     db.add(crash)
                     seen_case_ids.add(case_id)
@@ -1940,15 +2066,29 @@ async def import_crash_upload_batch(
                         "has_drinking_party": False,
                         "driver_subtype_code": None,
                         "driver_drinking_code": None,
+                        "driver_license_status": None,
+                        "driver_protective_gear": None,
+                        "any_hit_and_run": False,
+                        "delivery_platform": None,
                         "_picked_priority": 0,
                     })
                     if not _is_pedestrian and _is_drinking:
                         _bucket["has_drinking_party"] = True
+                    # 案件級聚合：任一當事者肇逃=是；外送平台取第一個有效值
+                    if _safe_eis_str(_row, "35.肇事逃逸(是否肇逃)") == "是":
+                        _bucket["any_hit_and_run"] = True
+                    if not _bucket["delivery_platform"]:
+                        _dp = _safe_eis_str(_row, "37.共享經濟或外送平台")
+                        # 僅收真外送/共享（排除「其他(非共享經濟與外送平台)」「非駕駛人」雜訊）
+                        if _dp and ("外送" in _dp or "共享" in _dp) and "非共享" not in _dp:
+                            _bucket["delivery_platform"] = _dp[:50]
                     _priority = 3 if (not _is_pedestrian and _is_drinking) else (2 if not _is_pedestrian else 1)
                     if _priority > _bucket["_picked_priority"]:
                         _bucket["_picked_priority"] = _priority
                         _bucket["driver_subtype_code"] = _subtype[:10] if _subtype else None
                         _bucket["driver_drinking_code"] = _drinking[:2] if _drinking else None
+                        _bucket["driver_license_status"] = (_safe_eis_str(_row, "30.駕照狀態") or None)
+                        _bucket["driver_protective_gear"] = (_safe_eis_str(_row, "24.保護裝備") or None)
 
             for idx, row in df.iterrows():
                 try:
@@ -1975,11 +2115,12 @@ async def import_crash_upload_batch(
 
                     if case_id in seen_case_ids:
                         # 同批次重複（同案多當事者列 / 跨檔同案）：
-                        # 較新匯出檔帶官方事故類別時，仍要回補先寫入的 severity
-                        if data_format == "EIS" and _row_official_severity(row):
+                        # 較新匯出檔帶官方事故類別或工程欄位時，回補先寫入的案件
+                        if data_format == "EIS":
                             dup = db.query(Crash).filter(Crash.case_id == case_id).first()
                             if dup is not None:
                                 backfill_official_severity(dup, row, stats)
+                                backfill_road_fields(dup, row, case_rollup.get(case_id, {}))
                         stats["skipped"] += 1
                         continue
                     existing = db.query(Crash).filter(Crash.case_id == case_id).first()
@@ -2017,6 +2158,7 @@ async def import_crash_upload_batch(
                                 existing.party_subtype_code = new_subtype
                             # 官方 severity / 死傷回補（較新匯出檔為準）
                             backfill_official_severity(existing, row, stats)
+                            backfill_road_fields(existing, row, rollup)
                         stats["skipped"] += 1
                         continue
 
@@ -2063,6 +2205,12 @@ async def import_crash_upload_batch(
                         drinking_code = rollup.get("driver_drinking_code")
                         party_subtype_code = rollup.get("driver_subtype_code")
                         suspected_alcohol = is_dui_crash_party
+                        # 道路工程分析欄位（Phase 1：案件級 + 代表駕駛級）
+                        road_fields = extract_road_engineering_fields(row)
+                        license_status = rollup.get("driver_license_status")
+                        protective_gear = rollup.get("driver_protective_gear")
+                        is_hit_and_run = bool(rollup.get("any_hit_and_run", False))
+                        delivery_platform = rollup.get("delivery_platform")
 
                         # 舊邏輯 fallback
                         if not is_dui_crash_party and (drinking_code is None and party_subtype_code is None):
@@ -2136,6 +2284,12 @@ async def import_crash_upload_batch(
                         drinking_code = None
                         party_subtype_code = None
                         is_dui_crash_party = suspected_alcohol
+                        # LEGACY 無道路工程欄位
+                        road_fields = {}
+                        license_status = None
+                        protective_gear = None
+                        is_hit_and_run = False
+                        delivery_platform = None
 
                     # 共用欄位
                     age_val = (
@@ -2222,6 +2376,12 @@ async def import_crash_upload_batch(
                         evehicle_type=evehicle_type,
                         is_youth=is_youth,
                         is_underage_14=is_underage_14_riding,
+                        # 道路工程分析欄位（Phase 1）
+                        license_status=license_status,
+                        protective_gear=protective_gear,
+                        is_hit_and_run=is_hit_and_run,
+                        delivery_platform=delivery_platform,
+                        **road_fields,
                     )
 
                     db.add(crash)
