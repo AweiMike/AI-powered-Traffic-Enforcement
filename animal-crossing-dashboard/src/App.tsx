@@ -944,15 +944,24 @@ const PlaceholderView: React.FC<{ title: string; emoji: string; description: str
 const AUTH_KEY = 'dashboard_auth';
 
 function useAuth() {
+  // sessionStorage 存後端簽發的 token（非 'true' 旗標）；client.ts 發請求時自動帶上
   const [authenticated, setAuthenticated] = useState(
-    () => sessionStorage.getItem(AUTH_KEY) === 'true'
+    () => {
+      const v = sessionStorage.getItem(AUTH_KEY);
+      return !!v && v !== 'true'; // 舊版旗標視為未登入，強制重新驗證
+    }
   );
 
-  const login = (username: string, password: string): boolean => {
-    if (username === 'xinhua' && password === 'xinhua3736') {
-      sessionStorage.setItem(AUTH_KEY, 'true');
-      setAuthenticated(true);
-      return true;
+  const login = async (username: string, password: string): Promise<boolean> => {
+    try {
+      const res = await apiClient.login(username, password);
+      if (res?.token) {
+        sessionStorage.setItem(AUTH_KEY, res.token);
+        setAuthenticated(true);
+        return true;
+      }
+    } catch {
+      // 401 帳密錯誤或後端未啟動
     }
     return false;
   };
@@ -965,15 +974,15 @@ function useAuth() {
   return { authenticated, login, logout };
 }
 
-const LoginPage: React.FC<{ onLogin: (u: string, p: string) => boolean }> = ({ onLogin }) => {
+const LoginPage: React.FC<{ onLogin: (u: string, p: string) => Promise<boolean> }> = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(false);
   const [shake, setShake] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const ok = onLogin(username, password);
+    const ok = await onLogin(username, password);
     if (!ok) {
       setError(true);
       setShake(true);

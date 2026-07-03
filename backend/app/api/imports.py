@@ -195,6 +195,11 @@ def classify_age(age) -> Tuple[str, bool, bool]:
     except (ValueError, TypeError):
         return ("未知", False, False)
 
+    # EIS 以 -1 表示「年齡未知」（如肇逃未查獲、物/動物當事者），
+    # 不可落入 <14 判斷，否則未知年齡會被灌入青少年統計
+    if age < 0:
+        return ("未知", False, False)
+
     if age < 14:
         return ("<18", False, True)  # 未滿14歲，青少年
     elif age < 18:
@@ -368,7 +373,8 @@ def build_eis_location(row) -> str:
         cross = _safe_eis_str(row, "2-1.發生地址_交叉路口_路街口")
     cross_seg = _safe_eis_str(row, "2-1.發生交叉路口_段")
     highway = _safe_eis_str(row, "2-2.發生-路線-公路(國道/省道/縣道/鄉道)")
-    other = _safe_eis_str(row, "2-1.發生地址_其他")
+    # 全選條件匯出的欄名無「2-1.」前綴（發生地址_其他），兩種都認
+    other = _safe_eis_str(row, "2-1.發生地址_其他") or _safe_eis_str(row, "發生地址_其他")
 
     parts = []
     if road:
@@ -427,6 +433,81 @@ def clean_precinct_name(raw) -> Optional[str]:
     if any(ord(ch) > 0xFFFF for ch in name):
         name = "".join("那" if ord(ch) > 0xFFFF else ch for ch in name)
     return name or None
+
+
+def extract_sub_unit(row) -> Optional[str]:
+    """轄區派出所（sub_unit）統一取值 + 正規化。
+
+    欄名相容（EIS 不同匯出模式對同一資料用不同欄名）：
+    - 所轄單位名稱       —— 部分欄位匯出（手動加選欄位）
+    - 管轄單位名稱       —— 全選條件匯出（欄名不同，內容同為轄區派出所）
+    - 處理單位名稱派出所 —— 備援（實際處理單位，多為交通分隊）
+
+    值正規化：全選條件檔的值是全稱「臺南市政府警察局新化分局𦰡拔派出所」，
+    需剝除警察局 + 分局前綴成短名「那拔派出所」，才與既有 DB 的 sub_unit 值一致
+    （否則派出所統計會因同所異名而分裂成兩組）。
+    值本身就是「新化分局」（未特定所）時保留原名。
+    """
+    val = (
+        _safe_eis_str(row, "所轄單位名稱")
+        or _safe_eis_str(row, "管轄單位名稱")
+        or _safe_eis_str(row, "處理單位名稱派出所")
+    )
+    if not val:
+        return None
+    name = clean_precinct_name(val)  # 去「臺南市政府警察局」前綴 + 罕見字正規化
+    if name and "分局" in name:
+        suffix = name.split("分局", 1)[1].strip()
+        if suffix:
+            name = suffix
+    return name[:100] if name else None
+
+
+def has_subunit_column(df) -> bool:
+    """檔案是否帶有轄區派出所欄位（兩種匯出模式的欄名皆認得）"""
+    return any(
+        ("所轄單位名稱" in str(c)) or ("管轄單位名稱" in str(c))
+        for c in df.columns
+    )
+
+
+def _row_official_severity(row) -> Optional[str]:
+    """取出該列的官方「事故類別」值（A1/A2/A3），無官方值回傳 None。"""
+    for col in ("事故類別", "交通事故類別"):
+        v = _safe_eis_str(row, col)
+        if v:
+            v = (v.upper().replace("Ａ", "A")
+                 .replace("１", "1").replace("２", "2").replace("３", "3"))
+            if v in ("A1", "A2", "A3"):
+                return v
+    return None
+
+
+def backfill_official_severity(existing, row, stats) -> None:
+    """重複匯入時，以較新匯出檔的「官方事故類別」回補既有案件的 severity 與死傷。
+
+    背景：EIS 同一案件在不同時間匯出，severity/傷亡會隨調查成熟而更新
+    （傷亡人數回填、A2/A3 改判）。若舊檔先匯入、新檔後到，案件會因去重被略過，
+    導致官方判定永遠進不了 DB（實證：6/1-6/7 A2 官方 26 件，先舊後新只剩 24）。
+
+    僅當該列真的帶官方「事故類別」值（A1/A2/A3）時才覆寫——
+    死傷推導出的 severity 不覆寫官方值；死傷人數也僅在官方檔且欄位存在時同步。
+    """
+    new_sev = _row_official_severity(row)
+    if not new_sev:
+        return
+    if new_sev != existing.severity:
+        existing.severity = new_sev
+        existing.severity_weight = get_severity_weight(new_sev)
+        stats["updated"] = stats.get("updated", 0) + 1
+    if ("3-1.24小時內死亡人數" in row.index) or ("死亡" in row.index):
+        nd = get_eis_int(row, "3-1.24小時內死亡人數", "死亡")
+        if nd != (existing.death_count or 0):
+            existing.death_count = nd
+    if ("3-2.受傷人數" in row.index) or ("受傷" in row.index):
+        ni = get_eis_int(row, "3-2.受傷人數", "受傷")
+        if ni != (existing.injury_count or 0):
+            existing.injury_count = ni
 
 
 def derive_eis_severity(row) -> str:
@@ -632,7 +713,7 @@ async def import_crash_file(
         data_format = detect_crash_format(list(df.columns))
 
         # 檢查 EIS 檔是否含「所轄單位名稱」欄位（缺則事故會 fallback 成交通分隊，派出所統計失準）
-        has_subunit_col = data_format == "EIS" and any("所轄單位名稱" in str(c) for c in df.columns)
+        has_subunit_col = data_format == "EIS" and has_subunit_column(df)
         # 檢查是否含「事故類別」欄位（缺則 A1/A2/A3 只能靠死傷人數推導，可能失準）
         has_severity_col = data_format == "EIS" and any(
             ("事故類別" in str(c)) or ("交通事故類別" in str(c)) for c in df.columns
@@ -771,6 +852,8 @@ async def import_crash_file(
                             changed = True
                         if changed:
                             stats["updated"] = stats.get("updated", 0) + 1
+                        # 官方 severity / 死傷回補（較新匯出檔為準）
+                        backfill_official_severity(existing, row, stats)
                     stats["skipped"] += 1
                     continue
 
@@ -818,14 +901,10 @@ async def import_crash_file(
                     injury_count = get_eis_int(row, "3-2.受傷人數", "受傷")
 
                     # --- 分局 / 所轄單位 / 派出所 ---
-                    # 優先使用「所轄單位名稱」= 案件發生地的轄區派出所（用於地圖與統計）
-                    # 若新匯出的 TXT 沒有該欄位，才退回「處理單位名稱派出所」（= 實際處理單位，通常為交通分隊）
+                    # 轄區派出所統一由 extract_sub_unit 處理：
+                    # 所轄單位名稱(部分欄位匯出) → 管轄單位名稱(全選條件匯出) → 處理單位名稱派出所(備援)
                     precinct = clean_precinct_name(row.get("處理單位名稱分局層"))
-                    sub_unit_val = (
-                        _safe_eis_str(row, "所轄單位名稱")
-                        or _safe_eis_str(row, "處理單位名稱派出所")
-                    )
-                    sub_unit = clean_precinct_name(sub_unit_val)[:100] if sub_unit_val else None
+                    sub_unit = extract_sub_unit(row)
 
                     # --- 肇因 ---
                     cause = (
@@ -837,7 +916,7 @@ async def import_crash_file(
                     )
 
                     # --- 天候/光線 ---
-                    weather = _safe_eis_str(row, "天候") or None
+                    weather = _safe_eis_str(row, "天候") or _safe_eis_str(row, "4.天候") or None
                     light = _safe_eis_str(row, "光線") or None
 
                     # --- 酒駕（新邏輯：用 32. 飲酒情形代碼 + 排除行人）---
@@ -993,6 +1072,15 @@ async def import_crash_file(
                     or _safe_eis_str(row, "當事人性別")
                     or _safe_eis_str(row, "性別")
                 ) or None
+                # 全選條件檔的屬(性)別含非人值（無或物(動物、堆置物)、肇事逃逸尚未查獲），
+                # 僅認得男/女，其餘視為未知，避免污染性別統計
+                if driver_gender:
+                    if "男" in driver_gender:
+                        driver_gender = "男"
+                    elif "女" in driver_gender:
+                        driver_gender = "女"
+                    else:
+                        driver_gender = None
 
                 # ============================
                 # 寫入資料庫
@@ -1196,7 +1284,7 @@ def _do_batch_import(txt_files: list, db):
             coords_stats = {"with_gps": 0, "fallback": 0}
 
             # 缺「所轄單位名稱」欄位偵測
-            if data_format == "EIS" and not any("所轄單位名稱" in str(c) for c in df.columns):
+            if data_format == "EIS" and not has_subunit_column(df):
                 files_missing_subunit.append(fname)
             # 缺「事故類別」欄位偵測
             if data_format == "EIS" and not any(
@@ -1270,6 +1358,12 @@ def _do_batch_import(txt_files: list, db):
 
                     # 去重：先查 in-memory set（同批次多當事人），再查 DB（先前批次）
                     if case_id in seen_case_ids:
+                        # 同批次重複（同案多當事者列 / 跨檔同案）：
+                        # 較新匯出檔帶官方事故類別時，仍要回補先寫入的 severity
+                        if data_format == "EIS" and _row_official_severity(row):
+                            dup = db.query(Crash).filter(Crash.case_id == case_id).first()
+                            if dup is not None:
+                                backfill_official_severity(dup, row, stats)
                         stats["skipped"] += 1
                         continue
                     existing = db.query(Crash).filter(Crash.case_id == case_id).first()
@@ -1277,9 +1371,17 @@ def _do_batch_import(txt_files: list, db):
                         seen_case_ids.add(case_id)
                         # 回補轄區派出所：若既有 sub_unit 含「交通分隊」且新檔帶了所轄單位，更新之
                         if needs_backfill and existing.sub_unit and "交通分隊" in existing.sub_unit:
-                            new_sub_val = _safe_eis_str(row, "所轄單位名稱")
+                            # 僅用真正的轄區欄位回補（不含處理單位備援，避免用交通分隊覆寫）
+                            new_sub_val = (
+                                _safe_eis_str(row, "所轄單位名稱")
+                                or _safe_eis_str(row, "管轄單位名稱")
+                            )
                             if new_sub_val:
                                 new_sub = clean_precinct_name(new_sub_val)
+                                if new_sub and "分局" in new_sub:
+                                    suffix = new_sub.split("分局", 1)[1].strip()
+                                    if suffix:
+                                        new_sub = suffix
                                 if new_sub and new_sub != existing.sub_unit:
                                     existing.sub_unit = new_sub[:100]
                                     stats["updated"] += 1
@@ -1297,6 +1399,8 @@ def _do_batch_import(txt_files: list, db):
                                 existing.drinking_code = new_drinking
                             if not existing.party_subtype_code and new_subtype:
                                 existing.party_subtype_code = new_subtype
+                            # 官方 severity / 死傷回補（較新匯出檔為準）
+                            backfill_official_severity(existing, row, stats)
                         stats["skipped"] += 1
                         continue
 
@@ -1326,19 +1430,15 @@ def _do_batch_import(txt_files: list, db):
                         death_count = get_eis_int(row, "3-1.24小時內死亡人數", "死亡")
                         injury_count = get_eis_int(row, "3-2.受傷人數", "受傷")
                         precinct = clean_precinct_name(row.get("處理單位名稱分局層"))
-                        # 優先使用「所轄單位名稱」= 轄區派出所，備援為處理單位（通常為交通分隊）
-                        sub_unit_val = (
-                            _safe_eis_str(row, "所轄單位名稱")
-                            or _safe_eis_str(row, "處理單位名稱派出所")
-                        )
-                        sub_unit = clean_precinct_name(sub_unit_val)[:100] if sub_unit_val else None
+                        # 轄區派出所統一由 extract_sub_unit 處理（含全選條件「管轄單位名稱」欄名）
+                        sub_unit = extract_sub_unit(row)
                         cause = (
                             _safe_eis_str(row, "34.初步分析研判子類別-主要")
                             or _safe_eis_str(row, "34.初步分析研判-個別")
                             or _safe_eis_str(row, "34.初步分析研判-個別代碼")
                             or None
                         )
-                        weather = _safe_eis_str(row, "天候") or None
+                        weather = _safe_eis_str(row, "天候") or _safe_eis_str(row, "4.天候") or None
                         light = _safe_eis_str(row, "光線") or None
                         # 新邏輯：飲酒情形代碼（從 case_rollup 取）
                         rollup = case_rollup.get(case_id, {})
@@ -1411,12 +1511,21 @@ def _do_batch_import(txt_files: list, db):
                             pass
 
                     driver_gender = (
-                    _safe_eis_str(row, "17.當事者屬(性)別")
-                    or _safe_eis_str(row, "當事者屬(性)別")
-                    or _safe_eis_str(row, "當事者性別")
-                    or _safe_eis_str(row, "當事人性別")
-                    or _safe_eis_str(row, "性別")
-                ) or None
+                        _safe_eis_str(row, "17.當事者屬(性)別")
+                        or _safe_eis_str(row, "當事者屬(性)別")
+                        or _safe_eis_str(row, "當事者性別")
+                        or _safe_eis_str(row, "當事人性別")
+                        or _safe_eis_str(row, "性別")
+                    ) or None
+                    # 全選條件檔的屬(性)別含非人值（無或物(動物、堆置物)、肇事逃逸尚未查獲），
+                    # 僅認得男/女，其餘視為未知，避免污染性別統計
+                    if driver_gender:
+                        if "男" in driver_gender:
+                            driver_gender = "男"
+                        elif "女" in driver_gender:
+                            driver_gender = "女"
+                        else:
+                            driver_gender = None
 
                     crash = Crash(
                         case_id=case_id,
@@ -1789,7 +1898,7 @@ async def import_crash_upload_batch(
             batch_id = f"UPLOAD_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}"
 
             # 缺「所轄單位名稱」欄位偵測
-            if data_format == "EIS" and not any("所轄單位名稱" in str(c) for c in df.columns):
+            if data_format == "EIS" and not has_subunit_column(df):
                 files_missing_subunit.append(file.filename)
             # 缺「事故類別」欄位偵測
             if data_format == "EIS" and not any(
@@ -1865,6 +1974,12 @@ async def import_crash_upload_batch(
                         continue
 
                     if case_id in seen_case_ids:
+                        # 同批次重複（同案多當事者列 / 跨檔同案）：
+                        # 較新匯出檔帶官方事故類別時，仍要回補先寫入的 severity
+                        if data_format == "EIS" and _row_official_severity(row):
+                            dup = db.query(Crash).filter(Crash.case_id == case_id).first()
+                            if dup is not None:
+                                backfill_official_severity(dup, row, stats)
                         stats["skipped"] += 1
                         continue
                     existing = db.query(Crash).filter(Crash.case_id == case_id).first()
@@ -1872,9 +1987,17 @@ async def import_crash_upload_batch(
                         seen_case_ids.add(case_id)
                         # 回補轄區派出所
                         if needs_backfill and existing.sub_unit and "交通分隊" in existing.sub_unit:
-                            new_sub_val = _safe_eis_str(row, "所轄單位名稱")
+                            # 僅用真正的轄區欄位回補（不含處理單位備援，避免用交通分隊覆寫）
+                            new_sub_val = (
+                                _safe_eis_str(row, "所轄單位名稱")
+                                or _safe_eis_str(row, "管轄單位名稱")
+                            )
                             if new_sub_val:
                                 new_sub = clean_precinct_name(new_sub_val)
+                                if new_sub and "分局" in new_sub:
+                                    suffix = new_sub.split("分局", 1)[1].strip()
+                                    if suffix:
+                                        new_sub = suffix
                                 if new_sub and new_sub != existing.sub_unit:
                                     existing.sub_unit = new_sub[:100]
                                     stats["updated"] += 1
@@ -1892,6 +2015,8 @@ async def import_crash_upload_batch(
                                 existing.drinking_code = new_drinking
                             if not existing.party_subtype_code and new_subtype:
                                 existing.party_subtype_code = new_subtype
+                            # 官方 severity / 死傷回補（較新匯出檔為準）
+                            backfill_official_severity(existing, row, stats)
                         stats["skipped"] += 1
                         continue
 
@@ -1920,12 +2045,8 @@ async def import_crash_upload_batch(
                         death_count = get_eis_int(row, "3-1.24小時內死亡人數", "死亡")
                         injury_count = get_eis_int(row, "3-2.受傷人數", "受傷")
                         precinct = clean_precinct_name(row.get("處理單位名稱分局層"))
-                        # 優先使用「所轄單位名稱」= 轄區派出所，備援為處理單位（通常為交通分隊）
-                        sub_unit_val = (
-                            _safe_eis_str(row, "所轄單位名稱")
-                            or _safe_eis_str(row, "處理單位名稱派出所")
-                        )
-                        sub_unit = clean_precinct_name(sub_unit_val)[:100] if sub_unit_val else None
+                        # 轄區派出所統一由 extract_sub_unit 處理（含全選條件「管轄單位名稱」欄名）
+                        sub_unit = extract_sub_unit(row)
                         cause = (
                             _safe_eis_str(row, "34.初步分析研判子類別-主要")
                             or _safe_eis_str(row, "34.初步分析研判-個別")
@@ -1933,7 +2054,7 @@ async def import_crash_upload_batch(
                             or _safe_eis_str(row, "肇事主要原因")
                             or None
                         )
-                        weather = _safe_eis_str(row, "天候") or None
+                        weather = _safe_eis_str(row, "天候") or _safe_eis_str(row, "4.天候") or None
                         light = _safe_eis_str(row, "光線") or None
 
                         # 新邏輯：飲酒情形代碼（從 case_rollup 取）

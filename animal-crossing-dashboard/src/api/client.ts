@@ -405,6 +405,9 @@ export interface CrossAnalysisResponse {
 // API Client Class
 // ============================================
 
+/** 登入 token 的 sessionStorage key（App.tsx useAuth 寫入、此處自動帶上） */
+const AUTH_TOKEN_KEY = 'dashboard_auth';
+
 class APIClient {
 
   private baseUrl: string;
@@ -415,12 +418,15 @@ class APIClient {
 
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
     const url = `${this.baseUrl}${API_VERSION}${endpoint}`;
+    const token = sessionStorage.getItem(AUTH_TOKEN_KEY);
 
     try {
       const response = await fetch(url, {
         ...options,
         headers: {
           'Content-Type': 'application/json',
+          // 寫入型 API 需要登入憑證（後端 write-protect middleware 驗證）
+          ...(token ? { 'X-Auth-Token': token } : {}),
           ...options?.headers,
         },
       });
@@ -447,6 +453,17 @@ class APIClient {
       console.error('API Request Failed:', error);
       throw error;
     }
+  }
+
+  // ============================================
+  // Auth API（登入驗證 — 帳密由後端驗證，不再存在前端）
+  // ============================================
+
+  async login(username: string, password: string): Promise<{ success: boolean; token: string }> {
+    return this.request('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    });
   }
 
   // ============================================

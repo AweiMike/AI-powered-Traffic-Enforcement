@@ -31,12 +31,18 @@ class Settings(BaseSettings):
     ]
 
     # 安全
-    SECRET_KEY: str = "your-secret-key-change-in-production"
+    # SECRET_KEY 用於登入 token 簽章；正式環境請在 backend/.env 覆寫成自己的隨機值
+    # （例：SECRET_KEY=<執行 python -c "import secrets;print(secrets.token_hex(32))" 產生>）
+    SECRET_KEY: str = "xinhua-dashboard-2026-e7c1a9f4b3d8265f0a1c4e7b9d2f6083"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
-    # 除錯模式
-    DEBUG: bool = True
+    # 儀表板登入帳密（由後端驗證，不再硬編碼於前端；可在 backend/.env 覆寫）
+    DASHBOARD_USERNAME: str = "xinhua"
+    DASHBOARD_PASSWORD: str = "xinhua3736"
+
+    # 除錯模式（True 會開啟 /docs 與 SQL echo；正式部署保持 False）
+    DEBUG: bool = False
 
     # 地理編碼 API (選用)
     GOOGLE_MAPS_API_KEY: str = ""

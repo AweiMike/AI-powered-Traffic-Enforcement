@@ -8,12 +8,13 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from contextlib import asynccontextmanager
 
 from app.config import settings
 from app.database import init_db
-from app.api import topics, stats, recommendations, imports, admin, hotspots, report, evehicle, enforcement
+from app.api import topics, stats, recommendations, imports, admin, hotspots, report, evehicle, enforcement, auth
+from app.api.auth import verify_token
 
 # 前端靜態檔案目錄
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -71,10 +72,33 @@ app = FastAPI(
     - 現有系統：個案查詢、詳細資料
     """,
     version=settings.VERSION,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    # 正式部署（DEBUG=False）不對外提供互動式 API 文件
+    docs_url="/docs" if settings.DEBUG else None,
+    redoc_url="/redoc" if settings.DEBUG else None,
     lifespan=lifespan,
 )
+
+
+# ============================================
+# 寫入保護中間件
+# 非 GET 的 API 請求（匯入/報告生成/管理操作）需要有效登入憑證。
+# GET 統計查詢不強制（資料已完全去識別化，且保留 #view 免登入唯讀模式）。
+# ============================================
+@app.middleware("http")
+async def write_protect_middleware(request: Request, call_next):
+    path = request.url.path
+    if (
+        path.startswith(settings.API_V1_PREFIX)
+        and request.method not in ("GET", "HEAD", "OPTIONS")
+        and not path.startswith(f"{settings.API_V1_PREFIX}/auth")
+    ):
+        token = request.headers.get("X-Auth-Token", "")
+        if not verify_token(token):
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "未授權：此操作需要登入（寫入保護）"},
+            )
+    return await call_next(request)
 
 
 # ============================================
@@ -92,6 +116,10 @@ app.add_middleware(
 # ============================================
 # 路由註冊
 # ============================================
+app.include_router(
+    auth.router, prefix=f"{settings.API_V1_PREFIX}/auth", tags=["登入驗證"]
+)
+
 app.include_router(
     topics.router, prefix=f"{settings.API_V1_PREFIX}/topics", tags=["主題管理"]
 )

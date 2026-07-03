@@ -30,6 +30,11 @@ backend/data/
 舉發案件綜合查詢/
 excel_analysis.json
 violations_analysis.json
+# EIS 匯出 TXT 含完整個資（姓名/身分證/電話/住址/車牌），無論放哪一律禁止上傳。
+# 白名單制：先擋所有 txt，再放行已確認無個資的說明檔。
+*.txt
+!requirements*.txt
+!*欄位說明.txt
 
 ## 內部文件 / 截圖
 *.pdf
