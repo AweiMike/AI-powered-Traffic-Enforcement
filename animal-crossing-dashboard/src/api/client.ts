@@ -904,6 +904,29 @@ class APIClient {
     return this.request(`/recommendations/road-lighting-issues?start_date=${startDate}&end_date=${endDate}`);
   }
 
+  /**
+   * 廊帶（公路路線）線性分析
+   * - 不帶 route：回傳全路線排名（依 EPDO 降冪）
+   * - 帶 route：回傳該路線 0.5 公里分段熱段分析（route 以 URLSearchParams 自動編碼，中文路名安全）
+   */
+  async getCorridorAnalysis(startDate: string, endDate: string, route?: string): Promise<any> {
+    const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
+    // 注意：URLSearchParams.append 已自動做 percent-encoding，route 傳原始字串即可，
+    // 若再套用 encodeURIComponent 會造成雙重編碼（%25xx)
+    if (route) params.append('route', route);
+    return this.request(`/recommendations/corridor-analysis?${params}`);
+  }
+
+  /** 會勘資料包：座標＋半徑範圍內近 3 年事故彙整、樣態、涉入對象與改善建議 */
+  async getSiteDossier(lat: number, lng: number, radiusM: number): Promise<any> {
+    return this.request(`/recommendations/site-dossier?lat=${lat}&lng=${lng}&radius_m=${radiusM}`);
+  }
+
+  /** 勤務建議單（DDACTS 簡化版）：7 所依 EPDO 降冪排序，各所前 3 高風險班別與取締缺口標記 */
+  async getPatrolPlan(startDate: string, endDate: string): Promise<any> {
+    return this.request(`/recommendations/patrol-plan?start_date=${startDate}&end_date=${endDate}`);
+  }
+
   /** 資料品質總覽 */
   async getDataQuality(): Promise<any> {
     return this.request('/admin/data-quality');

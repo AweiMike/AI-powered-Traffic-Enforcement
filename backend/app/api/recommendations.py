@@ -1662,3 +1662,459 @@ async def batch_update_crash_coordinates(
         'errors': errors if errors else None,
         'message': f'已更新 {updated_count} 筆座標'
     }
+
+
+# ============================================
+# Phase 2：廊帶線性分析 / 會勘資料包 / 勤務建議單
+# ============================================
+
+@router.get("/corridor-analysis")
+async def get_corridor_analysis(
+    start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    route: str = Query(None, description="公路路線名稱（如：台20線），未提供時回傳路線排名"),
+    db: Session = Depends(get_db),
+):
+    """廊帶（公路路線）線性分析。
+
+    模式 A（route 未指定）：依路線彙整事故件數與 EPDO（當量死亡數），依 EPDO 降冪排序，
+    用於找出應優先介入的路線。
+    模式 B（route 指定）：將該路線切成 500 公尺一段，逐段統計事故樣態，
+    用於鎖定路線內的具體「熱段」供工程改善。
+    """
+    try:
+        sd = datetime.strptime(start_date, "%Y-%m-%d").date()
+        ed = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return {"error": "日期格式錯誤"}
+
+    period = {"start_date": start_date, "end_date": end_date}
+
+    if not route:
+        # ---- 模式 A：路線排名 ----
+        rows = db.query(
+            Crash.route_name,
+            func.count(Crash.id).label("total"),
+            func.sum(case((Crash.severity == "A1", 1), else_=0)).label("a1"),
+            func.sum(case((Crash.severity == "A2", 1), else_=0)).label("a2"),
+            func.sum(case((Crash.severity == "A3", 1), else_=0)).label("a3"),
+            func.coalesce(func.sum(Crash.death_count), 0).label("deaths"),
+            func.coalesce(func.sum(Crash.injury_count), 0).label("injuries"),
+            func.coalesce(func.sum(Crash.severity_weight), 0).label("epdo"),
+        ).filter(
+            Crash.route_name.isnot(None),
+            Crash.occurred_date >= sd,
+            Crash.occurred_date <= ed,
+        ).group_by(Crash.route_name).order_by(desc("epdo")).all()
+
+        routes = [{
+            "route": r.route_name,
+            "total": r.total,
+            "a1": int(r.a1 or 0),
+            "a2": int(r.a2 or 0),
+            "a3": int(r.a3 or 0),
+            "deaths": int(r.deaths or 0),
+            "injuries": int(r.injuries or 0),
+            "epdo": int(r.epdo or 0),
+        } for r in rows]
+
+        return {"period": period, "mode": "routes", "routes": routes}
+
+    # ---- 模式 B：該路線 500 公尺分段 ----
+    import math
+    from collections import Counter
+
+    NIGHT_SHIFTS = {"10", "11", "12", "01", "02", "03"}
+
+    crashes = db.query(Crash).filter(
+        Crash.route_name == route,
+        Crash.route_km.isnot(None),
+        Crash.occurred_date >= sd,
+        Crash.occurred_date <= ed,
+    ).all()
+
+    def mode_value(values):
+        """計算眾數（NULL/空值不計，無資料回傳 None）"""
+        filtered = [v for v in values if v]
+        if not filtered:
+            return None
+        return Counter(filtered).most_common(1)[0][0]
+
+    # 依 0.5 公里分段（key = 該段起點公里數）
+    seg_map: dict = {}
+    for c in crashes:
+        seg_key = round(math.floor(c.route_km * 2) / 2, 1)
+        seg_map.setdefault(seg_key, []).append(c)
+
+    segments = []
+    for seg_key in sorted(seg_map.keys()):
+        items = seg_map[seg_key]
+        segments.append({
+            "km_start": seg_key,
+            "km_end": round(seg_key + 0.5, 1),
+            "total": len(items),
+            "a1": sum(1 for c in items if c.severity == "A1"),
+            "a2": sum(1 for c in items if c.severity == "A2"),
+            "a3": sum(1 for c in items if c.severity == "A3"),
+            "deaths": sum(c.death_count or 0 for c in items),
+            "injuries": sum(c.injury_count or 0 for c in items),
+            "epdo": sum(c.severity_weight or 0 for c in items),
+            "top_crash_type": mode_value([c.crash_type for c in items]),
+            "top_cause": mode_value([c.cause for c in items]),
+            "night_count": sum(1 for c in items if c.shift_id in NIGHT_SHIFTS),
+        })
+
+    top_segments = sorted(segments, key=lambda s: -s["epdo"])[:5]
+
+    return {
+        "period": period,
+        "mode": "segments",
+        "route": route,
+        "total_with_km": len(crashes),
+        "segments": segments,
+        "top_segments": top_segments,
+    }
+
+
+@router.get("/site-dossier")
+async def get_site_dossier(
+    lat: float = Query(..., description="會勘點緯度"),
+    lng: float = Query(..., description="會勘點經度"),
+    radius_m: int = Query(200, description="搜尋半徑（公尺），限制 50~1000"),
+    end_date: str = Query(None, description="分析窗結束日期 YYYY-MM-DD，未提供時採資料庫最新事故日期"),
+    db: Session = Depends(get_db),
+):
+    """會勘資料包（site dossier）。
+
+    給定座標與半徑，彙整過去 3 年內事故清單、樣態統計、涉及人員類型，
+    並依規則引擎產出改善建議，供警力會同工務/養工單位現場會勘時使用。
+    """
+    import math
+    from collections import Counter
+
+    # radius_m 限制 50~1000，超界夾住
+    radius_m = max(50, min(1000, radius_m))
+
+    if end_date:
+        try:
+            ed = datetime.strptime(end_date, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            return {"error": "日期格式錯誤"}
+    else:
+        ed = db.query(func.max(Crash.occurred_date)).scalar() or datetime.now().date()
+
+    sd = ed - timedelta(days=365 * 3)
+
+    # bounding box 預過濾：1 度緯度約 111000 公尺；經度依緯度用 cos 修正
+    lat_delta = radius_m / 111000.0
+    cos_lat = math.cos(math.radians(lat))
+    lng_delta = radius_m / (111000.0 * cos_lat) if cos_lat != 0 else 180.0
+
+    candidates = db.query(Crash).filter(
+        Crash.latitude.isnot(None),
+        Crash.longitude.isnot(None),
+        Crash.latitude >= lat - lat_delta,
+        Crash.latitude <= lat + lat_delta,
+        Crash.longitude >= lng - lng_delta,
+        Crash.longitude <= lng + lng_delta,
+        Crash.occurred_date >= sd,
+        Crash.occurred_date <= ed,
+    ).all()
+
+    def haversine_m(lat1, lng1, lat2, lng2):
+        """Haversine 公式計算兩點間距離（公尺），供精算過濾用"""
+        R = 6371000.0
+        phi1, phi2 = math.radians(lat1), math.radians(lat2)
+        dphi = math.radians(lat2 - lat1)
+        dlambda = math.radians(lng2 - lng1)
+        a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+        return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    crashes = [c for c in candidates if haversine_m(lat, lng, c.latitude, c.longitude) <= radius_m]
+
+    total = len(crashes)
+    a1 = sum(1 for c in crashes if c.severity == "A1")
+    a2 = sum(1 for c in crashes if c.severity == "A2")
+    a3 = sum(1 for c in crashes if c.severity == "A3")
+    deaths = sum(c.death_count or 0 for c in crashes)
+    injuries = sum(c.injury_count or 0 for c in crashes)
+    epdo = sum(c.severity_weight or 0 for c in crashes)
+
+    by_year_counter = Counter(c.occurred_date.year for c in crashes)
+    by_year = [{"year": y, "count": by_year_counter[y]} for y in sorted(by_year_counter.keys())]
+
+    def top_n(values, n=None):
+        """依出現次數由高到低排列（NULL/空值不計），n=None 表示回傳全部"""
+        filtered = [v for v in values if v]
+        return [{"name": k, "count": v} for k, v in Counter(filtered).most_common(n)]
+
+    top_crash_types = top_n([c.crash_type for c in crashes], 5)
+    top_causes = top_n([c.cause for c in crashes], 5)
+    road_types = top_n([c.road_type for c in crashes])
+    signal_types = top_n([c.signal_type for c in crashes])
+    by_weather = top_n([c.weather for c in crashes])
+
+    NIGHT_SHIFTS = {"10", "11", "12", "01", "02", "03"}
+    night_count = sum(1 for c in crashes if c.shift_id in NIGHT_SHIFTS)
+    night_pct = round(night_count * 100 / total, 1) if total else 0.0
+
+    lighting_issue_count = sum(
+        1 for c in crashes
+        if c.road_lighting == "有照明未開啟或故障" and c.shift_id in NIGHT_SHIFTS
+    )
+
+    shift_counter = Counter(c.shift_id for c in crashes)
+    by_shift = [{"shift": f"{i:02d}", "count": shift_counter.get(f"{i:02d}", 0)} for i in range(1, 13)]
+
+    elderly = sum(1 for c in crashes if c.is_elderly)
+    youth = sum(1 for c in crashes if c.is_youth)
+    dui = sum(1 for c in crashes if c.is_dui_crash_party)
+    unlicensed = sum(1 for c in crashes if c.license_status and "無照" in c.license_status)
+    pedestrian = sum(1 for c in crashes if c.party_type and ("行人" in c.party_type or c.party_type == "人"))
+    hit_and_run = sum(1 for c in crashes if c.is_hit_and_run)
+
+    sorted_cases = sorted(
+        crashes,
+        key=lambda c: (c.occurred_date, c.occurred_time or datetime.min),
+        reverse=True,
+    )[:200]
+    cases = [{
+        "date": c.occurred_date.isoformat(),
+        "time": c.occurred_time.strftime("%H:%M") if c.occurred_time else "",
+        "severity": c.severity,
+        "crash_type": c.crash_type,
+        "cause": c.cause,
+        "deaths": c.death_count or 0,
+        "injuries": c.injury_count or 0,
+        "location": c.location_desc,
+    } for c in sorted_cases]
+
+    # === suggestions 規則引擎：依序檢查，符合即加入；全部不符合時加入預設項 ===
+    suggestions = []
+
+    # 規則 1：照明改善
+    if night_pct >= 40 or lighting_issue_count >= 3:
+        suggestions.append({
+            "title": "照明改善",
+            "reason": f"夜間事故占比 {night_pct}%、照明未開啟/故障 {lighting_issue_count} 件，建議會同養工單位檢視路燈配置與開啟時制",
+        })
+
+    # 規則 2：路口管制設施（無號誌占比 >=50% 且前二大事故型態含側撞/路口交岔撞）
+    signal_total = sum(s["count"] for s in signal_types)
+    no_signal_count = next((s["count"] for s in signal_types if s["name"] == "無號誌"), 0)
+    no_signal_pct = round(no_signal_count * 100 / signal_total, 1) if signal_total else 0.0
+    top2_type_names = [t["name"] for t in top_crash_types[:2]]
+    matched_type = next((n for n in top2_type_names if n in ("側撞", "路口交岔撞")), None)
+    if no_signal_pct >= 50 and matched_type:
+        matched_count = next((t["count"] for t in top_crash_types if t["name"] == matched_type), 0)
+        suggestions.append({
+            "title": "路口管制設施",
+            "reason": f"無號誌占 {no_signal_pct}%、以{matched_type}為主 {matched_count} 件，建議評估增設閃光號誌或停讓標誌標線",
+        })
+
+    # 規則 3：速度管理（追撞為首且速限眾數 >=60）
+    if top_crash_types and top_crash_types[0]["name"] == "追撞":
+        speed_limits = [c.speed_limit for c in crashes if c.speed_limit is not None]
+        if speed_limits:
+            speed_mode = Counter(speed_limits).most_common(1)[0][0]
+            if speed_mode >= 60:
+                suggestions.append({
+                    "title": "速度管理",
+                    "reason": f"以追撞為主 {top_crash_types[0]['count']} 件且速限 {speed_mode}km/h，建議評估測速執法或速限檢討",
+                })
+
+    # 規則 4：行人安全設施
+    if pedestrian >= 3:
+        suggestions.append({
+            "title": "行人安全設施",
+            "reason": f"行人事故 {pedestrian} 件，建議檢視行穿線、行人庇護與照明",
+        })
+
+    # 規則 5：防追撞宣導與執法（肇因前五名含「未保持行車安全距離」）
+    following_distance_cause = next(
+        (c for c in top_causes if "未保持行車安全距離" in c["name"]), None
+    )
+    if following_distance_cause:
+        suggestions.append({
+            "title": "防追撞宣導與執法",
+            "reason": f"「未保持行車安全距離」為肇因 {following_distance_cause['count']} 件，建議加強防追撞宣導與科技執法",
+        })
+
+    # 規則 6：酒駕熱點攔查
+    if dui >= 2:
+        suggestions.append({
+            "title": "酒駕熱點攔查",
+            "reason": f"酒駕事故 {dui} 件，建議列入夜間攔檢點",
+        })
+
+    # 規則 7：都未觸發時的預設項
+    if not suggestions:
+        suggestions.append({
+            "title": "持續觀察",
+            "reason": "事故樣態分散，建議持續監測並優先加強執法見警率",
+        })
+
+    return {
+        "center": {"lat": lat, "lng": lng, "radius_m": radius_m},
+        "window": {"start_date": sd.isoformat(), "end_date": ed.isoformat()},
+        "summary": {
+            "total": total,
+            "a1": a1,
+            "a2": a2,
+            "a3": a3,
+            "deaths": deaths,
+            "injuries": injuries,
+            "epdo": epdo,
+            "by_year": by_year,
+        },
+        "patterns": {
+            "top_crash_types": top_crash_types,
+            "top_causes": top_causes,
+            "road_types": road_types,
+            "signal_types": signal_types,
+            "night_count": night_count,
+            "night_pct": night_pct,
+            "lighting_issue_count": lighting_issue_count,
+            "by_shift": by_shift,
+            "by_weather": by_weather,
+        },
+        "involved": {
+            "elderly": elderly,
+            "youth": youth,
+            "dui": dui,
+            "unlicensed": unlicensed,
+            "pedestrian": pedestrian,
+            "hit_and_run": hit_and_run,
+        },
+        "cases": cases,
+        "suggestions": suggestions,
+    }
+
+
+@router.get("/patrol-plan")
+async def get_patrol_plan(
+    start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """勤務建議單（DDACTS 簡化版）。
+
+    僅分析新化分局轄下 7 個轄區所，依「事故能量（EPDO）」找出每所前 3 高風險班別，
+    並比對現有舉發張數，標記出 EPDO 高但取締密度偏低的「勤務缺口（gap）」，
+    產出可直接排勤參考的建議文字。
+    """
+    try:
+        sd = datetime.strptime(start_date, "%Y-%m-%d").date()
+        ed = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return {"error": "日期格式錯誤"}
+
+    from collections import Counter, defaultdict
+
+    # 僅分析這 7 個轄區所（清單寫死）
+    PATROL_UNITS = [
+        "新化派出所", "唪口派出所", "知義派出所", "那拔派出所",
+        "山上分駐所", "左鎮分駐所", "岡林派出所",
+    ]
+
+    def shift_label(shift_id: str) -> str:
+        """班別代碼轉時段文字，如 "01" -> "00-02時"（(int-1)*2 起，2 小時一段）"""
+        n = int(shift_id)
+        start_hour = (n - 1) * 2
+        return f"{start_hour:02d}-{start_hour + 2:02d}時"
+
+    def mode_value(values):
+        """計算眾數（NULL/空值不計，無資料回傳 None）"""
+        filtered = [v for v in values if v]
+        if not filtered:
+            return None
+        return Counter(filtered).most_common(1)[0][0]
+
+    def top_locations(values, n=2):
+        """地點描述眾數前 n 名，排除「未知地點」"""
+        filtered = [v for v in values if v and v != "未知地點"]
+        return [{"location": k, "count": v} for k, v in Counter(filtered).most_common(n)]
+
+    # 一次撈出 7 所在區間內的全部事故，於 Python 端依（單位, 班別）分組，
+    # 避免對每個班別再各別查詢明細造成大量重複查詢。
+    crashes = db.query(Crash).filter(
+        Crash.sub_unit.in_(PATROL_UNITS),
+        Crash.occurred_date >= sd,
+        Crash.occurred_date <= ed,
+    ).all()
+
+    unit_shift_map: dict = defaultdict(list)
+    for c in crashes:
+        unit_shift_map[(c.sub_unit, c.shift_id)].append(c)
+
+    units_result = []
+    for unit in PATROL_UNITS:
+        shift_stats = []
+        shift_ids = sorted({sid for (u, sid) in unit_shift_map.keys() if u == unit})
+        for shift_id in shift_ids:
+            items = unit_shift_map[(unit, shift_id)]
+            shift_stats.append({
+                "shift_id": shift_id,
+                "count": len(items),
+                "epdo": sum(c.severity_weight or 0 for c in items),
+                "dui_count": sum(1 for c in items if c.is_dui_crash_party),
+                "items": items,
+            })
+
+        # 依 epdo 前 3 班別，epdo 同分以 count 高者先
+        shift_stats.sort(key=lambda s: (-s["epdo"], -s["count"]))
+        top3 = shift_stats[:3]
+
+        top_slots = []
+        for s in top3:
+            items = s["items"]
+            top_crash_type = mode_value([c.crash_type for c in items])
+            top_cause = mode_value([c.cause for c in items])
+            hotspots = top_locations([c.location_desc for c in items])
+
+            # 違規側：該所（unit_code 含該所名）該班區間內張數
+            existing_tickets = db.query(func.count(Ticket.id)).filter(
+                Ticket.unit_code.like(f"%{unit}%"),
+                Ticket.shift_id == s["shift_id"],
+                Ticket.violation_date >= sd,
+                Ticket.violation_date <= ed,
+            ).scalar() or 0
+
+            # gap 標記：事故能量高（epdo>=10）但取締密度偏低（張數 < 件數*3）
+            is_gap = s["epdo"] >= 10 and existing_tickets < s["count"] * 3
+
+            label = shift_label(s["shift_id"])
+            if hotspots:
+                suggestion = f"{label}於{hotspots[0]['location']}等熱點加強{top_crash_type or '交通'}防制勤務"
+            else:
+                suggestion = "加強巡邏見警率"
+            if s["dui_count"] > 0:
+                suggestion += "，並列入酒駕攔檢"
+
+            top_slots.append({
+                "shift_id": s["shift_id"],
+                "shift_label": label,
+                "crash_count": s["count"],
+                "epdo": s["epdo"],
+                "dui_count": s["dui_count"],
+                "top_crash_type": top_crash_type,
+                "top_cause": top_cause,
+                "hotspots": hotspots,
+                "existing_tickets": existing_tickets,
+                "is_gap": is_gap,
+                "suggestion": suggestion,
+            })
+
+        units_result.append({
+            "unit": unit,
+            "total_crashes": sum(s["count"] for s in shift_stats),
+            "total_epdo": sum(s["epdo"] for s in shift_stats),
+            "top_slots": top_slots,
+        })
+
+    units_result.sort(key=lambda u: -u["total_epdo"])
+
+    return {
+        "period": {"start_date": start_date, "end_date": end_date},
+        "units": units_result,
+    }

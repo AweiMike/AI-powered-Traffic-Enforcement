@@ -107,3 +107,15 @@ table th {
 .animate-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/*
+ * 卷宗／建議單列印機制（Phase 2）
+ * 觸發方式：JS 先在 <body> 加上 .printing-area class 再呼叫 window.print()，
+ * 只讓含 .print-area class 的容器（及其子元素）在列印時可見，其餘畫面全部隱藏。
+ * 列印結束（afterprint）後需移除 .printing-area，避免影響一般畫面顯示。
+ */
+@media print {
+  body.printing-area * { visibility: hidden; }
+  body.printing-area .print-area, body.printing-area .print-area * { visibility: visible; }
+  body.printing-area .print-area { position: absolute; left: 0; top: 0; width: 100%; }
+}

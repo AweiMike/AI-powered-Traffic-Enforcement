@@ -30,7 +30,8 @@ import {
   PersonStanding,
   Construction,
   Gauge,
-  Pill
+  Pill,
+  ClipboardList
 } from 'lucide-react';
 
 // Import custom components
@@ -54,6 +55,7 @@ import HeavyVehiclePerformancePage from './components/HeavyVehiclePerformancePag
 import SpeedPerformancePage from './components/SpeedPerformancePage';
 import PedestrianAnalysisPage from './components/PedestrianAnalysisPage';
 import RoadEngineeringPage from './components/RoadEngineeringPage';
+import PatrolPlanPage from './components/PatrolPlanPage';
 import DateRangePicker, { type DateRange } from './components/DateRangePicker';
 import BrandLogo from './components/BrandLogo';
 import TrendCardSkeleton from './components/TrendCardSkeleton';
@@ -119,6 +121,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, readOnly, o
         { id: 'map', icon: MapPin, label: '地圖視覺化', description: '精準座標點位分布' },
         { id: 'monthly', icon: BarChart3, label: '綜合執法成效', description: '數據總覽·趨勢·A1清單' },
         { id: 'road-eng', icon: Construction, label: '道路工程改善', description: '照明故障通報·會勘佐證資料' },
+        { id: 'patrol-plan', icon: ClipboardList, label: '勤務建議', description: 'DDACTS 高風險班別與熱點建議' },
       ],
     },
     {
@@ -1144,6 +1147,8 @@ const App: React.FC = () => {
         return <HeavyVehiclePerformancePage />;
       case 'road-eng':
         return <RoadEngineeringPage />;
+      case 'patrol-plan':
+        return <PatrolPlanPage />;
       case 'speed':
         return <SpeedPerformancePage />;
       case 'pedestrian':
