@@ -84,6 +84,27 @@ app = FastAPI(
 # 非 GET 的 API 請求（匯入/報告生成/管理操作）需要有效登入憑證。
 # GET 統計查詢不強制（資料已完全去識別化，且保留 #view 免登入唯讀模式）。
 # ============================================
+def _write_audit_log(action: str, status_code: int, actor: str) -> None:
+    """寫入一筆稽核軌跡（獨立短連線，失敗絕不影響主請求）。
+
+    使用獨立 SessionLocal 而非 Depends(get_db)，
+    因為 middleware 不在路由依賴注入的生命週期內。
+    """
+    try:
+        from app.database import SessionLocal
+        from app.models.core import AuditLog
+
+        db = SessionLocal()
+        try:
+            db.add(AuditLog(action=action, status_code=status_code, actor=actor))
+            db.commit()
+        finally:
+            db.close()
+    except Exception:
+        # 稽核失敗絕不能弄壞主請求
+        pass
+
+
 @app.middleware("http")
 async def write_protect_middleware(request: Request, call_next):
     path = request.url.path
@@ -94,10 +115,14 @@ async def write_protect_middleware(request: Request, call_next):
     ):
         token = request.headers.get("X-Auth-Token", "")
         if not verify_token(token):
+            _write_audit_log(f"{request.method} {path}", 401, "anonymous")
             return JSONResponse(
                 status_code=401,
                 content={"detail": "未授權：此操作需要登入（寫入保護）"},
             )
+        response = await call_next(request)
+        _write_audit_log(f"{request.method} {path}", response.status_code, "admin")
+        return response
     return await call_next(request)
 
 

@@ -71,6 +71,10 @@ async def get_overview(
     """
     start_date, end_date = _resolve_range(days, start_date, end_date, fallback_end=_data_end_date(db))
 
+    # 去年同期（起迄各減一年，供 EPDO 去年同期比較用；C2）
+    last_year_start = start_date.replace(year=start_date.year - 1)
+    last_year_end = end_date.replace(year=end_date.year - 1)
+
     # 違規統計
     total_tickets = (
         db.query(func.count(Ticket.id))
@@ -86,6 +90,24 @@ async def get_overview(
         db.query(func.count(Crash.id))
         .filter(
             and_(Crash.occurred_date >= start_date, Crash.occurred_date <= end_date)
+        )
+        .scalar()
+        or 0
+    )
+
+    # EPDO 指標（Phase 3 C2）：本期與去年同期的嚴重度權重總和
+    epdo = (
+        db.query(func.sum(Crash.severity_weight))
+        .filter(
+            and_(Crash.occurred_date >= start_date, Crash.occurred_date <= end_date)
+        )
+        .scalar()
+        or 0
+    )
+    epdo_last_year = (
+        db.query(func.sum(Crash.severity_weight))
+        .filter(
+            and_(Crash.occurred_date >= last_year_start, Crash.occurred_date <= last_year_end)
         )
         .scalar()
         or 0
@@ -177,6 +199,8 @@ async def get_overview(
             "elderly_percentage": round(elderly_crashes / total_crashes * 100, 1)
             if total_crashes > 0
             else 0,
+            "epdo": epdo,
+            "epdo_last_year": epdo_last_year,
         },
         "topics": {
             "dui": dui_count,

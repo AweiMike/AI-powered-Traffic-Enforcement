@@ -39,6 +39,22 @@ class LoginRequest(BaseModel):
     password: str
 
 
+def _write_login_audit(action: str, username: str) -> None:
+    """寫入登入稽核紀錄（獨立短連線，失敗絕不影響登入流程；絕不記密碼）"""
+    try:
+        from app.database import SessionLocal
+        from app.models.core import AuditLog
+
+        db = SessionLocal()
+        try:
+            db.add(AuditLog(action=action, detail=username, actor="admin"))
+            db.commit()
+        finally:
+            db.close()
+    except Exception:
+        pass
+
+
 @router.post("/login")
 async def login(req: LoginRequest):
     """帳密驗證；成功回傳 X-Auth-Token 用的 token"""
@@ -46,5 +62,7 @@ async def login(req: LoginRequest):
         hmac.compare_digest(req.username, settings.DASHBOARD_USERNAME)
         and hmac.compare_digest(req.password, settings.DASHBOARD_PASSWORD)
     ):
+        _write_login_audit("login_success", req.username)
         return {"success": True, "token": make_token(req.username)}
+    _write_login_audit("login_failed", req.username)
     raise HTTPException(status_code=401, detail="帳號或密碼錯誤")

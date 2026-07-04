@@ -102,6 +102,29 @@ class ReportPrompts:
         return "\n".join(lines)
 
     @staticmethod
+    def _format_route_segments(data: ReportSummary) -> str:
+        """格式化風險路線 Top 3 給 prompt 用（Phase 1 新增 route_name/route_km 維度）"""
+        if not data.top_route_segments:
+            return "- （本期無路線資料）"
+        lines = []
+        for seg in data.top_route_segments:
+            lines.append(f"- {seg.get('route')}：{seg.get('total')} 件（EPDO {seg.get('epdo')}）")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _format_improvement_effects(data: ReportSummary) -> str:
+        """格式化改善措施成效給 prompt 用（Phase 3-A3 成效評估織入 AI 報告）"""
+        if not data.improvement_effects:
+            return "- （尚無改善措施登記，暫無成效數據可供引用）"
+        lines = []
+        for eff in data.improvement_effects:
+            lines.append(
+                f"- {eff.get('title')}（{eff.get('implemented_date')} 實施）："
+                f"淨變化 {eff.get('net_pct'):+.1f}%，{eff.get('verdict')}"
+            )
+        return "\n".join(lines)
+
+    @staticmethod
     def get_analysis_prompt(data: ReportSummary) -> str:
         """
         生成綜合分析報告的 Prompt
@@ -147,6 +170,15 @@ class ReportPrompts:
 - 大型車涉事事故：{data.heavy_vehicle_crashes} 件
 - **行人事故：{data.pedestrian_crashes} 件**（高齡行人 {data.pedestrian_elderly_crashes} 件｜死亡 {data.pedestrian_deaths} 人｜受傷 {data.pedestrian_injuries} 人）
   {'⚠ 高齡行人佔比高，需納入教育宣導重點' if data.pedestrian_crashes > 0 and data.pedestrian_elderly_crashes / max(data.pedestrian_crashes, 1) >= 0.4 else ''}
+
+### 🚧 道路環境與駕駛資格指標（本期，Phase 1-3 新增維度）
+- 夜間照明故障事故：{data.lighting_issues.get("total", 0)} 件（其中夜間時段 {data.lighting_issues.get("night", 0)} 件）
+- 無照駕駛事故：{data.unlicensed_count} 件
+- 肇事逃逸事故：{data.hit_and_run_count} 件
+- 風險路線前 3（依 EPDO 降冪）：
+{ReportPrompts._format_route_segments(data)}
+- 改善措施成效（Phase 3-A3 登記）：
+{ReportPrompts._format_improvement_effects(data)}
 
 ### 🏢 派出所 4 管區表現（必須全部列出，含取締比率）
 {ReportPrompts._format_unit_stats(data)}
@@ -234,6 +266,7 @@ class ReportPrompts:
 - 🔴 **A1 死亡事故地點必列**：若本期有 A1 案件，**每個 A1 地點都必須單獨列出具體工程改善方向**（此為警政實務必要檢討項）
   - 範例：「新化區中山路（1 件 A1 死亡）— 建議工程單位評估增設左轉專用時相、加強路口照明、標線清晰度」
 - 其他事故熱點：若該路段反覆發生事故，列出評估項目（號誌、標線、照明、速限）
+- 若有夜間照明故障事故，須建議通報養工單位；若 top_route_segments 有資料，須點名風險路線；若 improvement_effects 有資料，須引用成效數據佐證工程投資效益。
 - 若本期完全無 A1 且其他熱點無明顯工程議題，可寫「本月無急需工程改善項目」
 
 **教育宣導 (Education) 建議**
@@ -270,6 +303,7 @@ class ReportPrompts:
    - ❌「事故 20 件 > 取締 39 件」（數學錯誤）
    - ✅「事故 20 件最多，但取締比率 1.95 低於唪口 3.88，執法相對事故規模不足」
 10. ☐ 是否全程**未使用 Markdown table**（`|` 分隔）？派出所表現必須用 bullet list 格式。
+11. ☐ 確認已提及照明故障與風險路線（若資料非零）
 
 若任一項未達成，請重寫該段。
 

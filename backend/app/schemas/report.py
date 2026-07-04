@@ -107,3 +107,14 @@ class ReportSummary(BaseModel):
     # === AI 重點關注（自動偵測）===
     focus_districts: List[str]   # 事故增加最多的行政區
     focus_causes: List[str]      # 增加最多的違規/事故類型
+
+    # === Phase 1-3 新資料維度織入（Phase 3-C3：道安會報月報升級）===
+    # keys: "total"（期間內件數）, "night"（其中夜間班別件數）
+    lighting_issues: Dict[str, int] = {"total": 0, "night": 0}
+    unlicensed_count: int = 0        # 無照駕駛事故件數
+    hit_and_run_count: int = 0       # 肇事逃逸事故件數
+    # 風險路線 Top 3（依 EPDO 降冪）：[{"route","total","epdo"}]
+    top_route_segments: List[Dict] = []
+    # 改善措施成效 Top 3（依實施日期降冪，僅含可判讀者）：
+    # [{"title","implemented_date","net_pct","verdict","preliminary"}]
+    improvement_effects: List[Dict] = []

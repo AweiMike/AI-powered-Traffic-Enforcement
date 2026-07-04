@@ -71,6 +71,10 @@ export interface OverviewStats {
     total: number;
     elderly: number;
     elderly_percentage: number;
+    /** 事故當量（Equivalent Property Damage Only）— 依嚴重度加權的事故能量指標 */
+    epdo: number;
+    /** 去年同期 EPDO，供卡片對照 */
+    epdo_last_year: number;
   };
   topics: {
     dui: number;
@@ -963,6 +967,16 @@ class APIClient {
   /** 改善成效評估：比較各已登記措施實施前後事故率（含全區同期基準線，預設近 365 天） */
   async getImprovementEvaluations(days: number = 365): Promise<any> {
     return this.request(`/improvements/evaluations?days=${days}`);
+  }
+
+  /** 明日風險預警：依歷史同星期型態推估各所各班別風險分數（不帶參數時，後端預設抓「資料最新日 + 1」） */
+  async getRiskForecast(targetDate?: string): Promise<any> {
+    return this.request(`/recommendations/risk-forecast${targetDate ? `?target_date=${targetDate}` : ''}`);
+  }
+
+  /** 系統操作稽核軌跡：最近 N 筆寫入操作與登入事件（預設 30 筆） */
+  async getAuditLog(limit?: number): Promise<any> {
+    return this.request(`/admin/audit-log?limit=${limit ?? 30}`);
   }
 
   /** 資料品質總覽 */

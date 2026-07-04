@@ -433,7 +433,7 @@ const DashboardView: React.FC = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-5 gap-6 mb-8">
         <StatCard
           title="違規案件"
           value={overview?.tickets.total || 0}
@@ -446,6 +446,13 @@ const DashboardView: React.FC = () => {
           value={overview?.crashes.total || 0}
           emoji="⚠️"
           color="bg-nook-red"
+          loading={loading}
+        />
+        <StatCard
+          title="事故當量 EPDO"
+          value={overview?.crashes.epdo || 0}
+          emoji="⚖️"
+          color="bg-nook-bell"
           loading={loading}
         />
         <StatCard

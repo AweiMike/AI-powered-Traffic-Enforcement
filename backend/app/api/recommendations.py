@@ -2118,3 +2118,129 @@ async def get_patrol_plan(
         "period": {"start_date": start_date, "end_date": end_date},
         "units": units_result,
     }
+
+
+# ============================================
+# 明日風險預警（Phase 3 B2）
+# ============================================
+@router.get("/risk-forecast")
+async def get_risk_forecast(
+    target_date: str = Query(None, description="目標日期 YYYY-MM-DD（預設＝資料庫最新事故日+1天）"),
+    db: Session = Depends(get_db),
+):
+    """明日風險預警：歷史頻率＋平滑演算法，找出（轄區所, 班別）明日風險最高組合。
+
+    Recall 優先（本系統原則「寧可多攔不可漏網」）：
+    - 分數 = 同星期幾歷史平均 EPDO * 0.7 + 全週歷史平均 EPDO * 0.3
+      （樣本數小的組合用全週平均做平滑，避免單一極端值誤導）
+    - per_unit_top 額外確保 7 所皆有預警項目，不因某所整體風險偏低而被 Top 10 排除。
+    """
+    from collections import Counter, defaultdict
+
+    # 僅分析這 7 個轄區所（與 patrol-plan 一致）
+    PATROL_UNITS = [
+        "新化派出所", "唪口派出所", "知義派出所", "那拔派出所",
+        "山上分駐所", "左鎮分駐所", "岡林派出所",
+    ]
+
+    def shift_label(shift_id: str) -> str:
+        """班別代碼轉時段文字，如 "01" -> "00-02時"（(int-1)*2 起，2 小時一段）"""
+        n = int(shift_id)
+        start_hour = (n - 1) * 2
+        return f"{start_hour:02d}-{start_hour + 2:02d}時"
+
+    def mode_value(values):
+        """計算眾數（NULL/空值不計，無資料回傳 None）"""
+        filtered = [v for v in values if v]
+        if not filtered:
+            return None
+        return Counter(filtered).most_common(1)[0][0]
+
+    # 決定 target_date：預設＝DB 最新 occurred_date + 1 天
+    max_crash_date = db.query(func.max(Crash.occurred_date)).scalar()
+    if target_date:
+        try:
+            td = datetime.strptime(target_date, "%Y-%m-%d").date()
+        except ValueError:
+            return {"error": "日期格式錯誤"}
+    elif max_crash_date:
+        td = max_crash_date + timedelta(days=1)
+    else:
+        td = datetime.now().date()
+
+    target_weekday = td.weekday()
+    weekday_labels = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
+    weekday_label = weekday_labels[target_weekday]
+
+    # 歷史窗：DB 全部事故，一次撈 7 所必要欄位，Python 端分組
+    crashes = db.query(
+        Crash.occurred_date,
+        Crash.shift_id,
+        Crash.sub_unit,
+        Crash.severity_weight,
+        Crash.cause,
+        Crash.is_dui_crash_party,
+    ).filter(
+        Crash.sub_unit.in_(PATROL_UNITS),
+    ).all()
+
+    # 歷史涵蓋週數：(data_end - data_start).days / 7，至少 1
+    dates = [c.occurred_date for c in crashes if c.occurred_date]
+    if dates:
+        data_start, data_end = min(dates), max(dates)
+        n_weeks = max(1, (data_end - data_start).days / 7)
+    else:
+        n_weeks = 1
+
+    # 依 (unit, shift_id) 分組，組內再拆「同星期幾」子集
+    group_all: dict = defaultdict(list)
+    for c in crashes:
+        group_all[(c.sub_unit, c.shift_id)].append(c)
+
+    combo_results = []
+    for (unit, shift_id), items in group_all.items():
+        same_dow = [c for c in items if c.occurred_date.weekday() == target_weekday]
+
+        same_dow_epdo = sum(c.severity_weight or 0 for c in same_dow)
+        all_epdo = sum(c.severity_weight or 0 for c in items)
+
+        same_dow_rate = same_dow_epdo / n_weeks
+        all_dow_rate = all_epdo / (n_weeks * 7)
+
+        score = same_dow_rate * 0.7 + all_dow_rate * 0.3
+
+        samples = len(same_dow)
+        avg_epdo = same_dow_epdo / max(1, samples)
+        top_cause = mode_value([c.cause for c in same_dow])
+        dui_count = sum(1 for c in same_dow if c.is_dui_crash_party)
+
+        combo_results.append({
+            "unit": unit,
+            "shift_id": shift_id,
+            "shift_label": shift_label(shift_id),
+            "score": round(score, 2),
+            "samples": samples,
+            "avg_epdo": round(avg_epdo, 1),
+            "top_cause": top_cause,
+            "dui_count": dui_count,
+        })
+
+    # Top 10 依 score 降冪
+    combo_results.sort(key=lambda r: -r["score"])
+    top_risks = combo_results[:10]
+
+    # per_unit_top：每所 score 最高的 1 筆（確保 7 所都有預警，Recall 優先）
+    per_unit_top = []
+    for unit in PATROL_UNITS:
+        unit_combos = [r for r in combo_results if r["unit"] == unit]
+        if unit_combos:
+            best = max(unit_combos, key=lambda r: r["score"])
+            per_unit_top.append(best)
+
+    return {
+        "target_date": td.isoformat(),
+        "weekday_label": weekday_label,
+        "history_weeks": round(n_weeks, 1),
+        "top_risks": top_risks,
+        "per_unit_top": per_unit_top,
+    }

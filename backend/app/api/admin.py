@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import engine, Base, get_db
-from app.models.core import Crash, Ticket
+from app.models.core import Crash, Ticket, AuditLog
 
 router = APIRouter()
 
@@ -86,4 +86,38 @@ async def get_data_quality(db: Session = Depends(get_db)):
             if crash_range[1] and ticket_range[1] else None
         ),
         "phase1_road_fields": phase1,
+    }
+
+
+@router.get("/audit-log")
+async def get_audit_log(
+    limit: int = Query(default=50, description="回傳筆數（夾在 1-200 之間）"),
+    db: Session = Depends(get_db),
+):
+    """稽核軌跡查詢（Phase 3 C5）：依時間降冪回傳最近的系統操作紀錄。
+
+    涵蓋兩類寫入來源：
+    - main.py write_protect_middleware：非 GET 的 /api/v1/* 請求
+    - auth.py login：login_success / login_failed
+    """
+    limit = max(1, min(limit, 200))
+
+    rows = (
+        db.query(AuditLog)
+        .order_by(AuditLog.ts.desc())
+        .limit(limit)
+        .all()
+    )
+
+    return {
+        "items": [
+            {
+                "ts": row.ts.isoformat() if row.ts else None,
+                "action": row.action,
+                "detail": row.detail,
+                "status_code": row.status_code,
+                "actor": row.actor,
+            }
+            for row in rows
+        ]
     }

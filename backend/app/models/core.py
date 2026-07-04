@@ -346,3 +346,25 @@ class Improvement(Base):
 
     def __repr__(self):
         return f"<Improvement(id={self.id}, title={self.title}, date={self.implemented_date})>"
+
+
+# ============================================
+# 系統操作稽核軌跡（Phase 3 C5：機關課責）
+# ============================================
+class AuditLog(Base):
+    """系統操作稽核軌跡（機關課責）"""
+
+    __tablename__ = "core_audit_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ts = Column(DateTime, default=datetime.utcnow, index=True)
+    action = Column(
+        String(100), nullable=False, index=True,
+        comment="動作：METHOD /path 或 login_success/login_failed",
+    )
+    detail = Column(String(300), comment="補充（如登入帳號、檔名）")
+    status_code = Column(Integer, comment="HTTP 狀態碼")
+    actor = Column(String(50), default="admin", comment="admin=已驗證寫入 / anonymous=未驗證")
+
+    def __repr__(self):
+        return f"<AuditLog(id={self.id}, action={self.action}, ts={self.ts})>"

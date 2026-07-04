@@ -747,6 +747,75 @@ const DataQualityCard: React.FC<{ refreshTrigger: number }> = ({ refreshTrigger 
   );
 };
 
+/** 操作紀錄卡（Phase 3）：最近 N 筆系統寫入操作與登入事件，供稽核軌跡查核 */
+const AuditLogCard: React.FC<{ refreshTrigger: number }> = ({ refreshTrigger }) => {
+  const [items, setItems] = useState<any[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    apiClient.getAuditLog(30)
+      .then((r) => { if (alive) setItems(r?.items ?? []); })
+      .catch(() => { if (alive) setItems([]); });
+    return () => { alive = false; };
+  }, [refreshTrigger]);
+
+  const fmtTs = (iso: string) => {
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const renderAction = (action: string) => {
+    if (action === 'login_success') return <span className="text-success">登入成功</span>;
+    if (action === 'login_failed') return <span className="text-danger">登入失敗</span>;
+    return <span className="font-mono">{action}</span>;
+  };
+
+  if (items === null) return null;
+
+  return (
+    <div className="mt-8 bg-white/80 backdrop-blur-sm rounded-3xl p-6 nook-shadow">
+      <h3 className="text-lg font-bold text-nook-text mb-1">🧾 操作紀錄</h3>
+      <p className="text-xs text-text-subtle mb-4">最近 30 筆系統寫入操作與登入事件（稽核軌跡）</p>
+
+      {items.length === 0 ? (
+        <p className="text-sm text-text-subtle text-center py-6">尚無紀錄</p>
+      ) : (
+        <div className="max-h-64 overflow-y-auto">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-white">
+              <tr className="text-left text-text-muted border-b border-surface-3">
+                <th className="py-2 px-2 font-medium">時間</th>
+                <th className="py-2 px-2 font-medium">動作</th>
+                <th className="py-2 px-2 font-medium">狀態</th>
+                <th className="py-2 px-2 font-medium">身分</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, idx) => (
+                <tr key={idx} className="border-b border-surface-3/60">
+                  <td className="py-1.5 px-2 tabular-nums text-text-muted whitespace-nowrap">{fmtTs(item.ts)}</td>
+                  <td className="py-1.5 px-2">{renderAction(item.action)}</td>
+                  <td className={`py-1.5 px-2 tabular-nums ${item.status_code === 401 ? 'text-danger font-bold' : 'text-text-muted'}`}>
+                    {item.status_code}
+                  </td>
+                  <td className="py-1.5 px-2">
+                    {item.actor === 'anonymous' ? (
+                      <span className="bg-surface-3 text-text-subtle rounded px-1.5 py-0.5 text-[11px]">未驗證</span>
+                    ) : (
+                      <span className="text-text-muted">已驗證</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const DataImportPage: React.FC = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -832,6 +901,9 @@ const DataImportPage: React.FC = () => {
 
       {/* 資料品質總覽（Phase 1）*/}
       <DataQualityCard refreshTrigger={refreshTrigger} />
+
+      {/* 操作紀錄（Phase 3）*/}
+      <AuditLogCard refreshTrigger={refreshTrigger} />
 
       {/* 系統維護區 */}
       <div className="mt-8 border-t border-nook-text/10 pt-8">

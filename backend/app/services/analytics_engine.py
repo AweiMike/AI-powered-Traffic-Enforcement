@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta
 import calendar
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, case, desc, or_
-from app.models.core import Crash, Ticket
+from app.models.core import Crash, Ticket, Improvement
 from app.schemas.report import (
     ReportSummary, ReportPeriod, StatComparison,
     MonthlyTrend, HotspotItem, UnitStat, ShiftStat
@@ -152,6 +152,14 @@ class AnalyticsEngine:
         focus_districts = self._detect_focus_districts(start_date, end_date, last_start_date, last_end_date)
         focus_causes = self._detect_focus_causes(topics, severity, overall_stats)
 
+        # 12. Phase 1-3 新資料維度織入（Phase 3-C3：道安會報月報升級）
+        #     照明故障／無照／逃逸／風險路線／改善措施成效
+        lighting_issues = self._get_lighting_issues(start_date, end_date)
+        unlicensed_count = self._get_unlicensed_count(start_date, end_date)
+        hit_and_run_count = self._get_hit_and_run_count(start_date, end_date)
+        top_route_segments = self._get_top_route_segments(start_date, end_date)
+        improvement_effects = self._get_improvement_effects()
+
         return ReportSummary(
             period=ReportPeriod(
                 year=year, month=month,
@@ -182,6 +190,11 @@ class AnalyticsEngine:
             a1_locations=a1_locations,
             focus_districts=focus_districts,
             focus_causes=focus_causes,
+            lighting_issues=lighting_issues,
+            unlicensed_count=unlicensed_count,
+            hit_and_run_count=hit_and_run_count,
+            top_route_segments=top_route_segments,
+            improvement_effects=improvement_effects,
         )
 
     def _get_actual_data_end(self, start_date: date, end_date: date) -> date:
@@ -796,3 +809,90 @@ class AnalyticsEngine:
             if len(hotspots) >= top_n:
                 break
         return hotspots
+
+    # ========================================
+    # Phase 1-3 新資料維度織入（Phase 3-C3：道安會報月報升級）
+    # 照明故障／無照駕駛／肇事逃逸／風險路線／改善措施成效
+    # ========================================
+
+    # 夜間班別集合（與 recommendations.py 的 NIGHT_SHIFTS 保持一致，22:00~06:00）
+    _NIGHT_SHIFTS = {"10", "11", "12", "01", "02", "03"}
+
+    def _get_lighting_issues(self, start: date, end: date) -> dict:
+        """
+        夜間照明故障事故統計（Phase 1 新增 road_lighting 欄位）。
+        total：期間內道路照明「有照明未開啟或故障」件數
+        night：其中發生於夜間班別（見 _NIGHT_SHIFTS）的件數
+        """
+        total = self._count_crash_range(start, end, Crash.road_lighting == "有照明未開啟或故障")
+        night = self._count_crash_range(
+            start, end,
+            and_(Crash.road_lighting == "有照明未開啟或故障", Crash.shift_id.in_(self._NIGHT_SHIFTS)),
+        )
+        return {"total": total, "night": night}
+
+    def _get_unlicensed_count(self, start: date, end: date) -> int:
+        """無照駕駛事故件數（license_status 含「無照」，Phase 1 新增欄位）"""
+        return self._count_crash_range(start, end, Crash.license_status.like('%無照%'))
+
+    def _get_hit_and_run_count(self, start: date, end: date) -> int:
+        """肇事逃逸事故件數（Phase 1 新增 is_hit_and_run 欄位）"""
+        return self._count_crash_range(start, end, Crash.is_hit_and_run == True)
+
+    def _get_top_route_segments(self, start: date, end: date) -> list:
+        """
+        風險路線 Top 3（Phase 1 新增 route_name / route_km / severity_weight 維度）。
+        依 EPDO（當量死亡數）降冪排序，與 recommendations.py /corridor-analysis
+        路線排名（模式 A）採同一評比邏輯，方便跨功能對照。
+        """
+        rows = (
+            self.db.query(
+                Crash.route_name,
+                func.count(Crash.id).label("total"),
+                func.coalesce(func.sum(Crash.severity_weight), 0).label("epdo"),
+            )
+            .filter(
+                Crash.occurred_date >= start,
+                Crash.occurred_date <= end,
+                Crash.route_name.isnot(None),
+                Crash.route_name != "",
+            )
+            .group_by(Crash.route_name)
+            .order_by(desc("epdo"))
+            .limit(3)
+            .all()
+        )
+        return [
+            {"route": r.route_name, "total": r.total, "epdo": int(r.epdo or 0)}
+            for r in rows
+        ]
+
+    def _get_improvement_effects(self) -> list:
+        """
+        改善措施成效（Phase 3-A3 成效評估織入 AI 報告，Phase 3-C3 新增）。
+        沿用 improvements.py 端點抽取出的共用函式 evaluate_improvement()，
+        避免同一套 before/after 評估邏輯維護兩份。
+        取有 net_pct（可判讀）者，依實施日期降冪排序後取前 3 筆；
+        無改善措施登記或全部尚無法判讀時回傳 []。
+        """
+        rows = self.db.query(Improvement).order_by(Improvement.implemented_date.desc()).all()
+        if not rows:
+            return []
+
+        # 延遲匯入：避免 services 層與 api 層在模組載入時互相牽動
+        from app.api.improvements import evaluate_improvement
+
+        effects = []
+        for imp in rows:
+            evaluation = evaluate_improvement(self.db, imp, 365)
+            if evaluation.get("net_pct") is not None:
+                effects.append({
+                    "title": evaluation["title"],
+                    "implemented_date": evaluation["implemented_date"],
+                    "net_pct": evaluation["net_pct"],
+                    "verdict": evaluation["verdict"],
+                    "preliminary": evaluation["preliminary"],
+                })
+            if len(effects) >= 3:
+                break
+        return effects

@@ -402,6 +402,13 @@ class LLMService:
         focus_districts = d.get("focus_districts", [])
         focus_causes = d.get("focus_causes", [])
 
+        # Phase 1-3 新資料維度織入（Phase 3-C3：道安會報月報升級）
+        lighting_issues = d.get("lighting_issues", {})
+        unlicensed_count = d.get("unlicensed_count", 0)
+        hit_and_run_count = d.get("hit_and_run_count", 0)
+        top_route_segments = d.get("top_route_segments", [])
+        improvement_effects = d.get("improvement_effects", [])
+
         def fmt_stat(key: str, label: str) -> str:
             s = overall.get(key, {})
             if not s:
@@ -510,6 +517,11 @@ class LLMService:
         if a_hot:
             top = a_hot[0]
             lines.append(f"- 事故最嚴重路段 **{top.get('district')} {top.get('location')}** 建議加強見警率與取締密度")
+        if unlicensed_count > 0 or hit_and_run_count > 0:
+            lines.append(
+                f"- 無照駕駛事故 {unlicensed_count} 件、肇事逃逸事故 {hit_and_run_count} 件，"
+                f"建議加強路檢盤查與科技執法追緝"
+            )
         lines.append("")
         lines.append("### 工程（Engineering）")
         # A1 死亡地點必須列入檢討（警政實務鐵則）
@@ -523,7 +535,32 @@ class LLMService:
                 )
         if a_hot and len(a_hot) >= 2:
             lines.append(f"- 其他事故熱點建議評估：{a_hot[0].get('location')} 與 {a_hot[1].get('location')} 的號誌、標線、照明")
-        if not a1_locs and (not a_hot or len(a_hot) < 2):
+        # 夜間照明故障（Phase 1 新增 road_lighting 欄位）→ 須建議通報養工單位
+        if lighting_issues.get("total", 0) > 0:
+            lines.append(
+                f"- 夜間照明故障事故 {lighting_issues.get('total', 0)} 件"
+                f"（其中夜間時段 {lighting_issues.get('night', 0)} 件），建議通報養工單位檢修路燈"
+            )
+        # 風險路線 Top 3（Phase 1 新增 route_name/route_km 維度）→ 須點名風險路線
+        if top_route_segments:
+            route_desc = "、".join(
+                f"{r.get('route')}（{r.get('total')} 件）" for r in top_route_segments[:3]
+            )
+            lines.append(f"- 風險路線前 3：{route_desc}，建議列為道安會報重點路線")
+        # 改善措施成效（Phase 3-A3）→ 須引用成效數據佐證工程投資效益
+        if improvement_effects:
+            eff = improvement_effects[0]
+            lines.append(
+                f"- 改善措施成效佐證：「{eff.get('title')}」淨變化 {eff.get('net_pct'):+.1f}%，"
+                f"{eff.get('verdict')}，可作為後續工程投資效益佐證"
+            )
+        if (
+            not a1_locs
+            and (not a_hot or len(a_hot) < 2)
+            and lighting_issues.get("total", 0) == 0
+            and not top_route_segments
+            and not improvement_effects
+        ):
             lines.append("- 本月無急需工程改善項目")
         lines.append("")
         lines.append("### 教育宣導（Education）")
