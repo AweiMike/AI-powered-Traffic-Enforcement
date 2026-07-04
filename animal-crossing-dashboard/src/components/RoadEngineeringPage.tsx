@@ -10,7 +10,7 @@
  *   - 會勘資料產生器：輸入座標＋半徑，彙整近 3 年事故樣態與改善建議，支援列印卷宗
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Construction, Lightbulb, Download, MapPin, Moon, AlertTriangle, FileSearch, Milestone, ChevronDown, ChevronUp } from 'lucide-react';
+import { Construction, Lightbulb, Download, MapPin, Moon, AlertTriangle, FileSearch, Milestone, ChevronDown, ChevronUp, Hammer, Trash2 } from 'lucide-react';
 import DateRangePicker, { type DateRange } from './DateRangePicker';
 import { apiClient } from '../api/client';
 
@@ -56,6 +56,123 @@ function HBarList({ items }: { items: Array<{ name: string; count: number }> | u
   );
 }
 
+/** 改善成效追蹤：登記表單欄位 */
+interface ImprovementFormState {
+  title: string;
+  measure_type: string;
+  implemented_date: string;
+  latitude: string;
+  longitude: string;
+  radius_m: number;
+  source: string;
+  description: string;
+}
+
+const MEASURE_TYPES = ['照明改善', '號誌增設', '標線標誌', '實體工程', '測速科技執法', '其他'];
+
+function defaultImprovementForm(): ImprovementFormState {
+  return {
+    title: '',
+    measure_type: MEASURE_TYPES[0],
+    implemented_date: '',
+    latitude: '',
+    longitude: '',
+    radius_m: 200,
+    source: '',
+    description: '',
+  };
+}
+
+/** 淨效果 badge 色階（net_pct 越負代表改善幅度越大；null 表示樣本不足無法計算） */
+function netEffectBadgeClass(netPct: number | null | undefined): string {
+  if (netPct == null) return 'bg-surface-3 text-text-muted';
+  if (netPct <= -30) return 'bg-success text-white';
+  if (netPct <= -10) return 'bg-success/15 text-success';
+  if (netPct < 10) return 'bg-surface-3 text-text-muted';
+  return 'bg-danger text-white';
+}
+
+/** 改善成效追蹤：單筆措施成效卡（改善前後對比 + 全區同期控制 + 淨效果判讀） */
+function ImprovementCard({ ev, onDelete }: { ev: any; onDelete: (id: number) => void }) {
+  return (
+    <div className="border border-surface-3 rounded-xl p-4">
+      <div className="flex items-start justify-between mb-3 gap-2">
+        <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-bold text-nook-text">{ev.title}</span>
+            <span className="px-2 py-0.5 bg-surface-3 rounded-full text-xs text-text-muted">{ev.measure_type}</span>
+          </div>
+          <p className="text-xs text-text-subtle mt-0.5 tabular-nums">實施日 {ev.implemented_date}</p>
+        </div>
+        <button
+          onClick={() => onDelete(ev.id)}
+          title="刪除此登記"
+          className="shrink-0 p-1.5 rounded-lg text-text-subtle hover:bg-red-50 hover:text-danger transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+
+      {ev.status === 'no_after_data' ? (
+        <p className="text-sm text-text-subtle py-1">實施日之後尚無資料，無法評估</p>
+      ) : (
+        <>
+          <table className="w-full text-sm mb-3">
+            <thead>
+              <tr className="text-text-muted">
+                <th className="text-left font-medium py-1"> </th>
+                <th className="text-right font-medium py-1">改善前（{ev.before?.days ?? '—'}天）</th>
+                <th className="text-right font-medium py-1">
+                  改善後（{ev.after?.days ?? '—'}天）
+                  {ev.preliminary && <span className="text-[10px] text-text-subtle ml-1">(初期)</span>}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="tabular-nums">
+              <tr className="border-t border-surface-3">
+                <td className="py-1 text-text-muted">事故件數</td>
+                <td className="py-1 text-right font-bold">{ev.before?.total ?? '—'}</td>
+                <td className="py-1 text-right font-bold">{ev.after?.total ?? '—'}</td>
+              </tr>
+              <tr className="border-t border-surface-3">
+                <td className="py-1 text-text-muted">日均率</td>
+                <td className="py-1 text-right">{ev.before?.daily_rate != null ? ev.before.daily_rate.toFixed(4) : '—'}</td>
+                <td className="py-1 text-right">{ev.after?.daily_rate != null ? ev.after.daily_rate.toFixed(4) : '—'}</td>
+              </tr>
+              <tr className="border-t border-surface-3">
+                <td className="py-1 text-text-muted">EPDO</td>
+                <td className="py-1 text-right">{ev.before?.epdo ?? '—'}</td>
+                <td className="py-1 text-right">{ev.after?.epdo ?? '—'}</td>
+              </tr>
+              <tr className="border-t border-surface-3">
+                <td className="py-1 text-text-muted">死/傷</td>
+                <td className="py-1 text-right">{ev.before?.deaths ?? 0}/{ev.before?.injuries ?? 0}</td>
+                <td className="py-1 text-right">{ev.after?.deaths ?? 0}/{ev.after?.injuries ?? 0}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 text-xs text-text-muted mb-2">
+            <span>點位變化 <span className="font-bold tabular-nums text-nook-text">{ev.pct_change != null ? `${ev.pct_change}%` : '—'}</span></span>
+            <span className="text-border-strong">·</span>
+            <span>全區同期 <span className="font-bold tabular-nums text-nook-text">{ev.baseline_pct != null ? `${ev.baseline_pct}%` : '—'}</span></span>
+            <span className="text-border-strong">·</span>
+            <span className={`px-2 py-0.5 rounded-full font-bold tabular-nums ${netEffectBadgeClass(ev.net_pct)}`}>
+              {ev.net_pct == null ? '無法計算' : `淨效果 ${ev.net_pct > 0 ? '+' : ''}${ev.net_pct}%`}
+            </span>
+          </div>
+
+          {ev.verdict && (
+            <div className="bg-accent-soft/40 rounded-lg px-3 py-1.5 text-sm text-nook-text">
+              📋 {ev.verdict}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 const RoadEngineeringPage: React.FC = () => {
   const [range, setRange] = useState<DateRange>(defaultRange);
   const [data, setData] = useState<any>(null);
@@ -78,6 +195,16 @@ const RoadEngineeringPage: React.FC = () => {
   const [dossierLoading, setDossierLoading] = useState(false);
   const [casesExpanded, setCasesExpanded] = useState(false);
   const dossierSectionRef = useRef<HTMLDivElement>(null);
+
+  // ---- 改善成效追蹤 ----
+  const [improvementFormOpen, setImprovementFormOpen] = useState(false);
+  const [improvementForm, setImprovementForm] = useState<ImprovementFormState>(defaultImprovementForm);
+  const [improvementSaving, setImprovementSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [evaluations, setEvaluations] = useState<any[]>([]);
+  const [evaluationsLoading, setEvaluationsLoading] = useState(false);
+  const improvementSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -141,6 +268,23 @@ const RoadEngineeringPage: React.FC = () => {
     return () => window.removeEventListener('afterprint', handleAfterPrint);
   }, []);
 
+  /** 改善成效清單：取得所有已登記措施的改善前後比較（掛載時載入一次，儲存/刪除後重新載入） */
+  const loadEvaluations = async () => {
+    setEvaluationsLoading(true);
+    try {
+      const res = await apiClient.getImprovementEvaluations(365);
+      setEvaluations(res?.items || []);
+    } catch (e) {
+      console.error('Failed to fetch improvement evaluations', e);
+      setEvaluations([]);
+    }
+    setEvaluationsLoading(false);
+  };
+
+  useEffect(() => {
+    loadEvaluations();
+  }, []);
+
   const visibleItems = (data?.items || []).filter((r: any) => !nightOnly || r.is_night);
 
   /** 匯出 CSV（UTF-8 BOM，Excel 直開不亂碼）——給養工處的修燈通報清單，跟隨夜間篩選 */
@@ -199,6 +343,63 @@ const RoadEngineeringPage: React.FC = () => {
       document.body.classList.add('printing-area');
       window.print();
     }, 50);
+  };
+
+  /** 儲存改善措施登記；未登入（401）顯示唯讀模式提示，其餘錯誤顯示後端 detail */
+  const handleSaveImprovement = async () => {
+    setFormError(null);
+    const lat = parseFloat(improvementForm.latitude);
+    const lng = parseFloat(improvementForm.longitude);
+    if (!improvementForm.title || !improvementForm.implemented_date || Number.isNaN(lat) || Number.isNaN(lng)) {
+      setFormError('請填寫必填欄位（措施名稱、實施日期、緯度、經度）');
+      return;
+    }
+    setImprovementSaving(true);
+    try {
+      await apiClient.createImprovement({
+        title: improvementForm.title,
+        measure_type: improvementForm.measure_type,
+        latitude: lat,
+        longitude: lng,
+        radius_m: improvementForm.radius_m,
+        implemented_date: improvementForm.implemented_date,
+        description: improvementForm.description || undefined,
+        source: improvementForm.source || undefined,
+      });
+      setImprovementForm(defaultImprovementForm());
+      setImprovementFormOpen(false);
+      await loadEvaluations();
+    } catch (e: any) {
+      setFormError(e?.status === 401 ? '需登入後才能登記（唯讀模式無法寫入）' : (e?.detail || '登記失敗，請稍後再試'));
+    }
+    setImprovementSaving(false);
+  };
+
+  /** 刪除改善措施登記；未登入（401）顯示唯讀模式提示，其餘錯誤顯示後端 detail */
+  const handleDeleteImprovement = async (id: number) => {
+    if (!window.confirm('確定刪除此登記？')) return;
+    setActionError(null);
+    try {
+      await apiClient.deleteImprovement(id);
+      await loadEvaluations();
+    } catch (e: any) {
+      setActionError(e?.status === 401 ? '需登入後才能刪除（唯讀模式無法寫入）' : (e?.detail || '刪除失敗，請稍後再試'));
+    }
+  };
+
+  /** 由會勘卷宗點擊「登記此點改善」：展開登記表單、帶入卷宗座標/半徑、來源預設會勘、捲動到表單 */
+  const handleRegisterFromDossier = () => {
+    if (!dossier) return;
+    setImprovementForm((f) => ({
+      ...f,
+      latitude: String(dossier.center.lat),
+      longitude: String(dossier.center.lng),
+      radius_m: dossier.center.radius_m,
+      source: '會勘',
+    }));
+    setImprovementFormOpen(true);
+    setFormError(null);
+    setTimeout(() => improvementSectionRef.current?.scrollIntoView({ behavior: 'smooth' }), 0);
   };
 
   const s = data?.summary;
@@ -510,12 +711,20 @@ const RoadEngineeringPage: React.FC = () => {
                       分析窗 {dossier.window.start_date} ~ {dossier.window.end_date}
                     </p>
                   </div>
-                  <button
-                    onClick={handlePrintDossier}
-                    className="print:hidden shrink-0 px-3 py-1.5 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-lg transition-colors"
-                  >
-                    🖨 列印
-                  </button>
+                  <div className="print:hidden shrink-0 flex items-center gap-2">
+                    <button
+                      onClick={handleRegisterFromDossier}
+                      className="px-3 py-1.5 bg-white border border-accent text-accent hover:bg-accent-soft text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5"
+                    >
+                      <Hammer className="w-4 h-4" />➕ 登記此點改善
+                    </button>
+                    <button
+                      onClick={handlePrintDossier}
+                      className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-lg transition-colors"
+                    >
+                      🖨 列印
+                    </button>
+                  </div>
                 </div>
 
                 {/* b. 概要 6 小卡 + by_year */}
@@ -670,6 +879,160 @@ const RoadEngineeringPage: React.FC = () => {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* 改善成效追蹤 */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 nook-shadow mt-6" ref={improvementSectionRef}>
+            <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
+              <div>
+                <h3 className="font-bold text-nook-text flex items-center gap-2">
+                  <Hammer className="w-4 h-4 text-accent" />改善成效追蹤
+                </h3>
+                <p className="text-xs text-text-subtle mt-1">登記改善措施，系統自動比較改善前後事故率（含全區同期控制）</p>
+              </div>
+              <button
+                onClick={() => { setImprovementFormOpen((v) => !v); setFormError(null); }}
+                className="shrink-0 px-3 py-1.5 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                ➕ 登記新措施
+              </button>
+            </div>
+
+            {improvementFormOpen && (
+              <div className="bg-surface-2 rounded-xl p-4 mb-5">
+                <div className="grid grid-cols-4 gap-3 mb-3">
+                  <div className="col-span-2">
+                    <label className="block text-xs text-text-muted mb-1">措施名稱 *</label>
+                    <input
+                      type="text"
+                      value={improvementForm.title}
+                      onChange={(e) => setImprovementForm((f) => ({ ...f, title: e.target.value }))}
+                      placeholder="例：OO路口號誌增設"
+                      className="w-full px-2.5 py-1.5 text-sm border border-surface-3 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-accent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-text-muted mb-1">對策類型</label>
+                    <select
+                      value={improvementForm.measure_type}
+                      onChange={(e) => setImprovementForm((f) => ({ ...f, measure_type: e.target.value }))}
+                      className="w-full px-2.5 py-1.5 text-sm border border-surface-3 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-accent"
+                    >
+                      {MEASURE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-text-muted mb-1">實施日期 *</label>
+                    <input
+                      type="date"
+                      value={improvementForm.implemented_date}
+                      onChange={(e) => setImprovementForm((f) => ({ ...f, implemented_date: e.target.value }))}
+                      className="w-full px-2.5 py-1.5 text-sm border border-surface-3 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-accent tabular-nums"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-text-muted mb-1">緯度 Lat *</label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      value={improvementForm.latitude}
+                      onChange={(e) => setImprovementForm((f) => ({ ...f, latitude: e.target.value }))}
+                      placeholder="23.0356"
+                      className="w-full px-2.5 py-1.5 text-sm border border-surface-3 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-accent tabular-nums"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-text-muted mb-1">經度 Lng *</label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      value={improvementForm.longitude}
+                      onChange={(e) => setImprovementForm((f) => ({ ...f, longitude: e.target.value }))}
+                      placeholder="120.3111"
+                      className="w-full px-2.5 py-1.5 text-sm border border-surface-3 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-accent tabular-nums"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-text-muted mb-1">評估半徑</label>
+                    <select
+                      value={improvementForm.radius_m}
+                      onChange={(e) => setImprovementForm((f) => ({ ...f, radius_m: Number(e.target.value) }))}
+                      className="w-full px-2.5 py-1.5 text-sm border border-surface-3 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-accent"
+                    >
+                      <option value={100}>100 公尺</option>
+                      <option value={200}>200 公尺</option>
+                      <option value={300}>300 公尺</option>
+                      <option value={500}>500 公尺</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-text-muted mb-1">來源</label>
+                    <select
+                      value={improvementForm.source}
+                      onChange={(e) => setImprovementForm((f) => ({ ...f, source: e.target.value }))}
+                      className="w-full px-2.5 py-1.5 text-sm border border-surface-3 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-accent"
+                    >
+                      <option value="">（未指定）</option>
+                      <option value="會勘">會勘</option>
+                      <option value="道安會報">道安會報</option>
+                      <option value="自行改善">自行改善</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs text-text-muted mb-1">說明</label>
+                    <input
+                      type="text"
+                      value={improvementForm.description}
+                      onChange={(e) => setImprovementForm((f) => ({ ...f, description: e.target.value }))}
+                      placeholder="選填備註"
+                      className="w-full px-2.5 py-1.5 text-sm border border-surface-3 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-accent"
+                    />
+                  </div>
+                </div>
+
+                {formError && (
+                  <div className="mb-3 bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-lg px-3 py-2">
+                    {formError}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleSaveImprovement}
+                    disabled={improvementSaving}
+                    className="px-4 py-1.5 bg-accent hover:bg-accent-hover disabled:bg-border text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    {improvementSaving ? '儲存中...' : '儲存登記'}
+                  </button>
+                  <button
+                    onClick={() => { setImprovementFormOpen(false); setFormError(null); }}
+                    className="px-4 py-1.5 text-sm text-text-muted hover:bg-surface-3 rounded-lg transition-colors"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {actionError && (
+              <div className="mb-3 bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-lg px-3 py-2">
+                {actionError}
+              </div>
+            )}
+
+            {evaluationsLoading ? (
+              <div className="py-8 text-center text-text-subtle text-sm">載入成效資料中...</div>
+            ) : evaluations.length === 0 ? (
+              <div className="py-8 text-center text-text-subtle text-sm">
+                尚未登記任何改善措施——完成會勘後在此登記，系統將自動追蹤成效
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {evaluations.map((ev: any) => (
+                  <ImprovementCard key={ev.id} ev={ev} onDelete={handleDeleteImprovement} />
+                ))}
               </div>
             )}
           </div>

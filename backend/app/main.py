@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 
 from app.config import settings
 from app.database import init_db
-from app.api import topics, stats, recommendations, imports, admin, hotspots, report, evehicle, enforcement, auth
+from app.api import topics, stats, recommendations, imports, admin, hotspots, report, evehicle, enforcement, auth, improvements
 from app.api.auth import verify_token
 
 # 前端靜態檔案目錄
@@ -118,6 +118,12 @@ app.add_middleware(
 # ============================================
 app.include_router(
     auth.router, prefix=f"{settings.API_V1_PREFIX}/auth", tags=["登入驗證"]
+)
+
+app.include_router(
+    improvements.router,
+    prefix=f"{settings.API_V1_PREFIX}/improvements",
+    tags=["改善成效追蹤"],
 )
 
 app.include_router(

@@ -319,3 +319,30 @@ class ViolationTypeMap(Base):
 # 統計匯總表 - 已移至 aggregate.py
 # MonthlyStats, DailyStats, ShiftStats 等聚合表都在 aggregate.py
 # ============================================
+
+
+# ============================================
+# 道路改善措施登記表（Phase 3-A3：成效追蹤用）
+# ============================================
+class Improvement(Base):
+    """道路改善措施登記（成效追蹤 before-after 分析用）"""
+
+    __tablename__ = "core_improvement"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(100), nullable=False, comment="措施名稱（如：中山路口增設閃光號誌）")
+    measure_type = Column(
+        String(50), nullable=False, index=True,
+        comment="對策類型：照明改善/號誌增設/標線標誌/實體工程/測速科技執法/其他"
+    )
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    radius_m = Column(Integer, default=200, comment="成效評估半徑（公尺）")
+    implemented_date = Column(Date, nullable=False, index=True, comment="完工/實施日")
+    description = Column(String(300), comment="補充說明（選填）")
+    source = Column(String(50), comment="來源：會勘/道安會報/自行改善（選填）")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<Improvement(id={self.id}, title={self.title}, date={self.implemented_date})>"

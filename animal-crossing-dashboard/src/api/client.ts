@@ -927,6 +927,44 @@ class APIClient {
     return this.request(`/recommendations/patrol-plan?start_date=${startDate}&end_date=${endDate}`);
   }
 
+  // ============================================
+  // Improvement Tracking API（改善成效追蹤）
+  // ============================================
+
+  /** 登記改善措施（需登入；未登入時後端回應 401 寫入保護） */
+  async createImprovement(data: {
+    title: string;
+    measure_type: string;
+    latitude: number;
+    longitude: number;
+    radius_m: number;
+    implemented_date: string;
+    description?: string;
+    source?: string;
+  }): Promise<any> {
+    return this.request('/improvements/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /** 取得所有已登記改善措施 */
+  async getImprovements(): Promise<any> {
+    return this.request('/improvements/');
+  }
+
+  /** 刪除改善措施登記（需登入；未登入時後端回應 401 寫入保護） */
+  async deleteImprovement(id: number): Promise<any> {
+    return this.request(`/improvements/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  /** 改善成效評估：比較各已登記措施實施前後事故率（含全區同期基準線，預設近 365 天） */
+  async getImprovementEvaluations(days: number = 365): Promise<any> {
+    return this.request(`/improvements/evaluations?days=${days}`);
+  }
+
   /** 資料品質總覽 */
   async getDataQuality(): Promise<any> {
     return this.request('/admin/data-quality');
