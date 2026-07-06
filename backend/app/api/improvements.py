@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.core import Improvement, Crash
+from app.utils.epdo import epdo_sum
 
 router = APIRouter()
 
@@ -73,10 +74,12 @@ def _crashes_in_radius(db: Session, lat: float, lng: float, radius_m: int, start
 
 
 def _period_stats(crashes: list) -> dict:
-    """彙整某期間事故清單的 total/epdo/deaths/injuries"""
+    """彙整某期間事故清單的 total/epdo/deaths/injuries。
+    epdo 採台灣道安標準公式（人數口徑，見 app/utils/epdo.py）：
+    單案 EPDO = 30日死亡人數×9.5 + 調整受傷人數×3.5 + 1，多案加總後 round 1 位。"""
     return {
         "total": len(crashes),
-        "epdo": sum(c.severity_weight or 0 for c in crashes),
+        "epdo": epdo_sum(crashes),
         "deaths": sum(c.death_count or 0 for c in crashes),
         "injuries": sum(c.injury_count or 0 for c in crashes),
     }

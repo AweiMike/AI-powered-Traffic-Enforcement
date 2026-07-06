@@ -12,6 +12,7 @@ from math import radians, cos, sqrt
 
 from app.database import get_db
 from app.models.core import Crash, Ticket
+from app.utils.epdo import crash_epdo
 
 
 router = APIRouter()
@@ -30,7 +31,8 @@ class HotspotItem(BaseModel):
     a2_count: int
     a3_count: int
     total: int
-    trend_pct: Optional[float] = None  # 與基準期比較
+    epdo: float = 0  # EPDO（台灣道安標準公式，人數口徑，見 app/utils/epdo.py）；Top10 排序鍵
+    trend_pct: Optional[float] = None  # 與基準期比較（依 epdo 計算）
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
@@ -93,15 +95,19 @@ def cluster_crashes_by_gps(rows, radius_m=CLUSTER_RADIUS_M):
     """
     將事故記錄依 GPS 座標聚類。
 
-    rows: list of dicts with keys: lat, lng, district, location_desc, severity
-    returns: list of cluster dicts sorted by total desc
+    rows: list of dicts with keys: lat, lng, district, location_desc, severity,
+          death_count, late_death_count, injury_count（供 epdo 累加用）
+    returns: list of cluster dicts sorted by epdo desc（Top10 排序鍵，見 accident-hotspots）
     """
-    clusters = []  # each: {lat, lng, district, locations: {desc: count}, a1, a2, a3, total, ids: set}
+    clusters = []  # each: {lat, lng, district, locations: {desc: count}, a1, a2, a3, total, epdo, ids: set}
 
     for row in rows:
         lat, lng = row['lat'], row['lng']
         if lat is None or lng is None:
             continue
+
+        # 單案 EPDO（台灣道安標準公式，人數口徑）：見 app/utils/epdo.py
+        row_epdo = crash_epdo(row)
 
         matched = None
         min_dist = radius_m + 1
@@ -117,6 +123,7 @@ def cluster_crashes_by_gps(rows, radius_m=CLUSTER_RADIUS_M):
             matched['lat'] = (matched['lat'] * n + lat) / (n + 1)
             matched['lng'] = (matched['lng'] * n + lng) / (n + 1)
             matched['total'] += 1
+            matched['epdo'] += row_epdo
             sev = row.get('severity', '')
             if sev == 'A1':
                 matched['a1'] += 1
@@ -139,10 +146,11 @@ def cluster_crashes_by_gps(rows, radius_m=CLUSTER_RADIUS_M):
                 'a2': 1 if sev == 'A2' else 0,
                 'a3': 1 if sev != 'A1' and sev != 'A2' else 0,
                 'total': 1,
+                'epdo': row_epdo,
             })
 
-    # Sort by total descending
-    clusters.sort(key=lambda c: c['total'], reverse=True)
+    # 排序鍵改為 epdo 降冪（原為 total 降冪；財損案多但死傷少的路口不再壓過死傷路口）
+    clusters.sort(key=lambda c: c['epdo'], reverse=True)
     return clusters
 
 
@@ -163,10 +171,12 @@ class TicketHotspotItem(BaseModel):
 # ============================================
 
 def _fetch_crash_rows(db, start_dt, end_dt, severity=None):
-    """查詢指定日期範圍內的事故記錄，回傳 list of dicts"""
+    """查詢指定日期範圍內的事故記錄，回傳 list of dicts。
+    death_count/late_death_count/injury_count：供聚類後計算單案 EPDO 用（crash_epdo()）。"""
     query = db.query(
         Crash.latitude, Crash.longitude, Crash.district,
-        Crash.location_desc, Crash.severity
+        Crash.location_desc, Crash.severity,
+        Crash.death_count, Crash.late_death_count, Crash.injury_count,
     ).filter(
         and_(
             Crash.occurred_date >= start_dt,
@@ -185,7 +195,9 @@ def _fetch_crash_rows(db, start_dt, end_dt, severity=None):
     return [
         {'lat': r.latitude, 'lng': r.longitude,
          'district': r.district or '', 'location_desc': r.location_desc or '',
-         'severity': r.severity or ''}
+         'severity': r.severity or '',
+         'death_count': r.death_count, 'late_death_count': r.late_death_count,
+         'injury_count': r.injury_count}
         for r in query.all()
     ]
 
@@ -207,7 +219,9 @@ async def get_accident_hotspots(
 
     - 以 GPS 座標方圓 100m 聚類，將地理位置相近的事故歸為同一熱點
     - 自動從聚類內的 location_desc 挑選最具代表性的路口名稱
-    - 支援嚴重度篩選、去年同期趨勢比較
+    - 排序依 EPDO（台灣道安標準公式，人數口徑，見 app/utils/epdo.py）降冪，
+      而非單純件數，避免財損案多但死傷少的路口壓過死傷路口
+    - 支援嚴重度篩選、去年同期趨勢比較（trend_pct 亦以 epdo 比較）
     """
     # 決定日期範圍 (優先 start_date/end_date > year/month > days)
     if start_date and end_date:
@@ -243,6 +257,7 @@ async def get_accident_hotspots(
         location = _pick_best_location(c['locations'])
 
         # 與去年同期比較：找 baseline 中距離最近的 cluster
+        # trend_pct 改以 epdo 比較（原以 total 比較，財損案多寡會蓋掉死傷輕重的變化）
         trend_pct = None
         if compare_baseline and baseline_clusters:
             best_bl = None
@@ -252,8 +267,8 @@ async def get_accident_hotspots(
                 if d < best_dist:
                     best_dist = d
                     best_bl = bl
-            if best_bl and best_bl['total'] > 0:
-                trend_pct = round((c['total'] - best_bl['total']) / best_bl['total'] * 100, 1)
+            if best_bl and best_bl['epdo'] > 0:
+                trend_pct = round((c['epdo'] - best_bl['epdo']) / best_bl['epdo'] * 100, 1)
 
         hotspots.append(HotspotItem(
             rank=i,
@@ -263,6 +278,7 @@ async def get_accident_hotspots(
             a2_count=c['a2'],
             a3_count=c['a3'],
             total=c['total'],
+            epdo=round(c['epdo'], 1),
             trend_pct=trend_pct,
             latitude=round(c['lat'], 6),
             longitude=round(c['lng'], 6),

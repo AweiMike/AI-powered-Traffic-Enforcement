@@ -2,13 +2,14 @@
  * TrendCard - 泛用「週趨勢與專業判讀」卡（各執法主題共用）
  *
  * 資料來源：任一 `/enforcement/<topic>/trend` 端點，統一回傳：
- *   { weeks: [{label, total, primary, secondary, prev_total?}], trend: {...} }
- *   - primary    = 主動取締 / 取締（綠）
+ *   { weeks: [{label, total, primary, secondary, prev_total?, tertiary?}], trend: {...} }
+ *   - primary    = 主動取締 / 取締（綠）；事故趨勢卡則為傷亡事故 A1+A2
  *   - secondary  = 肇事舉發（紅）；單序列主題（如超速）此值為 0
  *   - prev_total = 去年同期（52 週前，星期對齊）總量；後端有查才會出現
+ *   - tertiary   = 選填第三參考序列（如 A3 財損事故），僅供對照，不列入主訊號
  *
  * 後端 trend_engine 提供 4 週移動平均 / 環比(MoM) / Z-score 異常偵測 / 專業判讀文字。
- * 視覺：Recharts ComposedChart（堆疊長條 + 移動平均線 + 去年同期虛線）+ 互動 tooltip。
+ * 視覺：Recharts ComposedChart（堆疊長條 + 移動平均線 + 去年同期虛線 + 選填第三參考線）+ 互動 tooltip。
  */
 import React, { useEffect, useState } from 'react';
 import {
@@ -28,7 +29,7 @@ const DEFAULT = {
 };
 
 interface TrendData {
-  weeks: { week_start: string; label: string; total: number; primary: number; secondary: number; prev_total?: number }[];
+  weeks: { week_start: string; label: string; total: number; primary: number; secondary: number; prev_total?: number; tertiary?: number }[];
   trend: {
     points: { label: string; value: number; ma: number }[];
     window: number;
@@ -50,6 +51,8 @@ interface TrendCardProps {
   primaryName: string;
   /** 次序列名稱（紅）；省略 = 單序列總量模式（如超速） */
   secondaryName?: string;
+  /** 第三參考序列名稱（淡灰實線）；省略或後端未回 tertiary 欄位時不顯示，行為與現在完全相同 */
+  tertiaryName?: string;
   metricName?: string;
   primaryColor?: string;
   secondaryColor?: string;
@@ -69,7 +72,7 @@ function MomBadge({ pct }: { pct: number | null }) {
 }
 
 const TrendCard: React.FC<TrendCardProps> = ({
-  range, title, fetcher, primaryName, secondaryName,
+  range, title, fetcher, primaryName, secondaryName, tertiaryName,
   metricName = '件', primaryColor, secondaryColor, emptyText = '此區間尚無資料',
 }) => {
   const [data, setData] = useState<TrendData | null>(null);
@@ -100,6 +103,8 @@ const TrendCard: React.FC<TrendCardProps> = ({
   }));
   const hasData = chartData.some((d) => d.total > 0);
   const hasPrevYear = (data?.weeks || []).some((w) => w.prev_total !== undefined);
+  // 第三參考序列：需同時提供 tertiaryName 且後端資料含 tertiary 欄位才顯示（向後相容）
+  const hasTertiary = !!tertiaryName && (data?.weeks || []).some((w) => w.tertiary !== undefined);
   const t = data?.trend;
 
   const Tip = ({ active, payload, label }: any) => {
@@ -137,6 +142,12 @@ const TrendCard: React.FC<TrendCardProps> = ({
           <div className="flex items-center justify-between gap-6">
             <span style={{ color: DEFAULT.prevYear }} className="font-medium">┄ 去年同期</span>
             <span className="tabular-nums">{row.prev_total} {metricName}</span>
+          </div>
+        )}
+        {hasTertiary && row.tertiary !== undefined && (
+          <div className="flex items-center justify-between gap-6">
+            <span className="text-gray-400 font-medium">─ {tertiaryName}</span>
+            <span className="tabular-nums">{row.tertiary} {metricName}</span>
           </div>
         )}
       </div>
@@ -215,6 +226,13 @@ const TrendCard: React.FC<TrendCardProps> = ({
                   <Line
                     type="monotone" dataKey="prev_total" name="去年同期"
                     stroke={DEFAULT.prevYear} strokeWidth={1.5} strokeDasharray="4 3"
+                    dot={false} activeDot={{ r: 3 }}
+                  />
+                )}
+                {hasTertiary && (
+                  <Line
+                    type="monotone" dataKey="tertiary" name={tertiaryName}
+                    stroke="#9CA3AF" strokeWidth={1.5}
                     dot={false} activeDot={{ r: 3 }}
                   />
                 )}

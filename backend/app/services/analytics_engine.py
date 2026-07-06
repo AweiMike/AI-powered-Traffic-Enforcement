@@ -7,6 +7,7 @@ from app.schemas.report import (
     ReportSummary, ReportPeriod, StatComparison,
     MonthlyTrend, HotspotItem, UnitStat, ShiftStat
 )
+from app.utils.epdo import epdo_sql_sum
 
 # 大型車車種關鍵字（與 enforcement.py 保持一致）
 HEAVY_VEHICLE_KEYWORDS = ["大貨車", "大客車", "曳引車", "拖車", "遊覽"]
@@ -135,6 +136,9 @@ class AnalyticsEngine:
         pedestrian_elderly_crashes = self._count_pedestrian_crashes(start_date, end_date, Crash.is_elderly == True)
         pedestrian_deaths, pedestrian_injuries = self._sum_pedestrian_casualties(start_date, end_date)
 
+        # 8.1.1 2-30日內死亡人數加總（僅註記用，不動 severity 分類與24hr口徑死亡統計）
+        late_deaths = self._sum_late_deaths(start_date, end_date)
+
         # 8.2 重度超速（40+ km/h）件數
         speeding_heavy_count = self._count_heavy_speeding(start_date, end_date)
 
@@ -183,6 +187,7 @@ class AnalyticsEngine:
             pedestrian_elderly_crashes=pedestrian_elderly_crashes,
             pedestrian_deaths=pedestrian_deaths,
             pedestrian_injuries=pedestrian_injuries,
+            late_deaths=late_deaths,
             speeding_heavy_count=speeding_heavy_count,
             trends=trends,
             accident_hotspots=accident_hotspots,
@@ -338,6 +343,13 @@ class AnalyticsEngine:
         deaths = sum(r.death_count or 0 for r in rows)
         injuries = sum(r.injury_count or 0 for r in rows)
         return deaths, injuries
+
+    def _sum_late_deaths(self, start: date, end: date) -> int:
+        """2-30日內死亡人數加總（僅註記用；不影響 severity 分類，死亡統計仍採24hr口徑不含此數）"""
+        return self.db.query(func.coalesce(func.sum(Crash.late_death_count), 0)).filter(
+            Crash.occurred_date >= start,
+            Crash.occurred_date <= end,
+        ).scalar() or 0
 
     def _get_severity_breakdown_range(self, start: date, end: date) -> dict:
         """A1/A2/A3 事故數（range 版）"""
@@ -841,15 +853,16 @@ class AnalyticsEngine:
 
     def _get_top_route_segments(self, start: date, end: date) -> list:
         """
-        風險路線 Top 3（Phase 1 新增 route_name / route_km / severity_weight 維度）。
-        依 EPDO（當量死亡數）降冪排序，與 recommendations.py /corridor-analysis
-        路線排名（模式 A）採同一評比邏輯，方便跨功能對照。
+        風險路線 Top 3（Phase 1 新增 route_name / route_km 維度）。
+        依 EPDO（台灣道安標準公式，人數口徑，見 app/utils/epdo.py）降冪排序，
+        與 recommendations.py /corridor-analysis 路線排名（模式 A）採同一評比邏輯，
+        方便跨功能對照。
         """
         rows = (
             self.db.query(
                 Crash.route_name,
                 func.count(Crash.id).label("total"),
-                func.coalesce(func.sum(Crash.severity_weight), 0).label("epdo"),
+                epdo_sql_sum().label("epdo"),
             )
             .filter(
                 Crash.occurred_date >= start,
@@ -863,7 +876,7 @@ class AnalyticsEngine:
             .all()
         )
         return [
-            {"route": r.route_name, "total": r.total, "epdo": int(r.epdo or 0)}
+            {"route": r.route_name, "total": r.total, "epdo": round(r.epdo or 0, 1)}
             for r in rows
         ]
 

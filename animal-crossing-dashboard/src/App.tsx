@@ -471,14 +471,15 @@ const DashboardView: React.FC = () => {
         />
       </div>
 
-      {/* 週事故趨勢與專業判讀（趨勢引擎 + Recharts）*/}
-      <React.Suspense fallback={<TrendCardSkeleton title="週事故趨勢與專業判讀" />}>
+      {/* 傷亡事故週趨勢與專業判讀（趨勢引擎 + Recharts）：A1+A2 傷亡事故為主訊號，A3 財損僅供參考 */}
+      <React.Suspense fallback={<TrendCardSkeleton title="傷亡事故週趨勢與專業判讀（A1+A2）" />}>
         <TrendCard
           range={dateRange}
-          title="週事故趨勢與專業判讀"
+          title="傷亡事故週趨勢與專業判讀（A1+A2）"
           fetcher={(s, e) => apiClient.getAccidentTrend(s, e)}
-          primaryName="A2/A3 事故"
-          secondaryName="A1 死亡事故"
+          primaryName="A2 受傷"
+          secondaryName="A1 死亡"
+          tertiaryName="A3 財損（參考）"
           primaryColor="#D97706"
           secondaryColor="#DC2626"
         />

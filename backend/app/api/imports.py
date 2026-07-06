@@ -509,6 +509,12 @@ def backfill_official_severity(existing, row, stats) -> None:
         ni = get_eis_int(row, "3-2.受傷人數", "受傷")
         if ni != (existing.injury_count or 0):
             existing.injury_count = ni
+    # 2-30日內死亡人數回補：僅註記用，不動 severity 分類與24hr口徑死亡統計；
+    # 欄位存在才覆寫（舊部分欄位檔無此欄，避免誤把既有值蓋成 0）
+    if "3-2.2-30日內死亡人數" in row.index:
+        nld = get_eis_int(row, "3-2.2-30日內死亡人數")
+        if nld != (existing.late_death_count or 0):
+            existing.late_death_count = nld
 
 
 def backfill_road_fields(existing, row, rollup) -> None:
@@ -522,6 +528,12 @@ def backfill_road_fields(existing, row, rollup) -> None:
     for k, v in rf.items():
         if v is not None and getattr(existing, k, None) is None:
             setattr(existing, k, v)
+    # 天候：主解析路徑欄位，但回補場景相同（舊檔無「4.天候」→ NULL，
+    # 全選檔後到需補值）。2026-07-06 品質面板抓到此遺漏（天候率 1.2%）後補上。
+    if existing.weather is None:
+        w = _safe_eis_str(row, "天候") or _safe_eis_str(row, "4.天候")
+        if w:
+            existing.weather = w
     if rollup:
         if existing.license_status is None and rollup.get("driver_license_status"):
             existing.license_status = rollup["driver_license_status"]
@@ -979,6 +991,8 @@ async def import_crash_file(
                     # --- 死傷人數 ---
                     death_count = get_eis_int(row, "3-1.24小時內死亡人數", "死亡")
                     injury_count = get_eis_int(row, "3-2.受傷人數", "受傷")
+                    # 2-30日內死亡人數（僅註記用，不影響 severity 分類與24hr口徑死亡統計；無 fallback 欄名，舊部分欄位檔無此欄）
+                    late_death_count = get_eis_int(row, "3-2.2-30日內死亡人數")
 
                     # --- 分局 / 所轄單位 / 派出所 ---
                     # 轄區派出所統一由 extract_sub_unit 處理：
@@ -1074,6 +1088,7 @@ async def import_crash_file(
                     # --- LEGACY 獨有欄位預設值 ---
                     death_count = 0
                     injury_count = 0
+                    late_death_count = 0  # LEGACY 無此欄，2-30日死亡註記僅 EIS 全選條件檔才有
                     precinct = None
                     sub_unit = None
                     cause = str(row.get("肇事主要原因") or row.get("肇事原因") or "").strip() or None
@@ -1210,6 +1225,7 @@ async def import_crash_file(
                     sub_unit=sub_unit,
                     death_count=death_count,
                     injury_count=injury_count,
+                    late_death_count=late_death_count,
                     # 慢車/微電車欄位
                     evehicle_type=evehicle_type,
                     is_youth=is_youth,
@@ -1553,6 +1569,8 @@ def _do_batch_import(txt_files: list, db):
                         severity = derive_eis_severity(row)
                         death_count = get_eis_int(row, "3-1.24小時內死亡人數", "死亡")
                         injury_count = get_eis_int(row, "3-2.受傷人數", "受傷")
+                        # 2-30日內死亡人數（僅註記用，不影響 severity 分類與24hr口徑死亡統計；無 fallback 欄名）
+                        late_death_count = get_eis_int(row, "3-2.2-30日內死亡人數")
                         precinct = clean_precinct_name(row.get("處理單位名稱分局層"))
                         # 轄區派出所統一由 extract_sub_unit 處理（含全選條件「管轄單位名稱」欄名）
                         sub_unit = extract_sub_unit(row)
@@ -1687,6 +1705,7 @@ def _do_batch_import(txt_files: list, db):
                         sub_unit=sub_unit,
                         death_count=death_count,
                         injury_count=injury_count,
+                        late_death_count=late_death_count,
                         evehicle_type=evehicle_type,
                         is_youth=is_youth,
                         is_underage_14=is_underage_14_riding,
@@ -2205,6 +2224,8 @@ async def import_crash_upload_batch(
                         severity = derive_eis_severity(row)
                         death_count = get_eis_int(row, "3-1.24小時內死亡人數", "死亡")
                         injury_count = get_eis_int(row, "3-2.受傷人數", "受傷")
+                        # 2-30日內死亡人數（僅註記用，不影響 severity 分類與24hr口徑死亡統計；無 fallback 欄名）
+                        late_death_count = get_eis_int(row, "3-2.2-30日內死亡人數")
                         precinct = clean_precinct_name(row.get("處理單位名稱分局層"))
                         # 轄區派出所統一由 extract_sub_unit 處理（含全選條件「管轄單位名稱」欄名）
                         sub_unit = extract_sub_unit(row)
@@ -2280,6 +2301,7 @@ async def import_crash_upload_batch(
 
                         death_count = 0
                         injury_count = 0
+                        late_death_count = 0  # LEGACY 無此欄，2-30日死亡註記僅 EIS 全選條件檔才有
                         precinct = None
                         sub_unit = None
                         cause = str(row.get("肇事主要原因") or row.get("肇事原因") or "").strip() or None
@@ -2392,6 +2414,7 @@ async def import_crash_upload_batch(
                         sub_unit=sub_unit,
                         death_count=death_count,
                         injury_count=injury_count,
+                        late_death_count=late_death_count,
                         evehicle_type=evehicle_type,
                         is_youth=is_youth,
                         is_underage_14=is_underage_14_riding,

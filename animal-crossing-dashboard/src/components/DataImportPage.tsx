@@ -10,6 +10,14 @@ import { apiClient } from '../api/client';
 // API 基礎 URL
 const API_BASE = '/api/v1';
 
+/** 寫入型 fetch 的登入憑證 header。
+ *  檔案上傳走 FormData 原生 fetch（不能經 apiClient，Content-Type 需由瀏覽器帶 boundary），
+ *  故須手動附上 X-Auth-Token，否則會被後端寫入保護 middleware 擋 401。 */
+const authHeaders = (): Record<string, string> => {
+  const token = sessionStorage.getItem('dashboard_auth');
+  return token && token !== 'true' ? { 'X-Auth-Token': token } : {};
+};
+
 // ============================================
 // 型別定義
 // ============================================
@@ -161,6 +169,7 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
         formData.append('file', files[0]);
         const response = await fetch(cfg.endpoint, {
           method: 'POST',
+          headers: authHeaders(),
           body: formData,
         });
         if (!response.ok) {
@@ -176,6 +185,7 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
         }
         const response = await fetch(cfg.batchEndpoint, {
           method: 'POST',
+          headers: authHeaders(),
           body: formData,
         });
         if (!response.ok) {
@@ -567,7 +577,7 @@ const BatchImportCard: React.FC<BatchImportProps> = ({
     setResult(null);
 
     try {
-      const response = await fetch(endpoint, { method: 'POST' });
+      const response = await fetch(endpoint, { method: 'POST', headers: authHeaders() });
 
       if (!response.ok) {
         const errorData = await response.json();

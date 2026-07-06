@@ -105,6 +105,10 @@ class Crash(Base):
     sub_unit = Column(String(100), index=True, comment="所轄單位名稱（如：新化派出所）")
     death_count = Column(Integer, default=0, comment="24小時內死亡人數")
     injury_count = Column(Integer, default=0, comment="受傷人數")
+    late_death_count = Column(
+        Integer, default=0,
+        comment="2-30日內死亡人數（案件分類仍為 A2，僅註記用；死亡統計採24hr口徑不含此數)",
+    )
 
     # === 道路工程分析欄位（Phase 1 擴充，來源=全選條件 EIS 匯出）===
     speed_limit = Column(Integer, index=True, comment="速限 km/h（7.速限-第1當事者）")

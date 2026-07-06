@@ -15,6 +15,7 @@ interface HotspotItem {
     a2_count?: number;
     a3_count?: number;
     total: number;
+    epdo?: number; // EPDO（台灣道安標準公式，人數口徑）：30日死亡人數x9.5 + 調整受傷人數x3.5 + 1
     count?: number;
     trend_pct?: number | null;
     latitude?: number | null;
@@ -149,6 +150,11 @@ const HotspotRankingCard: React.FC<HotspotRankingCardProps> = ({
                     </span>
                 )}
             </div>
+            {type === 'accident' && (
+                <div className="text-[10px] text-slate-400 -mt-1 mb-2">
+                    依 EPDO 排序（30日死亡×9.5＋受傷×3.5＋件數）
+                </div>
+            )}
 
             {hotspots.length === 0 ? (
                 <div className="text-center py-8 text-nook-text/60">
@@ -192,11 +198,23 @@ const HotspotRankingCard: React.FC<HotspotRankingCardProps> = ({
                                 </div>
                             )}
 
-                            {/* 主數字 + 佔比 */}
+                            {/* 主數字 + 佔比：事故型主數字改為 EPDO，件數降為副資訊 */}
                             <div className="text-right shrink-0 min-w-[60px]">
-                                <div className="font-bold text-slate-800 tabular-nums leading-tight">
-                                    {type === 'accident' ? item.total : (item.count || item.total)}
-                                </div>
+                                {type === 'accident' ? (
+                                    <>
+                                        <div className="font-bold text-slate-800 tabular-nums leading-tight">
+                                            EPDO {item.epdo ?? 0}
+                                        </div>
+                                        <div className="text-[10px] text-slate-400 tabular-nums">
+                                            {item.total} 件
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="font-bold text-slate-800 tabular-nums leading-tight">
+                                        {item.count || item.total}
+                                    </div>
+                                )}
+                                {/* 佔比維持以件數計算（語意不變：件數佔期間總件數比例） */}
                                 {type === 'accident' && showPercentage && totalInPeriod > 0 && (
                                     <div className="text-[10px] text-accent tabular-nums">
                                         {((item.total / totalInPeriod) * 100).toFixed(1)}%
@@ -221,7 +239,7 @@ const HotspotRankingCard: React.FC<HotspotRankingCardProps> = ({
             {/* 說明 */}
             <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-400 text-center">
                 {type === 'accident' ? (
-                    <span>依事故總數排名 · 趨勢為去年同期比較</span>
+                    <span>依 EPDO 排名 · 趨勢為去年同期比較</span>
                 ) : (
                     <span>依違規件數排名</span>
                 )}

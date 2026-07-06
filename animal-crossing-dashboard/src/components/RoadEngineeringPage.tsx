@@ -733,7 +733,19 @@ const RoadEngineeringPage: React.FC = () => {
                     <SummaryMini label="3年總件數" value={dossier.summary.total} />
                     <SummaryMini label="EPDO" value={dossier.summary.epdo} />
                     <SummaryMini label="A1" value={dossier.summary.a1} valueClassName="text-danger" />
-                    <SummaryMini label="死亡" value={dossier.summary.deaths} />
+                    <SummaryMini
+                      label="死亡"
+                      value={
+                        <>
+                          {dossier.summary.deaths}
+                          {dossier.summary.late_deaths > 0 && (
+                            <div className="text-[10px] text-danger font-normal mt-0.5">
+                              另 30日死亡 {dossier.summary.late_deaths}（列A2）
+                            </div>
+                          )}
+                        </>
+                      }
+                    />
                     <SummaryMini label="受傷" value={dossier.summary.injuries} />
                     <SummaryMini label="夜間占比" value={`${dossier.patterns.night_pct}%`} />
                   </div>
@@ -870,6 +882,10 @@ const RoadEngineeringPage: React.FC = () => {
                               <td className="px-3 py-2 text-right tabular-nums">
                                 {c.deaths > 0 && <span className="text-danger font-bold">{c.deaths}亡 </span>}
                                 {c.injuries > 0 ? `${c.injuries}傷` : (c.deaths === 0 ? '—' : '')}
+                                {/* 2-30日內死亡註記：案件分類仍為 A2，僅提示實質有人員亡故，不影響上方死/傷口徑數字 */}
+                                {c.late_deaths > 0 && (
+                                  <span className="tabular-nums text-danger text-[10px] block">⚰30日亡{c.late_deaths}</span>
+                                )}
                               </td>
                               <td className="px-3 py-2 max-w-[200px] truncate" title={c.location}>{c.location}</td>
                             </tr>

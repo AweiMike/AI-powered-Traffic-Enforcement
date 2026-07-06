@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 
 from app.database import get_db
 from app.models.core import Ticket, Crash
+from app.utils.epdo import epdo_sql_sum
 
 router = APIRouter()
 
@@ -95,22 +96,25 @@ async def get_overview(
         or 0
     )
 
-    # EPDO 指標（Phase 3 C2）：本期與去年同期的嚴重度權重總和
-    epdo = (
-        db.query(func.sum(Crash.severity_weight))
+    # EPDO 指標（台灣道安標準公式，人數口徑）：本期與去年同期的 EPDO 總和
+    # 單案 EPDO = 30日死亡人數×9.5 + 調整受傷人數×3.5 + 1（見 app/utils/epdo.py）
+    epdo = round(
+        db.query(epdo_sql_sum())
         .filter(
             and_(Crash.occurred_date >= start_date, Crash.occurred_date <= end_date)
         )
         .scalar()
-        or 0
+        or 0,
+        1,
     )
-    epdo_last_year = (
-        db.query(func.sum(Crash.severity_weight))
+    epdo_last_year = round(
+        db.query(epdo_sql_sum())
         .filter(
             and_(Crash.occurred_date >= last_year_start, Crash.occurred_date <= last_year_end)
         )
         .scalar()
-        or 0
+        or 0,
+        1,
     )
 
     # 主題分布

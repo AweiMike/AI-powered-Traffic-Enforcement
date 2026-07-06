@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, desc, case, or_
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 from app.database import get_db
 from app.models.core import Ticket, Crash
@@ -13,6 +13,7 @@ from app.models.dimension import Site
 from app.utils.dui_crash import dui_crash_filter, crash_dui_real_filter
 from app.utils.drug_drive import drug_drive_filter, drug_crash_filter, not_drug_filter
 from app.utils.trend_engine import weekly_trend
+from app.utils.epdo import crash_epdo, epdo_sum, epdo_sql_sum
 
 router = APIRouter()
 
@@ -51,7 +52,8 @@ def crash_topic_filter(topic: str):
 
 
 # ============================================
-# 週事故趨勢（總覽用）：A2/A3(primary) + A1 死亡(secondary)，higher_is_worse
+# 週事故趨勢（總覽用）：傷亡事故 A1+A2(total=primary 主訊號) + A1 死亡(secondary)，
+# 另附 A3 財損事故第三參考序列（tertiary），higher_is_worse
 # ============================================
 @router.get("/accidents/trend")
 async def get_accident_weekly_trend(
@@ -60,10 +62,17 @@ async def get_accident_weekly_trend(
     topic: str = Query(None, description="主題篩選：elderly/pedestrian/evehicle/dui/heavy，未提供時行為與原本相同"),
     db: Session = Depends(get_db),
 ):
-    """週事故趨勢：A2/A3 事故(primary) + A1 死亡事故(secondary)。
+    """週事故趨勢：傷亡事故 A1+A2（total=primary 主訊號）+ A1 死亡（secondary），
+    A3 財損事故僅作為第三參考序列（tertiary），不併入 total/primary 主訊號。
+
+    口徑依道安檢討慣例與國際 KABCO（Injury vs PDO）：傷亡事故（A1+A2）才是
+    執法與異常偵測應優先關注的重點；A3 純財損事故雖量體大，但風險意義較低，
+    併入 primary 會稀釋傷亡訊號、降低異常偵測靈敏度，故只看不列重點。
 
     事故越多越糟（higher_is_worse=True → 判讀用「惡化/改善」、配色橙/紅）。
     共用 trend_engine.weekly_trend：移動平均 / 環比 / Z-score 異常偵測 + 專業判讀。
+    ⚠️ 不修改 trend_engine.weekly_trend 本身（其他主題端點共用），僅在此端點
+    餵入「傷亡口徑」的 daily/daily_prev，並於取得回傳結果後另外 merge A3 參考序列。
 
     topic 未提供時行為與原本完全相同（向後相容）；提供時本期與去年同期
     查詢皆加上 crash_topic_filter 條件，可用於各專區的週趨勢卡。
@@ -80,12 +89,11 @@ async def get_accident_weekly_trend(
         if topic_condition is None:
             return {"error": "未知主題"}
 
-    is_a1 = case((Crash.severity == "A1", 1), else_=0)
-
-    def query_daily(s, e):
+    def query_daily_by_severity(s, e):
+        """依日期 × severity 分組取件數（本期/去年同期共用），回傳 ORM row 清單。"""
         query = db.query(
             Crash.occurred_date.label("d"),
-            is_a1.label("is_a1"),
+            Crash.severity.label("sev"),
             func.count(Crash.id).label("c"),
         ).filter(
             Crash.occurred_date >= s,
@@ -93,14 +101,43 @@ async def get_accident_weekly_trend(
         )
         if topic_condition is not None:
             query = query.filter(topic_condition)
-        rows = query.group_by(
-            Crash.occurred_date, is_a1,
-        ).all()
-        return [(r.d, r.c, r.c if r.is_a1 else 0) for r in rows]
+        return query.group_by(Crash.occurred_date, Crash.severity).all()
 
-    daily = query_daily(sd, ed)
-    daily_prev = query_daily(sd - timedelta(weeks=52), ed - timedelta(weeks=52))
+    def to_injury_daily(rows):
+        """把 (date, severity, count) 轉成傷亡口徑：(date, total=A1+A2 件數, secondary=A1 件數)。"""
+        by_date: dict = {}
+        for r in rows:
+            b = by_date.setdefault(r.d, {"a1": 0, "a2": 0})
+            if r.sev == "A1":
+                b["a1"] += r.c
+            elif r.sev == "A2":
+                b["a2"] += r.c
+        return [(d, b["a1"] + b["a2"], b["a1"]) for d, b in by_date.items()]
+
+    def to_a3_by_week(rows):
+        """把 (date, severity, count) 轉成 {週一日期: A3 件數}；週一規則與 trend_engine._week_start 一致。"""
+        by_week: dict = {}
+        for r in rows:
+            if r.sev != "A3":
+                continue
+            ws = r.d - timedelta(days=r.d.weekday())
+            by_week[ws] = by_week.get(ws, 0) + r.c
+        return by_week
+
+    rows_cur = query_daily_by_severity(sd, ed)
+    rows_prev = query_daily_by_severity(sd - timedelta(weeks=52), ed - timedelta(weeks=52))
+
+    daily = to_injury_daily(rows_cur)
+    daily_prev = to_injury_daily(rows_prev)
+    a3_by_week = to_a3_by_week(rows_cur)  # A3 參考線只看本期，不疊去年同期
+
     result = weekly_trend(daily, sd, ed, daily_prev=daily_prev, window=4, metric_name="件", higher_is_worse=True)
+
+    # 加欄不破壞：weekly_trend 回傳後，依每週 week_start（週一）merge 進 A3 參考件數
+    for w in result["weeks"]:
+        ws = date.fromisoformat(w["week_start"])
+        w["tertiary"] = a3_by_week.get(ws, 0)
+
     return {"period": {"start_date": start_date, "end_date": end_date}, **result}
 
 
@@ -1723,8 +1760,8 @@ async def get_corridor_analysis(
 ):
     """廊帶（公路路線）線性分析。
 
-    模式 A（route 未指定）：依路線彙整事故件數與 EPDO（當量死亡數），依 EPDO 降冪排序，
-    用於找出應優先介入的路線。
+    模式 A（route 未指定）：依路線彙整事故件數與 EPDO（台灣道安標準公式，人數口徑，
+    見 app/utils/epdo.py），依 EPDO 降冪排序，用於找出應優先介入的路線。
     模式 B（route 指定）：將該路線切成 500 公尺一段，逐段統計事故樣態，
     用於鎖定路線內的具體「熱段」供工程改善。
     """
@@ -1746,7 +1783,7 @@ async def get_corridor_analysis(
             func.sum(case((Crash.severity == "A3", 1), else_=0)).label("a3"),
             func.coalesce(func.sum(Crash.death_count), 0).label("deaths"),
             func.coalesce(func.sum(Crash.injury_count), 0).label("injuries"),
-            func.coalesce(func.sum(Crash.severity_weight), 0).label("epdo"),
+            epdo_sql_sum().label("epdo"),
         ).filter(
             Crash.route_name.isnot(None),
             Crash.occurred_date >= sd,
@@ -1761,7 +1798,7 @@ async def get_corridor_analysis(
             "a3": int(r.a3 or 0),
             "deaths": int(r.deaths or 0),
             "injuries": int(r.injuries or 0),
-            "epdo": int(r.epdo or 0),
+            "epdo": round(r.epdo or 0, 1),
         } for r in rows]
 
         return {"period": period, "mode": "routes", "routes": routes}
@@ -1804,7 +1841,7 @@ async def get_corridor_analysis(
             "a3": sum(1 for c in items if c.severity == "A3"),
             "deaths": sum(c.death_count or 0 for c in items),
             "injuries": sum(c.injury_count or 0 for c in items),
-            "epdo": sum(c.severity_weight or 0 for c in items),
+            "epdo": epdo_sum(items),
             "top_crash_type": mode_value([c.crash_type for c in items]),
             "top_cause": mode_value([c.cause for c in items]),
             "night_count": sum(1 for c in items if c.shift_id in NIGHT_SHIFTS),
@@ -1884,7 +1921,10 @@ async def get_site_dossier(
     a3 = sum(1 for c in crashes if c.severity == "A3")
     deaths = sum(c.death_count or 0 for c in crashes)
     injuries = sum(c.injury_count or 0 for c in crashes)
-    epdo = sum(c.severity_weight or 0 for c in crashes)
+    # 2-30日內死亡人數加總（僅註記用；案件分類仍為 A2，不併入 deaths/死亡統計口徑）
+    late_deaths = sum(c.late_death_count or 0 for c in crashes)
+    # EPDO（台灣道安標準公式，人數口徑）：見 app/utils/epdo.py
+    epdo = epdo_sum(crashes)
 
     by_year_counter = Counter(c.occurred_date.year for c in crashes)
     by_year = [{"year": y, "count": by_year_counter[y]} for y in sorted(by_year_counter.keys())]
@@ -1932,6 +1972,7 @@ async def get_site_dossier(
         "cause": c.cause,
         "deaths": c.death_count or 0,
         "injuries": c.injury_count or 0,
+        "late_deaths": c.late_death_count or 0,  # 2-30日內死亡人數（僅註記用，不影響 severity 分類）
         "location": c.location_desc,
     } for c in sorted_cases]
 
@@ -2010,6 +2051,7 @@ async def get_site_dossier(
             "a3": a3,
             "deaths": deaths,
             "injuries": injuries,
+            "late_deaths": late_deaths,  # 2-30日內死亡人數加總（僅註記；案件仍列A2，死亡統計採24hr口徑不含此數）
             "epdo": epdo,
             "by_year": by_year,
         },
@@ -2102,7 +2144,8 @@ async def get_patrol_plan(
             shift_stats.append({
                 "shift_id": shift_id,
                 "count": len(items),
-                "epdo": sum(c.severity_weight or 0 for c in items),
+                # EPDO（台灣道安標準公式，人數口徑）：見 app/utils/epdo.py
+                "epdo": epdo_sum(items),
                 "dui_count": sum(1 for c in items if c.is_dui_crash_party),
                 "items": items,
             })
@@ -2126,8 +2169,11 @@ async def get_patrol_plan(
                 Ticket.violation_date <= ed,
             ).scalar() or 0
 
-            # gap 標記：事故能量高（epdo>=10）但取締密度偏低（張數 < 件數*3）
-            is_gap = s["epdo"] >= 10 and existing_tickets < s["count"] * 3
+            # gap 標記：事故能量高但取締密度偏低（張數 < 件數*3）
+            # 門檻改為 epdo>=15（新公式量級與舊 severity_weight 不同：
+            # 一件單傷事故 EPDO=1*3.5+1=4.5，一件死亡事故=1*9.5+1=10.5；
+            # 15 約略等於 3 件輕重傷亡事故的能量，對應舊門檻 10 的抓漏水準）
+            is_gap = s["epdo"] >= 15 and existing_tickets < s["count"] * 3
 
             label = shift_label(s["shift_id"])
             if hotspots:
@@ -2219,11 +2265,14 @@ async def get_risk_forecast(
     weekday_label = weekday_labels[target_weekday]
 
     # 歷史窗：DB 全部事故，一次撈 7 所必要欄位，Python 端分組
+    # death_count/late_death_count/injury_count：供 crash_epdo() 計算單案 EPDO 用
     crashes = db.query(
         Crash.occurred_date,
         Crash.shift_id,
         Crash.sub_unit,
-        Crash.severity_weight,
+        Crash.death_count,
+        Crash.late_death_count,
+        Crash.injury_count,
         Crash.cause,
         Crash.is_dui_crash_party,
     ).filter(
@@ -2247,8 +2296,9 @@ async def get_risk_forecast(
     for (unit, shift_id), items in group_all.items():
         same_dow = [c for c in items if c.occurred_date.weekday() == target_weekday]
 
-        same_dow_epdo = sum(c.severity_weight or 0 for c in same_dow)
-        all_epdo = sum(c.severity_weight or 0 for c in items)
+        # EPDO（台灣道安標準公式，人數口徑）：見 app/utils/epdo.py
+        same_dow_epdo = epdo_sum(same_dow)
+        all_epdo = epdo_sum(items)
 
         same_dow_rate = same_dow_epdo / n_weeks
         all_dow_rate = all_epdo / (n_weeks * 7)

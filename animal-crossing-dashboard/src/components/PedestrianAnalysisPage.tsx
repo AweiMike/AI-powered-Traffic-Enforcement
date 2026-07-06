@@ -121,14 +121,15 @@ const PedestrianAnalysisPage: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* 行人事故週趨勢與專業判讀 */}
-                    <React.Suspense fallback={<TrendCardSkeleton title="行人事故週趨勢" />}>
+                    {/* 行人傷亡事故週趨勢與專業判讀：A1+A2 傷亡事故為主訊號，A3 財損僅供參考 */}
+                    <React.Suspense fallback={<TrendCardSkeleton title="行人傷亡事故週趨勢" />}>
                         <TrendCard
                             range={range}
-                            title="行人事故週趨勢"
+                            title="行人傷亡事故週趨勢"
                             fetcher={(s, e) => apiClient.getTopicAccidentTrend(s, e, 'pedestrian')}
-                            primaryName="A2/A3 事故"
+                            primaryName="A2 受傷"
                             secondaryName="A1 死亡"
+                            tertiaryName="A3 財損（參考）"
                             primaryColor="#D97706"
                             secondaryColor="#DC2626"
                         />

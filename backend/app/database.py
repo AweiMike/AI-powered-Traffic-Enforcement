@@ -70,6 +70,7 @@ def _migrate_eis_columns():
         "sub_unit": "VARCHAR(100)",
         "death_count": "INTEGER DEFAULT 0",
         "injury_count": "INTEGER DEFAULT 0",
+        "late_death_count": "INTEGER DEFAULT 0",
         "evehicle_type": "VARCHAR(50)",
         "is_youth": "BOOLEAN DEFAULT 0",
         "is_underage_14": "BOOLEAN DEFAULT 0",

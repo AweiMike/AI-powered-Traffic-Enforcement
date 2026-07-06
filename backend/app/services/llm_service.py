@@ -437,6 +437,10 @@ class LLMService:
         lines.append(fmt_stat("tickets", "總違規"))
         lines.append(fmt_stat("accidents", "總事故"))
         lines.append(f"- A1 死亡事故：{severity.get('A1', 0)} 件｜A2 受傷：{severity.get('A2', 0)} 件｜A3 財損：{severity.get('A3', 0)} 件")
+        late_deaths = d.get("late_deaths", 0)
+        if late_deaths > 0:
+            # 2-30日死亡：僅註記，案件分類仍為 A2，死亡統計仍採24hr口徑不含此數
+            lines.append(f"- 2-30日死亡：{late_deaths} 人（案件分類 A2；死亡統計採24hr口徑不含此數，惟道安檢討須註記）")
         if focus_causes:
             lines.append(f"- ⚠ 本期重點：{'、'.join(focus_causes[:3])}")
         if focus_districts:

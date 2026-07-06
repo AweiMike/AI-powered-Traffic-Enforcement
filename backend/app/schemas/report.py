@@ -93,6 +93,10 @@ class ReportSummary(BaseModel):
     pedestrian_deaths: int = 0           # 本期行人死亡人數
     pedestrian_injuries: int = 0         # 本期行人受傷人數
 
+    # === 2-30日內死亡註記（僅提示用）===
+    # 案件分類仍為 A2、死亡統計仍採 24hr 口徑不含此數；此欄僅供報告註記「A2 但實質有人死亡」
+    late_deaths: int = 0                 # 期間內 late_death_count 加總
+
     # === 趨勢數據 ===
     trends: List[MonthlyTrend]
 
