@@ -2494,3 +2494,53 @@ async def get_school_zone_hotspots(
         "other_total": len(other_items),
         "youth_total": youth_total,
     }
+
+
+# ============================================
+# 酒駕肇事案件清單匯出（供督導對單自查：Ticket subtype 補標用）
+# ============================================
+@router.get("/dui-crash-cases")
+async def get_dui_crash_cases(
+    start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """酒駕肇事案件清單（事故表 ground truth）。
+
+    篩選期間內 Crash.is_dui_crash_party == True 的案件，依發生日期降冪排列，
+    供各派出所核對舉發單 subtype 是否已標記「攔舉-肇事」，補正黑數用。
+    去識別化架構下無法自動 join 舉發單，故僅提供清單供人工對單。
+    """
+    try:
+        sd = datetime.strptime(start_date, "%Y-%m-%d").date()
+        ed = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return {"error": "日期格式錯誤"}
+
+    crashes = db.query(Crash).filter(
+        Crash.is_dui_crash_party == True,
+        Crash.occurred_date >= sd,
+        Crash.occurred_date <= ed,
+    ).order_by(Crash.occurred_date.desc()).all()
+
+    items = [
+        {
+            "date": c.occurred_date.isoformat(),
+            "time": c.occurred_time.strftime("%H:%M") if c.occurred_time else "",
+            "district": c.district,
+            "sub_unit": c.sub_unit,
+            "location": c.location_desc,
+            "severity": c.severity,
+            "deaths": c.death_count or 0,
+            "injuries": c.injury_count or 0,
+            "late_deaths": c.late_death_count or 0,
+            "drinking_code": c.drinking_code,
+        }
+        for c in crashes
+    ]
+
+    return {
+        "period": {"start_date": start_date, "end_date": end_date},
+        "total": len(items),
+        "items": items,
+    }

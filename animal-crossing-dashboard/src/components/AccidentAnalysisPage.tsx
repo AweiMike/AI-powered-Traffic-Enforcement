@@ -4,7 +4,7 @@
  */
 import React, { useState, useMemo } from 'react';
 import { useAccidentHotspots, useAccidentPeakTimes, useCrossAnalysis } from '../hooks/useAPI';
-import { AccidentHotspot, ShiftData } from '../api/client';
+import { apiClient, AccidentHotspot, ShiftData } from '../api/client';
 import DateRangePicker, { type DateRange, getCompareRange } from './DateRangePicker';
 
 // 同期比較標籤
@@ -122,6 +122,31 @@ const AccidentAnalysisPage: React.FC = () => {
     const { data: prevHotspots } = useAccidentHotspots(365, false, prevRange.startDate, prevRange.endDate);
     const { data: peakTimes, loading: peakLoading } = useAccidentPeakTimes(selectedDistrict || '__SKIP__', 365, false, dateRange.startDate, dateRange.endDate);
     const { data: crossAnalysis, loading: crossLoading } = useCrossAnalysis(selectedDistrict || undefined, 365, dateRange.startDate, dateRange.endDate);
+
+    /** 匯出酒駕肇事案件清單（事故表 ground truth）：供各所核對舉發單 subtype 是否已標記「攔舉-肇事」補標用
+     *  UTF-8 BOM CSV，檔名/表頭依督導對單自查需求固定格式，逗號以全形替換避免破壞欄位。 */
+    const exportDuiCrashCases = async () => {
+        try {
+            const res = await apiClient.getDuiCrashCases(dateRange.startDate, dateRange.endDate);
+            const items = res?.items || [];
+            const header = ['日期', '時間', '行政區', '轄區派出所', '地點', '嚴重度', '死亡', '受傷', '30日死亡', '飲酒情形代碼'];
+            const rows = items.map((r: any) => [
+                r.date, r.time, r.district || '', r.sub_unit || '',
+                (r.location || '').replaceAll(',', '，'), r.severity,
+                r.deaths, r.injuries, r.late_deaths, r.drinking_code || '',
+            ]);
+            const note = ['說明：本清單為事故表 ground truth（飲酒情形4-8排除行人）,請各所核對肇事舉發單 subtype 是否勾選「攔舉-肇事」,如漏標請洽承辦補正'];
+            const csv = [header, ...rows.map((r: any[]) => r.join(',')), note.join('')].join('\r\n');
+            const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `酒駕肇事案件清單_${dateRange.startDate}_${dateRange.endDate}.csv`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        } catch (e) {
+            console.error('Failed to export DUI crash cases', e);
+        }
+    };
 
     const tabs = [
         { id: 'list' as const, label: '📊 詳細分析', desc: '時段與缺口' },
@@ -354,6 +379,15 @@ const AccidentAnalysisPage: React.FC = () => {
                                   <p className="text-[10px] text-nook-text/40">subtype 漏標</p>
                                 </div>
                               </div>
+                            </div>
+                            {/* 卡尾：匯出肇事案件清單，供各所對單自查補標（人工對單，去識別化架構無法自動 join 舉發單） */}
+                            <div className="flex justify-end mt-3">
+                              <button
+                                onClick={exportDuiCrashCases}
+                                className="text-xs bg-white border border-amber-300 text-amber-800 rounded-lg px-2.5 py-1 hover:bg-amber-100"
+                              >
+                                📥 匯出肇事案件清單
+                              </button>
                             </div>
                           </div>
                         );

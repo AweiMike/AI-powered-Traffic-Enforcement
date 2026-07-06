@@ -979,6 +979,11 @@ class APIClient {
     return this.request(`/recommendations/risk-forecast${targetDate ? `?target_date=${targetDate}` : ''}`);
   }
 
+  /** 酒駕肇事案件清單（事故表 ground truth）：供各所核對舉發單 subtype 是否已標記「攔舉-肇事」，補標黑數用 */
+  async getDuiCrashCases(startDate: string, endDate: string): Promise<any> {
+    return this.request(`/recommendations/dui-crash-cases?start_date=${startDate}&end_date=${endDate}`);
+  }
+
   /** 系統操作稽核軌跡：最近 N 筆寫入操作與登入事件（預設 30 筆） */
   async getAuditLog(limit?: number): Promise<any> {
     return this.request(`/admin/audit-log?limit=${limit ?? 30}`);
