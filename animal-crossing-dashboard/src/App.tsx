@@ -660,7 +660,7 @@ const RecommendationsView: React.FC = () => {
             <div className="bg-nook-orange/10 rounded-2xl p-4">
               <h4 className="font-bold text-sm text-nook-text mb-2">🚧 事故熱點分析 <span className="font-normal text-xs bg-nook-orange/30 px-2 py-0.5 rounded-full">近 30 天</span></h4>
               <p className="text-xs text-nook-text/70">
-                依事故嚴重度權重排序（A1:5分, A2:3分, A3:1分），建議在事故高發區加強相關違規取締
+                依 EPDO（事故當量：30日死亡×9.5＋受傷×3.5＋件數）排序，建議在事故高發區加強相關違規取締
               </p>
             </div>
 
@@ -852,7 +852,7 @@ const RecommendationsView: React.FC = () => {
                 <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl p-4">
                   <h5 className="font-bold text-orange-700 mb-3">🚧 前幾大事故地點（輔助參考）</h5>
                   <p className="text-xs text-orange-600/70 mb-3">
-                    依事故嚴重度權重排序，紅色數字為 A1 死亡事故
+                    依 EPDO（事故當量）排序，紅色數字為 A1 死亡事故
                   </p>
                   <div className="grid grid-cols-3 gap-3">
                     {accidentHotspots.hotspots.slice(0, 3).map((hotspot, idx) => (

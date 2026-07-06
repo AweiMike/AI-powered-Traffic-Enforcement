@@ -334,6 +334,10 @@ async def get_monthly_stats(
         "a3": count_crashes_severity(prev_sd, prev_ed, "A3"),
     }
 
+    # 傷亡事故數（A1+A2，不含 A3 財損）：向後相容新增欄位，供趨勢圖對齊「傷亡」口徑用
+    current_casualty_crashes = current_severity["a1"] + current_severity["a2"]
+    last_year_casualty_crashes = last_year_severity["a1"] + last_year_severity["a2"]
+
     period_info = {"year": year, "month": month}
     if use_date_range:
         period_info = {"start_date": str(sd), "end_date": str(ed)}
@@ -343,6 +347,7 @@ async def get_monthly_stats(
         "current": {
             "tickets": current_tickets,
             "crashes": current_crashes,
+            "casualty_crashes": current_casualty_crashes,  # 傷亡事故數（A1+A2），新增欄位，不含 A3 財損
             "topics": current_topics,
             "severity": current_severity,
             "enforcement": current_enforcement,
@@ -351,6 +356,7 @@ async def get_monthly_stats(
             "year": prev_sd.year,
             "tickets": last_year_tickets,
             "crashes": last_year_crashes,
+            "casualty_crashes": last_year_casualty_crashes,  # 傷亡事故數（A1+A2）
             "topics": last_year_topics,
             "severity": last_year_severity,
             "enforcement": last_year_enforcement,

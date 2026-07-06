@@ -92,6 +92,7 @@ export interface MonthlyStats {
   current: {
     tickets: number;
     crashes: number;
+    casualty_crashes?: number;  // 傷亡事故數（A1+A2），不含 A3 財損
     topics: {
       dui: number;
       red_light: number;
@@ -108,6 +109,7 @@ export interface MonthlyStats {
     year: number;
     tickets: number;
     crashes: number;
+    casualty_crashes?: number;  // 傷亡事故數（A1+A2）
     topics: {
       dui: number;
       red_light: number;
@@ -746,9 +748,10 @@ class APIClient {
       topN?: number;
       severity?: string;
       compareBaseline?: boolean;
+      duiOnly?: boolean;
     } = {}
   ): Promise<any> {
-    const { days = 30, year, month, startDate, endDate, topN = 10, severity, compareBaseline = true } = options;
+    const { days = 30, year, month, startDate, endDate, topN = 10, severity, compareBaseline = true, duiOnly } = options;
     const params = new URLSearchParams({
       top_n: topN.toString(),
       compare_baseline: compareBaseline.toString()
@@ -766,6 +769,8 @@ class APIClient {
     }
 
     if (severity) params.append('severity', severity);
+    // 僅酒駕肇事熱點（is_dui_crash_party）：精準執法理念——肇事熱點才是真風險位置
+    if (duiOnly) params.append('dui_only', 'true');
     return this.request(`/hotspots/accident-hotspots?${params}`);
   }
 

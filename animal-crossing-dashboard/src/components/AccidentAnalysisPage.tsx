@@ -73,6 +73,11 @@ const HotspotCard: React.FC<{ hotspot: AccidentHotspot; rank: number; onSelect: 
                     <h4 className="font-bold text-nook-text">{hotspot.district}</h4>
                 </div>
 
+                <div className="bg-nook-orange/10 rounded-lg p-2 text-center mb-2">
+                    <p className="font-bold text-2xl text-orange-700">EPDO {hotspot.accidents.severity_score}</p>
+                    <p className="text-xs text-nook-text/60">{hotspot.accidents.total} 件事故（事故當量排序）</p>
+                </div>
+
                 <div className="grid grid-cols-4 gap-2 text-center text-xs mb-3">
                     <div className="bg-gray-50 rounded-lg p-2">
                         <p className="font-bold text-lg text-nook-text">{hotspot.accidents.total}</p>
@@ -187,7 +192,7 @@ const AccidentAnalysisPage: React.FC = () => {
                     <div className="space-y-4">
                         <div className="bg-nook-orange/10 rounded-2xl p-4">
                             <h4 className="font-bold text-nook-text mb-1">📊 區域事故排名</h4>
-                            <p className="text-xs text-nook-text/70">點擊區域查看詳細時段分析</p>
+                            <p className="text-xs text-nook-text/70">依 EPDO（事故當量）排序，點擊區域查看詳細時段分析</p>
                         </div>
                         {hotspotsLoading ? (
                             <div className="bg-white/80 rounded-2xl p-8 text-center">
@@ -195,15 +200,17 @@ const AccidentAnalysisPage: React.FC = () => {
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                {hotspots?.hotspots.map((hotspot, idx) => (
-                                    <HotspotCard
-                                        key={hotspot.district}
-                                        hotspot={hotspot}
-                                        rank={idx + 1}
-                                        onSelect={() => setSelectedDistrict(hotspot.district)}
-                                        selected={selectedDistrict === hotspot.district}
-                                    />
-                                ))}
+                                {[...(hotspots?.hotspots || [])]
+                                    .sort((a, b) => (b.accidents.severity_score || 0) - (a.accidents.severity_score || 0))
+                                    .map((hotspot, idx) => (
+                                        <HotspotCard
+                                            key={hotspot.district}
+                                            hotspot={hotspot}
+                                            rank={idx + 1}
+                                            onSelect={() => setSelectedDistrict(hotspot.district)}
+                                            selected={selectedDistrict === hotspot.district}
+                                        />
+                                    ))}
                             </div>
                         )}
                     </div>
@@ -399,16 +406,20 @@ const AccidentAnalysisPage: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-3 gap-6">
-                        {/* 左欄：酒駕高發區域排名 */}
+                        {/* 左欄：酒駕肇事高發區域排名 */}
                         <div className="space-y-4">
                             <div className="bg-slate-100 rounded-2xl p-4 border-l-4 border-warning">
-                                <h4 className="font-bold text-slate-800 mb-1">🍺 酒駕高發區域</h4>
-                                <p className="text-xs text-slate-600">依酒駕告發數量排序</p>
+                                <h4 className="font-bold text-slate-800 mb-1">🍺 酒駕肇事高發區域（事故防制優先於取締績效）</h4>
+                                <p className="text-xs text-slate-600">依酒駕肇事數排序，取締數僅為對照參考</p>
                             </div>
                             <div className="space-y-3 max-h-96 overflow-y-auto">
                                 {hotspots?.hotspots
-                                    .filter(h => (h.violations?.dui || 0) > 0)
-                                    .sort((a, b) => (b.violations?.dui || 0) - (a.violations?.dui || 0))
+                                    .filter(h => (h.dui_stats?.dui_with_crash || 0) > 0 || (h.violations?.dui || 0) > 0)
+                                    .sort((a, b) => {
+                                        const crashDiff = (b.dui_stats?.dui_with_crash || 0) - (a.dui_stats?.dui_with_crash || 0);
+                                        // 肇事數同為 0（或相同）時，以取締數作為次要排序鍵
+                                        return crashDiff !== 0 ? crashDiff : (b.violations?.dui || 0) - (a.violations?.dui || 0);
+                                    })
                                     .slice(0, 10)
                                     .map((hotspot, idx) => (
                                         <div
@@ -418,22 +429,22 @@ const AccidentAnalysisPage: React.FC = () => {
                                                 }`}
                                         >
                                             <div className="flex items-center gap-3 mb-2">
-                                                <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${idx === 0 ? 'bg-amber-500 text-white' :
-                                                    idx === 1 ? 'bg-amber-400 text-white' :
-                                                        'bg-amber-300 text-amber-800'
+                                                <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${idx === 0 ? 'bg-red-500 text-white' :
+                                                    idx === 1 ? 'bg-red-400 text-white' :
+                                                        'bg-red-300 text-red-800'
                                                     }`}>
                                                     {idx + 1}
                                                 </span>
                                                 <h4 className="font-bold text-nook-text">{hotspot.district}</h4>
                                             </div>
                                             <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                                                <div className="bg-amber-50 rounded-lg p-2">
-                                                    <p className="font-bold text-lg text-amber-700">{hotspot.violations?.dui || 0}</p>
-                                                    <p className="text-amber-600">酒駕總取締</p>
-                                                </div>
                                                 <div className="bg-red-50 rounded-lg p-2">
                                                     <p className="font-bold text-lg text-red-600">{hotspot.dui_stats?.dui_with_crash ?? 0}</p>
                                                     <p className="text-red-500">酒駕肇事</p>
+                                                </div>
+                                                <div className="bg-amber-50 rounded-lg p-2">
+                                                    <p className="font-bold text-lg text-amber-700">{hotspot.violations?.dui || 0}</p>
+                                                    <p className="text-amber-600">酒駕總取締</p>
                                                 </div>
                                                 <div className="bg-emerald-50 rounded-lg p-2">
                                                     <p className="font-bold text-lg text-emerald-700">{hotspot.dui_stats?.dui_no_crash ?? 0}</p>
@@ -442,7 +453,7 @@ const AccidentAnalysisPage: React.FC = () => {
                                             </div>
                                         </div>
                                     ))}
-                                {(!hotspots || hotspots.hotspots.filter(h => (h.violations?.dui || 0) > 0).length === 0) && (
+                                {(!hotspots || hotspots.hotspots.filter(h => (h.dui_stats?.dui_with_crash || 0) > 0 || (h.violations?.dui || 0) > 0).length === 0) && (
                                     <div className="bg-white/80 rounded-2xl p-8 text-center">
                                         <p className="text-nook-text/60">暫無酒駕數據</p>
                                     </div>

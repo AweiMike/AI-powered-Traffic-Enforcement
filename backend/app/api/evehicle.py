@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, date
 
 from app.database import get_db
 from app.models.core import Ticket, Crash
+from app.utils.epdo import epdo_sql_sum
 
 router = APIRouter()
 
@@ -223,13 +224,14 @@ async def get_youth_hotspots(
         Ticket.vehicle_type.ilike("%腳踏車%"),
     )
 
-    # 青少年事故熱點
+    # 青少年事故熱點（severity_score 改用 EPDO 公式，與全系統嚴重度排序語言統一）
     crash_hotspots = db.query(
         Crash.district,
         func.count(Crash.id).label("crash_count"),
         func.sum(case((Crash.severity == "A1", 1), else_=0)).label("a1_count"),
         func.sum(case((Crash.severity == "A2", 1), else_=0)).label("a2_count"),
         func.sum(case((Crash.severity == "A3", 1), else_=0)).label("a3_count"),
+        epdo_sql_sum().label("epdo_score"),
     ).filter(
         Crash.occurred_date >= sd,
         Crash.occurred_date <= ed,
@@ -251,18 +253,28 @@ async def get_youth_hotspots(
     ).group_by(Ticket.district).all()
 
     # 合併資料
-    crash_dict = {h.district: {"crash_count": h.crash_count, "a1": h.a1_count or 0, "a2": h.a2_count or 0, "a3": h.a3_count or 0} for h in crash_hotspots}
+    crash_dict = {
+        h.district: {
+            "crash_count": h.crash_count,
+            "a1": h.a1_count or 0,
+            "a2": h.a2_count or 0,
+            "a3": h.a3_count or 0,
+            "epdo": h.epdo_score or 0,
+        }
+        for h in crash_hotspots
+    }
     ticket_dict = {h.district: h.ticket_count for h in ticket_hotspots}
-    
+
     all_districts = set(crash_dict.keys()) | set(ticket_dict.keys())
-    
+
     result = []
     for district in all_districts:
-        crash_info = crash_dict.get(district, {"crash_count": 0, "a1": 0, "a2": 0, "a3": 0})
+        crash_info = crash_dict.get(district, {"crash_count": 0, "a1": 0, "a2": 0, "a3": 0, "epdo": 0})
         ticket_count = ticket_dict.get(district, 0)
         total = crash_info["crash_count"] + ticket_count
-        weighted_score = crash_info["a1"] * 5 + crash_info["a2"] * 3 + crash_info["a3"] * 1 + ticket_count
-        
+        # weighted_score = EPDO（事故當量）+ 違規舉發件數（沿用原設計：違規亦計入熱點排序）
+        weighted_score = round(crash_info["epdo"] + ticket_count, 1)
+
         result.append({
             "district": district,
             "crash_count": crash_info["crash_count"],
@@ -273,7 +285,7 @@ async def get_youth_hotspots(
             "a3_count": crash_info["a3"],
             "weighted_score": weighted_score,
         })
-    
+
     # 按總數排序
     result.sort(key=lambda x: x["weighted_score"], reverse=True)
     result = result[:limit]

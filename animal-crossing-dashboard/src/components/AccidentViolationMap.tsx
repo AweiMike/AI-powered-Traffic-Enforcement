@@ -325,7 +325,7 @@ export const TopAccidentLocations: React.FC<TopAccidentLocationsProps> = ({ data
                     <FileText className="w-5 h-5 text-red-500" />
                     <span className="font-bold text-nook-text">前十大易肇事區域</span>
                 </div>
-                <p className="text-xs text-nook-text/50 mt-1">依嚴重度權重排序（A1:5分 A2:3分 A3:1分）</p>
+                <p className="text-xs text-nook-text/50 mt-1">依 EPDO（事故當量）排序</p>
             </div>
 
             <div className="max-h-[400px] overflow-y-auto">

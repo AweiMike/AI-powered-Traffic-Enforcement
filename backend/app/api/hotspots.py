@@ -170,9 +170,10 @@ class TicketHotspotItem(BaseModel):
 # 事故熱點 API
 # ============================================
 
-def _fetch_crash_rows(db, start_dt, end_dt, severity=None):
+def _fetch_crash_rows(db, start_dt, end_dt, severity=None, dui_only: bool = False):
     """查詢指定日期範圍內的事故記錄，回傳 list of dicts。
-    death_count/late_death_count/injury_count：供聚類後計算單案 EPDO 用（crash_epdo()）。"""
+    death_count/late_death_count/injury_count：供聚類後計算單案 EPDO 用（crash_epdo()）。
+    dui_only：僅取酒駕肇事事故（Crash.is_dui_crash_party，案件層級 ground truth）。"""
     query = db.query(
         Crash.latitude, Crash.longitude, Crash.district,
         Crash.location_desc, Crash.severity,
@@ -191,6 +192,10 @@ def _fetch_crash_rows(db, start_dt, end_dt, severity=None):
         query = query.filter(Crash.severity == 'A2')
     elif severity == 'A1+A2':
         query = query.filter(Crash.severity.in_(['A1', 'A2']))
+
+    if dui_only:
+        # 僅酒駕肇事熱點（精準執法理念：事故防制優先於取締績效，見本檔 accident-hotspots 說明）
+        query = query.filter(Crash.is_dui_crash_party == True)
 
     return [
         {'lat': r.latitude, 'lng': r.longitude,
@@ -212,6 +217,7 @@ async def get_accident_hotspots(
     top_n: int = Query(default=10, ge=1, le=50, description="返回前 N 名"),
     severity: Optional[str] = Query(default=None, description="嚴重度篩選: A1, A2, A1+A2"),
     compare_baseline: bool = Query(default=True, description="是否比較去年同期"),
+    dui_only: bool = Query(default=False, description="僅酒駕事故（is_dui_crash_party）"),
     db: Session = Depends(get_db)
 ):
     """
@@ -222,6 +228,9 @@ async def get_accident_hotspots(
     - 排序依 EPDO（台灣道安標準公式，人數口徑，見 app/utils/epdo.py）降冪，
       而非單純件數，避免財損案多但死傷少的路口壓過死傷路口
     - 支援嚴重度篩選、去年同期趨勢比較（trend_pct 亦以 epdo 比較）
+    - dui_only=True 時僅計酒駕肇事事故：精準執法理念（交通組原意）——
+      取締熱點只反映警察常站的位置（自我強化偏差），肇事熱點才是真風險位置，
+      執法部署應以事故防制為目的，而非取締績效
     """
     # 決定日期範圍 (優先 start_date/end_date > year/month > days)
     if start_date and end_date:
@@ -237,7 +246,7 @@ async def get_accident_hotspots(
         start_date = end_date - timedelta(days=days)
 
     # 取得所有個別事故記錄並做 GPS 聚類
-    rows = _fetch_crash_rows(db, start_date, end_date, severity)
+    rows = _fetch_crash_rows(db, start_date, end_date, severity, dui_only)
     clusters = cluster_crashes_by_gps(rows)
 
     # 去年同期聚類（用於趨勢比較）
@@ -247,7 +256,7 @@ async def get_accident_hotspots(
     if compare_baseline:
         baseline_start = start_date.replace(year=start_date.year - 1)
         baseline_end = end_date.replace(year=end_date.year - 1)
-        baseline_rows = _fetch_crash_rows(db, baseline_start, baseline_end, severity)
+        baseline_rows = _fetch_crash_rows(db, baseline_start, baseline_end, severity, dui_only)
         baseline_clusters = cluster_crashes_by_gps(baseline_rows)
 
     # 組裝結果

@@ -630,7 +630,7 @@ const EVehicleAnalysisPage: React.FC = () => {
                         <div className="space-y-4">
                             <div className="bg-red-100 rounded-2xl p-4">
                                 <h4 className="font-bold text-red-800 mb-1">📍 青少年事故熱點排行</h4>
-                                <p className="text-xs text-red-600">依青少年慢車事故數量排序，權重計算：A1×5 + A2×3 + A3×1</p>
+                                <p className="text-xs text-red-600">依 EPDO（事故當量）排序</p>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 {hotspots.map((hotspot, idx) => (

@@ -20,6 +20,7 @@ interface TrendDataPoint {
     month: string;
     tickets: number;
     crashes: number;
+    casualty_crashes: number;  // 傷亡事故數（A1+A2），不含 A3 財損
     dui: number;
     red_light: number;
     dangerous: number;
@@ -256,7 +257,7 @@ const CrossAnalysisChart: React.FC<{ data: TrendDataPoint[] }> = ({ data }) => {
     if (data.length === 0) return null;
 
     const tickets = data.map(d => d.tickets);
-    const crashes = data.map(d => d.crashes);
+    const crashes = data.map(d => d.casualty_crashes);
 
     // 計算兩個 Y 軸的範圍
     const maxTickets = Math.max(...tickets, 1) * 1.1; // 留 10% 空間
@@ -276,15 +277,16 @@ const CrossAnalysisChart: React.FC<{ data: TrendDataPoint[] }> = ({ data }) => {
 
     // 生成路徑數據
     const ticketPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)},${getY_Tickets(d.tickets)}`).join(' ');
-    const crashPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)},${getY_Crashes(d.crashes)}`).join(' ');
+    const crashPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)},${getY_Crashes(d.casualty_crashes)}`).join(' ');
 
     return (
         <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 nook-shadow mb-8">
             <h3 className="text-lg font-bold text-nook-text mb-2 flex items-center gap-2">
                 <LineChart className="w-5 h-5 text-nook-leaf" />
-                違規 vs 事故 交叉趨勢分析
+                違規 vs 事故（A1+A2 傷亡）交叉趨勢分析
             </h3>
-            <p className="text-sm text-nook-text/60 mb-6">觀察「違規取締力度」與「交通事故發生」之關聯性</p>
+            <p className="text-sm text-nook-text/60 mb-1">觀察「違規取締力度」與「交通事故發生」之關聯性</p>
+            <p className="text-[11px] text-nook-text/40 mb-6">口徑：人員傷亡事故，不含 A3 財損</p>
 
             <div className="w-full overflow-x-auto">
                 <div className="min-w-[600px] relative">
@@ -371,7 +373,7 @@ const CrossAnalysisChart: React.FC<{ data: TrendDataPoint[] }> = ({ data }) => {
                                 <circle cx={getX(i)} cy={getY_Tickets(d.tickets)} r="6" fill="#E0F2FE" stroke="#0369A1" strokeWidth="3" className="group-hover:r-8 transition-all" />
 
                                 {/* 事故點 */}
-                                <circle cx={getX(i)} cy={getY_Crashes(d.crashes)} r="6" fill="#FEF3C7" stroke="#D97706" strokeWidth="3" className="group-hover:r-8 transition-all" />
+                                <circle cx={getX(i)} cy={getY_Crashes(d.casualty_crashes)} r="6" fill="#FEF3C7" stroke="#D97706" strokeWidth="3" className="group-hover:r-8 transition-all" />
 
                                 {/* Tooltip */}
                                 <g className="opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none transform -translate-y-2">
@@ -385,7 +387,7 @@ const CrossAnalysisChart: React.FC<{ data: TrendDataPoint[] }> = ({ data }) => {
                                     <text x={getX(i) - 20} y={padding.top + 34} textAnchor="start" fill="#0369A1" fontSize="12" fontWeight="bold">違規: {d.tickets}</text>
 
                                     <circle cx={getX(i) - 30} cy={padding.top + 50} r="4" fill="#D97706" />
-                                    <text x={getX(i) - 20} y={padding.top + 54} textAnchor="start" fill="#D97706" fontSize="12" fontWeight="bold">事故: {d.crashes}</text>
+                                    <text x={getX(i) - 20} y={padding.top + 54} textAnchor="start" fill="#D97706" fontSize="12" fontWeight="bold">事故: {d.casualty_crashes}</text>
                                 </g>
                             </g>
                         ))}
@@ -401,7 +403,7 @@ const CrossAnalysisChart: React.FC<{ data: TrendDataPoint[] }> = ({ data }) => {
                 </div>
                 <div className="flex items-center gap-2">
                     <span className="w-8 h-1 bg-warning rounded-full h-1.5"></span>
-                    <span className="text-sm font-bold text-nook-text">交通事故數 (右軸)</span>
+                    <span className="text-sm font-bold text-nook-text">交通事故數（A1+A2 傷亡，右軸）</span>
                 </div>
             </div>
         </div>
@@ -487,6 +489,9 @@ const PerformanceComparisonPage: React.FC = () => {
                             month: monthStr,
                             tickets: result.current.tickets,
                             crashes: result.current.crashes,
+                            // 傷亡事故（A1+A2）：優先採後端新欄位，若無則以 severity 換算，兩者皆缺時退回 0
+                            casualty_crashes: result.current.casualty_crashes
+                                ?? ((result.current.severity?.a1 || 0) + (result.current.severity?.a2 || 0)),
                             dui: result.current.topics.dui,
                             red_light: result.current.topics.red_light,
                             dangerous: result.current.topics.dangerous_driving,
@@ -495,6 +500,7 @@ const PerformanceComparisonPage: React.FC = () => {
                             month: monthStr,
                             tickets: 0,
                             crashes: 0,
+                            casualty_crashes: 0,
                             dui: 0,
                             red_light: 0,
                             dangerous: 0,
@@ -969,7 +975,10 @@ const PerformanceComparisonPage: React.FC = () => {
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
                         <SimpleTrendChart data={trendData} dataKey="tickets" color="bg-nook-sky" title="違規案件趨勢" />
-                        <SimpleTrendChart data={trendData} dataKey="crashes" color="bg-nook-orange" title="交通事故趨勢" />
+                        <div>
+                            <SimpleTrendChart data={trendData} dataKey="casualty_crashes" color="bg-nook-orange" title="交通事故（A1+A2 傷亡）趨勢" />
+                            <p className="text-[11px] text-nook-text/40 mt-1 px-1">口徑：人員傷亡事故，不含 A3 財損</p>
+                        </div>
                     </div>
                 </div>
             )}
@@ -980,23 +989,20 @@ const PerformanceComparisonPage: React.FC = () => {
             )}
 
             {/* 熱點排名區 */}
-            <div className="grid grid-cols-2 gap-6 mb-8 print:hidden">
+            <div className="max-w-2xl mx-auto mb-8 print:hidden">
                 <HotspotRankingCard
                     type="accident"
+                    duiOnly
                     startDate={dateRange.startDate}
                     endDate={dateRange.endDate}
                     topN={5}
-                    severity="A1+A2"
-                    title="🚨 A1/A2 事故熱點 Top 5"
+                    title="🍺 酒駕肇事熱點 Top 5"
                 />
-                <HotspotRankingCard
-                    type="ticket"
-                    startDate={dateRange.startDate}
-                    endDate={dateRange.endDate}
-                    topN={5}
-                    topic="DUI"
-                    title="🍺 酒駕違規熱點 Top 5"
-                />
+                {/* 精準執法理念（交通組原意）：取締熱點只反映警察常站的位置（自我強化偏差），
+                    肇事熱點才是真風險位置，勤務部署應以事故防制為目的，非取締績效 */}
+                <p className="text-[11px] text-text-subtle mt-2 px-1">
+                    以酒駕肇事地點部署攔檢勤務——事故防制優先於取締績效
+                </p>
             </div>
 
             {/* 成效摘要 */}

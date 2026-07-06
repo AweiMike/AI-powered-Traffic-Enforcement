@@ -661,7 +661,9 @@ async def get_accident_hotspots(
         func.sum(case((Crash.severity == 'A1', 1), else_=0)).label('a1_count'),
         func.sum(case((Crash.severity == 'A2', 1), else_=0)).label('a2_count'),
         func.sum(case((Crash.severity == 'A3', 1), else_=0)).label('a3_count'),
-        func.sum(Crash.severity_weight).label('severity_score'),
+        # severity_score 改用 EPDO 公式（30日死亡×9.5＋受傷×3.5＋件數），
+        # 與全系統嚴重度排序語言統一；欄名保留 severity_score 供前端零改動沿用
+        epdo_sql_sum().label('severity_score'),
         # 改用 is_dui_crash_party (飲酒情形 4-8 + 排除行人) ground truth
         func.sum(case((Crash.is_dui_crash_party == True, 1), else_=0)).label('dui_crashes'),
         func.coalesce(func.sum(Crash.death_count), 0).label('death_total'),
@@ -748,7 +750,7 @@ async def get_accident_hotspots(
                 'a1_count': a1,
                 'a2_count': a2,
                 'a3_count': a3,
-                'severity_score': severity_score or 0,
+                'severity_score': round(severity_score or 0, 1),
                 'death_count': deaths or 0,
                 'injury_count': injuries or 0,
             },
@@ -1392,8 +1394,9 @@ async def get_map_points(
             Crash.is_dui_crash_party,  # ground truth (飲酒情形 4-8)
             Crash.party_type,
             Crash.sub_unit,
-            Crash.death_count,    # 實際死亡人數（不是件數）
-            Crash.injury_count    # 實際受傷人數（不是件數）
+            Crash.death_count,       # 實際死亡人數（不是件數）
+            Crash.injury_count,      # 實際受傷人數（不是件數）
+            Crash.late_death_count   # 2-30日死亡人數（crash_epdo 計算用）
         ).filter(
             Crash.occurred_date >= start_date,
             Crash.occurred_date <= end_date
@@ -1453,6 +1456,7 @@ async def get_map_points(
                     'unit': c.sub_unit,
                     'death_count': c.death_count or 0,        # 實際死亡人數
                     'injury_count': c.injury_count or 0,       # 實際受傷人數
+                    'severity_score': round(crash_epdo(c), 1),  # 單案 EPDO（事故當量）
                 })
         result['summary']['crashes_with_coords'] = len(result['crash_points'])
         result['summary']['dui_real_crashes'] = dui_real_crash_count  # Crash 側真實涉酒事故

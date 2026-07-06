@@ -34,6 +34,7 @@ interface HotspotRankingCardProps {
     topic?: string;
     title?: string;
     showPercentage?: boolean;
+    duiOnly?: boolean; // 僅酒駕肇事熱點（type==='accident' 時傳給後端 is_dui_crash_party 篩選）
     onHotspotClick?: (item: HotspotItem) => void;
 }
 
@@ -49,6 +50,7 @@ const HotspotRankingCard: React.FC<HotspotRankingCardProps> = ({
     topic,
     title,
     showPercentage = false,
+    duiOnly = false,
     onHotspotClick
 }) => {
     const [hotspots, setHotspots] = useState<HotspotItem[]>([]);
@@ -69,7 +71,8 @@ const HotspotRankingCard: React.FC<HotspotRankingCardProps> = ({
                         startDate,
                         endDate,
                         topN,
-                        severity
+                        severity,
+                        duiOnly
                     });
                     setHotspots(result.hotspots || []);
                     setTotalInPeriod(result.total_in_period || 0);
@@ -85,7 +88,7 @@ const HotspotRankingCard: React.FC<HotspotRankingCardProps> = ({
             }
         };
         fetchData();
-    }, [type, days, year, month, startDate, endDate, topN, severity, topic]);
+    }, [type, days, year, month, startDate, endDate, topN, severity, topic, duiOnly]);
 
     const getRankBadge = (rank: number) => {
         if (rank === 1) return <span className="w-6 h-6 flex items-center justify-center bg-yellow-400 text-white rounded-full text-xs font-bold">🥇</span>;
