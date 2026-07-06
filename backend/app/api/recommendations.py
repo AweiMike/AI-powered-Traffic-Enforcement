@@ -18,18 +18,55 @@ router = APIRouter()
 
 
 # ============================================
+# 專區共通強化：主題篩選共用 helper（跨端點共用）
+# ============================================
+
+# 大型車關鍵字（與 enforcement.py 一致）
+HEAVY_VEHICLE_KEYWORDS = ["大貨車", "大客車", "曳引車", "拖車", "遊覽"]
+
+
+def crash_topic_filter(topic: str):
+    """依主題代碼回傳對應的 Crash 篩選條件（SQLAlchemy 條件式）。
+
+    支援的 topic：
+    - elderly：高齡者事故
+    - pedestrian：行人事故
+    - evehicle：慢車（微電車等）事故
+    - dui：酒駕肇事
+    - heavy：大型車事故
+
+    不認得的 topic 回傳 None，呼叫端應視為錯誤（回 400 或 {"error": ...}）。
+    """
+    if topic == "elderly":
+        return Crash.is_elderly == True
+    if topic == "pedestrian":
+        return or_(Crash.party_type.like("%行人%"), Crash.party_type == "人")
+    if topic == "evehicle":
+        return Crash.evehicle_type.isnot(None)
+    if topic == "dui":
+        return Crash.is_dui_crash_party == True
+    if topic == "heavy":
+        return or_(*[Crash.party_type.like(f"%{kw}%") for kw in HEAVY_VEHICLE_KEYWORDS])
+    return None
+
+
+# ============================================
 # 週事故趨勢（總覽用）：A2/A3(primary) + A1 死亡(secondary)，higher_is_worse
 # ============================================
 @router.get("/accidents/trend")
 async def get_accident_weekly_trend(
     start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
     end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    topic: str = Query(None, description="主題篩選：elderly/pedestrian/evehicle/dui/heavy，未提供時行為與原本相同"),
     db: Session = Depends(get_db),
 ):
     """週事故趨勢：A2/A3 事故(primary) + A1 死亡事故(secondary)。
 
     事故越多越糟（higher_is_worse=True → 判讀用「惡化/改善」、配色橙/紅）。
     共用 trend_engine.weekly_trend：移動平均 / 環比 / Z-score 異常偵測 + 專業判讀。
+
+    topic 未提供時行為與原本完全相同（向後相容）；提供時本期與去年同期
+    查詢皆加上 crash_topic_filter 條件，可用於各專區的週趨勢卡。
     """
     try:
         sd = datetime.strptime(start_date, "%Y-%m-%d").date()
@@ -37,17 +74,26 @@ async def get_accident_weekly_trend(
     except (ValueError, TypeError):
         return {"error": "日期格式錯誤"}
 
+    topic_condition = None
+    if topic is not None:
+        topic_condition = crash_topic_filter(topic)
+        if topic_condition is None:
+            return {"error": "未知主題"}
+
     is_a1 = case((Crash.severity == "A1", 1), else_=0)
 
     def query_daily(s, e):
-        rows = db.query(
+        query = db.query(
             Crash.occurred_date.label("d"),
             is_a1.label("is_a1"),
             func.count(Crash.id).label("c"),
         ).filter(
             Crash.occurred_date >= s,
             Crash.occurred_date <= e,
-        ).group_by(
+        )
+        if topic_condition is not None:
+            query = query.filter(topic_condition)
+        rows = query.group_by(
             Crash.occurred_date, is_a1,
         ).all()
         return [(r.d, r.c, r.c if r.is_a1 else 0) for r in rows]
@@ -2243,4 +2289,154 @@ async def get_risk_forecast(
         "history_weeks": round(n_weeks, 1),
         "top_risks": top_risks,
         "per_unit_top": per_unit_top,
+    }
+
+
+# ============================================
+# 專區共通強化：當事者特徵剖析（泛用，跨主題）
+# ============================================
+@router.get("/profile")
+async def get_topic_profile(
+    topic: str = Query(..., description="主題代碼：elderly/pedestrian/evehicle/dui/heavy"),
+    start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """當事者特徵剖析（泛用）。
+
+    依 topic 篩選查詢期間內的事故，於 Python 端統計年齡層/性別/車種/事故類型/
+    保護裝備/駕照狀態/班別/熱門路線等分佈，供各專區（高齡、行人、微電車、酒駕、
+    大型車）共用同一套剖析卡片。
+    """
+    try:
+        sd = datetime.strptime(start_date, "%Y-%m-%d").date()
+        ed = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return {"error": "日期格式錯誤"}
+
+    topic_condition = crash_topic_filter(topic)
+    if topic_condition is None:
+        return {"error": "未知主題"}
+
+    from collections import Counter
+
+    crashes = db.query(Crash).filter(
+        topic_condition,
+        Crash.occurred_date >= sd,
+        Crash.occurred_date <= ed,
+    ).all()
+
+    total = len(crashes)
+
+    # 年齡層：固定順序，0 也列出
+    AGE_ORDER = ["<18", "18-24", "25-44", "45-64", "65+", "未知"]
+    age_counter = Counter((c.driver_age_group or "未知") for c in crashes)
+    age_groups = [{"name": k, "count": age_counter.get(k, 0)} for k in AGE_ORDER]
+
+    # 性別：固定三項（男/女/未知，NULL 併入未知）
+    gender_counter = Counter((c.driver_gender or "未知") for c in crashes)
+    gender = [
+        {"name": k, "count": gender_counter.get(k, 0)}
+        for k in ["男", "女", "未知"]
+    ]
+
+    def top_n(values, n=8):
+        """依出現次數由高到低排列（NULL/空值不計）"""
+        filtered = [v for v in values if v]
+        return [{"name": k, "count": v} for k, v in Counter(filtered).most_common(n)]
+
+    party_types = top_n([c.party_type for c in crashes], 8)
+    crash_types = top_n([c.crash_type for c in crashes], 8)
+    protective_gear = top_n([c.protective_gear for c in crashes], None)
+    license_status = top_n([c.license_status for c in crashes], None)
+
+    # 班別：12 班全列，含 0
+    shift_counter = Counter(c.shift_id for c in crashes)
+    by_shift = [{"shift": f"{i:02d}", "count": shift_counter.get(f"{i:02d}", 0)} for i in range(1, 13)]
+
+    # 熱門路線：top5，route_name 非空
+    top_routes = top_n([c.route_name for c in crashes], 5)
+
+    return {
+        "topic": topic,
+        "period": {"start_date": start_date, "end_date": end_date},
+        "total": total,
+        "groups": {
+            "age_groups": age_groups,
+            "gender": gender,
+            "party_types": party_types,
+            "crash_types": crash_types,
+            "protective_gear": protective_gear,
+            "license_status": license_status,
+            "by_shift": by_shift,
+            "top_routes": top_routes,
+        },
+    }
+
+
+# ============================================
+# 專區共通強化：青少年微電車校園時段熱區
+# ============================================
+@router.get("/school-zone-hotspots")
+async def get_school_zone_hotspots(
+    start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """青少年微電車校園時段熱區。
+
+    篩選期間內「青少年（<18歲）+ 微電車/慢車」事故，分別統計上學時段（06-08時，
+    shift_id="04"）與放學時段（16-18時，shift_id="09"）的地點熱區，
+    供校園周邊巡查排點參考；另附非上下學時段件數作對照。
+    """
+    try:
+        sd = datetime.strptime(start_date, "%Y-%m-%d").date()
+        ed = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return {"error": "日期格式錯誤"}
+
+    from collections import Counter
+
+    MORNING_SHIFT = "04"   # 06:00-08:00 上學時段
+    AFTERNOON_SHIFT = "09"  # 16:00-18:00 放學時段
+
+    crashes = db.query(Crash).filter(
+        Crash.evehicle_type.isnot(None),
+        Crash.is_youth == True,
+        Crash.occurred_date >= sd,
+        Crash.occurred_date <= ed,
+    ).all()
+
+    youth_total = len(crashes)
+
+    def build_period(items):
+        """給定該時段的事故清單，統計 total 與 location_desc 眾數 top5（排除未知地點）"""
+        total = len(items)
+        location_counter = Counter(
+            c.location_desc for c in items if c.location_desc and c.location_desc != "未知地點"
+        )
+        hotspots = []
+        for location, count in location_counter.most_common(5):
+            district_counter = Counter(
+                c.district for c in items if c.location_desc == location and c.district
+            )
+            district_mode = district_counter.most_common(1)[0][0] if district_counter else None
+            hotspots.append({"location": location, "count": count, "district": district_mode})
+        return {"total": total, "hotspots": hotspots}
+
+    morning_items = [c for c in crashes if c.shift_id == MORNING_SHIFT]
+    afternoon_items = [c for c in crashes if c.shift_id == AFTERNOON_SHIFT]
+    other_items = [c for c in crashes if c.shift_id not in (MORNING_SHIFT, AFTERNOON_SHIFT)]
+
+    morning = build_period(morning_items)
+    morning["label"] = "上學時段 06-08時"
+    afternoon = build_period(afternoon_items)
+    afternoon["label"] = "放學時段 16-18時"
+
+    return {
+        "period": {"start_date": start_date, "end_date": end_date},
+        "morning": morning,
+        "afternoon": afternoon,
+        "other_total": len(other_items),
+        "youth_total": youth_total,
     }

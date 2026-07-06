@@ -34,6 +34,7 @@ interface ImportResult {
     elderly?: number;
   };
   topics_imported?: Record<string, number>;
+  health_warnings?: string[];
 }
 
 interface DatabaseStatus {
@@ -344,6 +345,19 @@ const UploadCard: React.FC<UploadCardProps> = ({ type, onUploadComplete }) => {
                     ))}
                   </ul>
                 </div>
+              )}
+
+              {/* 資料健檢（匯入後自動污染防線） */}
+              {result.health_warnings && result.health_warnings.length > 0 && (
+                <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+                  <p className="font-medium mb-1">🔍 資料健檢</p>
+                  {result.health_warnings.map((w, idx) => (
+                    <p key={idx}>{w}</p>
+                  ))}
+                </div>
+              )}
+              {result.health_warnings && result.health_warnings.length === 0 && (
+                <p className="mt-3 text-xs text-nook-leaf">✅ 資料健檢通過</p>
               )}
             </div>
           </div>
@@ -666,6 +680,19 @@ const BatchImportCard: React.FC<BatchImportProps> = ({
                     ))}
                   </ul>
                 </div>
+              )}
+
+              {/* 資料健檢（匯入後自動污染防線） */}
+              {result.health_warnings && result.health_warnings.length > 0 && (
+                <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+                  <p className="font-medium mb-1">🔍 資料健檢</p>
+                  {result.health_warnings.map((w, idx) => (
+                    <p key={idx}>{w}</p>
+                  ))}
+                </div>
+              )}
+              {result.health_warnings && result.health_warnings.length === 0 && (
+                <p className="mt-3 text-xs text-nook-leaf">✅ 資料健檢通過</p>
               )}
             </div>
           </div>

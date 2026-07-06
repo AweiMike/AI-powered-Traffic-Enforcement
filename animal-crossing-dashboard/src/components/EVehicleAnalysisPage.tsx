@@ -5,6 +5,12 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import DateRangePicker, { type DateRange } from './DateRangePicker';
+import TrendCardSkeleton from './TrendCardSkeleton';
+import ProfileCard from './ProfileCard';
+import SchoolZoneCard from './SchoolZoneCard';
+
+// recharts 依賴較重，動態載入讓它獨立成 chunk，不灌進主 bundle
+const TrendCard = React.lazy(() => import('./TrendCard'));
 
 // 定義類型
 interface EVehicleOverview {
@@ -420,6 +426,25 @@ const EVehicleAnalysisPage: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* 微電車事故週趨勢與專業判讀 */}
+            <React.Suspense fallback={<TrendCardSkeleton title="微電車事故週趨勢" />}>
+                <TrendCard
+                    range={dateRange}
+                    title="微電車事故週趨勢"
+                    fetcher={(s, e) => apiClient.getTopicAccidentTrend(s, e, 'evehicle')}
+                    primaryName="A2/A3 事故"
+                    secondaryName="A1 死亡"
+                    primaryColor="#D97706"
+                    secondaryColor="#DC2626"
+                />
+            </React.Suspense>
+
+            {/* 微電車當事者特徵剖析 */}
+            <ProfileCard topic="evehicle" title="微電車當事者特徵剖析" range={dateRange} />
+
+            {/* 校園時段熱區（青少年微電車） */}
+            <SchoolZoneCard range={dateRange} />
 
             {/* 分頁標籤 */}
             <div className="flex gap-2">

@@ -979,6 +979,21 @@ class APIClient {
     return this.request(`/admin/audit-log?limit=${limit ?? 30}`);
   }
 
+  /** 專區週事故趨勢（依 topic 分流：elderly / pedestrian / evehicle） */
+  async getTopicAccidentTrend(startDate: string, endDate: string, topic: string): Promise<any> {
+    return this.request(`/recommendations/accidents/trend?start_date=${startDate}&end_date=${endDate}&topic=${topic}`);
+  }
+
+  /** 當事者特徵剖析（年齡/性別/車種/事故型態/保護裝備/駕照狀態/班別/路線） */
+  async getCrashProfile(topic: string, startDate: string, endDate: string): Promise<any> {
+    return this.request(`/recommendations/profile?topic=${topic}&start_date=${startDate}&end_date=${endDate}`);
+  }
+
+  /** 校園時段熱區（上學/放學時段青少年微電車事故熱點） */
+  async getSchoolZoneHotspots(startDate: string, endDate: string): Promise<any> {
+    return this.request(`/recommendations/school-zone-hotspots?start_date=${startDate}&end_date=${endDate}`);
+  }
+
   /** 資料品質總覽 */
   async getDataQuality(): Promise<any> {
     return this.request('/admin/data-quality');

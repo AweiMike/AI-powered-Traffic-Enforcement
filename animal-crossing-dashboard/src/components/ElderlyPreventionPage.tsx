@@ -5,6 +5,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAccidentHotspots, useAccidentPeakTimes } from '../hooks/useAPI';
 import { AccidentHotspot, ShiftData, apiClient } from '../api/client';
 import DateRangePicker, { type DateRange, getCompareRange } from './DateRangePicker';
+import ProfileCard from './ProfileCard';
+import TrendCardSkeleton from './TrendCardSkeleton';
+
+// recharts 依賴較重，動態載入讓它獨立成 chunk，不灌進主 bundle
+const TrendCard = React.lazy(() => import('./TrendCard'));
 
 // 同期比較標籤
 const YoYBadge: React.FC<{ current: number; previous: number }> = ({ current, previous }) => {
@@ -173,6 +178,22 @@ const ElderlyPreventionPage: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* 高齡者事故週趨勢與專業判讀 */}
+            <React.Suspense fallback={<TrendCardSkeleton title="高齡者事故週趨勢" />}>
+                <TrendCard
+                    range={dateRange}
+                    title="高齡者事故週趨勢"
+                    fetcher={(s, e) => apiClient.getTopicAccidentTrend(s, e, 'elderly')}
+                    primaryName="A2/A3 事故"
+                    secondaryName="A1 死亡"
+                    primaryColor="#D97706"
+                    secondaryColor="#DC2626"
+                />
+            </React.Suspense>
+
+            {/* 高齡者事故特徵剖析 */}
+            <ProfileCard topic="elderly" title="高齡者事故特徵剖析" range={dateRange} />
 
             <div className="grid grid-cols-12 gap-6">
                 {/* 左欄：高齡事故熱區 */}

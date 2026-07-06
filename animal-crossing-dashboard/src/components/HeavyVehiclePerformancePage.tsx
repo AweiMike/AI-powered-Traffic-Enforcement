@@ -8,6 +8,7 @@ import { Truck, TrendingUp, TrendingDown, Minus, AlertTriangle, Shield } from 'l
 import DateRangePicker, { type DateRange } from './DateRangePicker';
 import { apiClient } from '../api/client';
 import TrendCardSkeleton from './TrendCardSkeleton';
+import ProfileCard from './ProfileCard';
 
 // recharts 依賴較重，動態載入讓它獨立成 chunk，不灌進主 bundle
 const TrendCard = React.lazy(() => import('./TrendCard'));
@@ -115,6 +116,9 @@ const HeavyVehiclePerformancePage: React.FC = () => {
           secondaryName="肇事舉發"
         />
       </React.Suspense>
+
+      {/* 大型車事故特徵剖析（年齡/性別/車種/事故型態/保護裝備/駕照狀態/班別/路線） */}
+      <ProfileCard topic="heavy" title="大型車事故特徵剖析" range={range} />
 
       {/* 各派出所明細表 */}
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl nook-shadow overflow-hidden mb-6">

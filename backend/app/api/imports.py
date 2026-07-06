@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.core import Crash, Ticket, Topic
+from app.utils.data_health import run_batch_health_checks
 
 router = APIRouter()
 
@@ -1260,6 +1261,12 @@ async def import_crash_file(
                 "若受傷人數欄位未填完整會誤判（A2↔A3）。建議匯出時勾選「事故類別」欄位。"
             )
 
+        # 匯入後自動資料健檢（防污染防線）：失敗不影響匯入結果本身
+        try:
+            health_warnings = run_batch_health_checks(db, batch_id)
+        except Exception:
+            health_warnings = ["健檢執行失敗（不影響匯入結果）"]
+
         return {
             "success": True,
             "message": (
@@ -1276,6 +1283,7 @@ async def import_crash_file(
             "severity_warning": severity_warning,
             "coordinates": coords_stats if data_format == "EIS" else None,
             "errors": error_messages[:10] if error_messages else [],
+            "health_warnings": health_warnings,
             "database": {
                 "total_crashes": total_crashes,
                 "severity": severity_stats,
@@ -1353,6 +1361,7 @@ def _do_batch_import(txt_files: list, db):
     files_missing_subunit = []  # 缺「所轄單位名稱」欄位的檔（事故會 fallback 成交通分隊）
     files_missing_severity = []  # 缺「事故類別」欄位的檔（A1/A2/A3 靠死傷推導）
     seen_case_ids: set = set()
+    batch_ids_this_run = []  # 本次匯入產生的所有 batch_id（各檔各自時間戳，健檢需收集全部）
 
     # 取得已匯入過的檔案名稱
     imported_files = _get_imported_filenames(db, Crash)
@@ -1378,6 +1387,7 @@ def _do_batch_import(txt_files: list, db):
             data_format = detect_crash_format(list(df.columns))
 
             batch_id = f"BATCH_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{fname}"
+            batch_ids_this_run.append(batch_id)
             stats = {"total": len(df), "new": 0, "skipped": 0, "errors": 0, "updated": 0}
             coords_stats = {"with_gps": 0, "fallback": 0}
 
@@ -1750,6 +1760,12 @@ def _do_batch_import(txt_files: list, db):
             + "、".join(files_missing_severity)
         )
 
+    # 匯入後自動資料健檢（防污染防線）：對本次匯入產生的全部 batch_id 一起檢查
+    try:
+        health_warnings = run_batch_health_checks(db, batch_ids_this_run)
+    except Exception:
+        health_warnings = ["健檢執行失敗（不影響匯入結果）"]
+
     return {
         "success": True,
         "message": "批次匯入完成：" + "，".join(msg_parts)
@@ -1762,6 +1778,7 @@ def _do_batch_import(txt_files: list, db):
         "coordinates": coords_total,
         "skipped_files": skipped_files,
         "errors": all_errors[:20] if all_errors else [],
+        "health_warnings": health_warnings,
         "database": {
             "total_crashes": total_crashes,
             "severity": severity_stats,
@@ -1982,6 +1999,7 @@ async def import_crash_upload_batch(
     files_missing_subunit = []  # 缺「所轄單位名稱」欄位的檔
     files_missing_severity = []  # 缺「事故類別」欄位的檔
     seen_case_ids: set = set()
+    batch_ids_this_run = []  # 本次上傳產生的所有 batch_id（各檔各自時間戳，健檢需收集全部）
 
     # 檢查是否需要回補 sub_unit（舊版匯入時未讀「所轄單位名稱」）
     needs_backfill = db.query(func.count(Crash.id)).filter(
@@ -2022,6 +2040,7 @@ async def import_crash_upload_batch(
             df.columns = [str(c).strip().replace("\n", "") for c in df.columns]
             data_format = detect_crash_format(list(df.columns))
             batch_id = f"UPLOAD_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}"
+            batch_ids_this_run.append(batch_id)
 
             # 缺「所轄單位名稱」欄位偵測
             if data_format == "EIS" and not has_subunit_column(df):
@@ -2448,6 +2467,12 @@ async def import_crash_upload_batch(
             + "、".join(files_missing_severity)
         )
 
+    # 匯入後自動資料健檢（防污染防線）：對本次上傳產生的全部 batch_id 一起檢查
+    try:
+        health_warnings = run_batch_health_checks(db, batch_ids_this_run)
+    except Exception:
+        health_warnings = ["健檢執行失敗（不影響匯入結果）"]
+
     return {
         "success": True,
         "message": "批次上傳匯入完成：" + "，".join(msg_parts)
@@ -2458,6 +2483,7 @@ async def import_crash_upload_batch(
         "severity_warning": severity_warning,
         "coordinates": coords_total,
         "errors": all_errors[:20] if all_errors else [],
+        "health_warnings": health_warnings,
         "database": {
             "total_crashes": total_crashes,
             "severity": severity_stats,

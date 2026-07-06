@@ -7,6 +7,11 @@ import React, { useState, useEffect } from 'react';
 import { PersonStanding, TrendingUp, TrendingDown, Minus, AlertTriangle, Users, MapPin } from 'lucide-react';
 import DateRangePicker, { type DateRange } from './DateRangePicker';
 import { apiClient } from '../api/client';
+import TrendCardSkeleton from './TrendCardSkeleton';
+import ProfileCard from './ProfileCard';
+
+// recharts 依賴較重，動態載入讓它獨立成 chunk，不灌進主 bundle
+const TrendCard = React.lazy(() => import('./TrendCard'));
 
 function defaultRange(): DateRange {
     // 行人事故資料稀少，預設本年度讓使用者看到足夠資料
@@ -115,6 +120,22 @@ const PedestrianAnalysisPage: React.FC = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* 行人事故週趨勢與專業判讀 */}
+                    <React.Suspense fallback={<TrendCardSkeleton title="行人事故週趨勢" />}>
+                        <TrendCard
+                            range={range}
+                            title="行人事故週趨勢"
+                            fetcher={(s, e) => apiClient.getTopicAccidentTrend(s, e, 'pedestrian')}
+                            primaryName="A2/A3 事故"
+                            secondaryName="A1 死亡"
+                            primaryColor="#D97706"
+                            secondaryColor="#DC2626"
+                        />
+                    </React.Suspense>
+
+                    {/* 行人事故特徵剖析 */}
+                    <ProfileCard topic="pedestrian" title="行人事故特徵剖析" range={range} />
 
                     {/* 警訊 banner（若高齡占比 >= 40% 特別提醒）*/}
                     {curr.elderly_pct >= 40 && curr.total > 0 && (
