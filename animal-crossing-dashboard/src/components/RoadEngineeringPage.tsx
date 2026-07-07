@@ -187,6 +187,14 @@ const RoadEngineeringPage: React.FC = () => {
   const [corridorData, setCorridorData] = useState<any>(null);
   const [corridorLoading, setCorridorLoading] = useState(false);
 
+  // ---- 易肇事路口 Top10（依 EPDO）----
+  const [hotspotsTop10, setHotspotsTop10] = useState<any[]>([]);
+  const [hotspotsTop10Loading, setHotspotsTop10Loading] = useState(false);
+
+  // ---- A1 死亡事故清冊 ----
+  const [a1Cases, setA1Cases] = useState<any[]>([]);
+  const [a1CasesLoading, setA1CasesLoading] = useState(false);
+
   // ---- 會勘資料產生器 + 卷宗 ----
   const [dossierLat, setDossierLat] = useState('');
   const [dossierLng, setDossierLng] = useState('');
@@ -260,6 +268,40 @@ const RoadEngineeringPage: React.FC = () => {
     })();
     return () => { alive = false; };
   }, [selectedRoute, range.startDate, range.endDate]);
+
+  // 易肇事路口 Top10：區間變動時重新取得（依 EPDO 降冪，GPS 100m 聚類）
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      setHotspotsTop10Loading(true);
+      try {
+        const res = await apiClient.getAccidentHotspotsRanking({ startDate: range.startDate, endDate: range.endDate, topN: 10 });
+        if (alive) setHotspotsTop10(res?.hotspots || []);
+      } catch (e) {
+        console.error('Failed to fetch accident hotspots ranking', e);
+        if (alive) setHotspotsTop10([]);
+      }
+      if (alive) setHotspotsTop10Loading(false);
+    })();
+    return () => { alive = false; };
+  }, [range.startDate, range.endDate]);
+
+  // A1 死亡事故清冊：區間變動時重新取得
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      setA1CasesLoading(true);
+      try {
+        const res = await apiClient.getA1Cases(range.startDate, range.endDate);
+        if (alive) setA1Cases(res?.items || []);
+      } catch (e) {
+        console.error('Failed to fetch A1 cases', e);
+        if (alive) setA1Cases([]);
+      }
+      if (alive) setA1CasesLoading(false);
+    })();
+    return () => { alive = false; };
+  }, [range.startDate, range.endDate]);
 
   // 列印完成（或取消）後移除 body class，避免影響下次一般畫面顯示
   useEffect(() => {
@@ -536,6 +578,132 @@ const RoadEngineeringPage: React.FC = () => {
               </>
             ) : (
               <div className="py-8 text-center text-text-subtle text-sm">此路線於本區間內無含里程座標之事故資料</div>
+            )}
+          </div>
+
+          {/* 易肇事路口 Top10（依 EPDO） */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 nook-shadow mb-6">
+            <h3 className="font-bold text-nook-text flex items-center gap-2">
+              🚨 易肇事路口 Top 10（依 EPDO）
+            </h3>
+            <p className="text-[11px] text-text-subtle mt-1 mb-3">
+              GPS 100 公尺聚類 · 依 EPDO（事故當量）排序 · 點 <FileSearch className="inline w-3 h-3" /> 產生該路口會勘資料包
+            </p>
+            {hotspotsTop10Loading ? (
+              <div className="py-8 text-center text-text-subtle text-sm">載入中...</div>
+            ) : hotspotsTop10.length === 0 ? (
+              <div className="py-8 text-center text-text-subtle text-sm">此區間無易肇事路口資料</div>
+            ) : (
+              <div className="max-h-80 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-surface-2">
+                    <tr className="text-nook-text/70">
+                      <th className="px-3 py-2.5 text-center font-medium">排名</th>
+                      <th className="px-3 py-2.5 text-left font-medium">地點</th>
+                      <th className="px-3 py-2.5 text-left font-medium">行政區</th>
+                      <th className="px-3 py-2.5 text-right font-medium">EPDO</th>
+                      <th className="px-3 py-2.5 text-right font-medium">總件數</th>
+                      <th className="px-3 py-2.5 text-right font-medium">A1·A2·A3</th>
+                      <th className="px-3 py-2.5 text-right font-medium">趨勢</th>
+                      <th className="px-3 py-2.5 text-center font-medium">會勘</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {hotspotsTop10.map((h: any) => (
+                      <tr key={`${h.rank}-${h.location}`} className="border-t border-surface-3">
+                        <td className="px-3 py-2 text-center tabular-nums">
+                          {h.rank === 1 ? '🥇' : h.rank === 2 ? '🥈' : h.rank === 3 ? '🥉' : h.rank}
+                        </td>
+                        <td className="px-3 py-2 max-w-[220px] truncate" title={h.location}>{h.location}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{h.district}</td>
+                        <td className="px-3 py-2 text-right font-bold text-danger tabular-nums">{h.epdo}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{h.total}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          <span className={h.a1_count > 0 ? 'text-red-600 font-bold' : ''}>{h.a1_count}</span>
+                          ・{h.a2_count}・{h.a3_count}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {h.trend_pct != null ? (
+                            <span className={h.trend_pct > 0 ? 'text-red-600 font-bold' : h.trend_pct < 0 ? 'text-green-600 font-bold' : 'text-text-muted'}>
+                              {h.trend_pct > 0 ? '↑' : h.trend_pct < 0 ? '↓' : ''}{Math.abs(h.trend_pct)}%
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            onClick={() => openDossier(h.latitude, h.longitude)}
+                            disabled={h.latitude == null || h.longitude == null}
+                            title="產生會勘資料"
+                            className="p-1.5 rounded-lg text-accent hover:bg-accent-soft disabled:text-text-subtle disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors"
+                          >
+                            <FileSearch className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* A1 死亡事故清冊 */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 nook-shadow mb-6">
+            <h3 className="font-bold text-nook-text flex items-center gap-2">
+              ⚫ A1 死亡事故清冊
+            </h3>
+            <p className="text-[11px] text-text-subtle mt-1 mb-3">
+              A1 案件依規定應辦理會勘檢討 · 點 <FileSearch className="inline w-3 h-3" /> 一鍵產生會勘資料包
+            </p>
+            {a1CasesLoading ? (
+              <div className="py-8 text-center text-text-subtle text-sm">載入中...</div>
+            ) : a1Cases.length === 0 ? (
+              <div className="py-8 text-center text-text-subtle text-sm">此區間無 A1 死亡事故</div>
+            ) : (
+              <div className="max-h-80 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-surface-2">
+                    <tr className="text-nook-text/70">
+                      <th className="px-3 py-2.5 text-left font-medium">日期</th>
+                      <th className="px-3 py-2.5 text-left font-medium">時間</th>
+                      <th className="px-3 py-2.5 text-left font-medium">區</th>
+                      <th className="px-3 py-2.5 text-left font-medium">轄區</th>
+                      <th className="px-3 py-2.5 text-left font-medium">地點</th>
+                      <th className="px-3 py-2.5 text-right font-medium">死亡</th>
+                      <th className="px-3 py-2.5 text-right font-medium">受傷</th>
+                      <th className="px-3 py-2.5 text-center font-medium">會勘</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {a1Cases.map((c: any, i: number) => (
+                      <tr key={i} className="border-t border-surface-3">
+                        <td className="px-3 py-2 tabular-nums whitespace-nowrap">{c.date}</td>
+                        <td className="px-3 py-2 tabular-nums">{c.time}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{c.district}</td>
+                        <td className="px-3 py-2 whitespace-nowrap text-text-muted">{c.sub_unit || '—'}</td>
+                        <td className="px-3 py-2 max-w-[260px] truncate" title={c.location}>{c.location}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          <span className="text-red-600 font-bold">{c.deaths}</span>
+                          {c.late_deaths > 0 && (
+                            <span className="tabular-nums text-red-600 text-[10px] block">⚰30日亡{c.late_deaths}</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">{c.injuries || '—'}</td>
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            onClick={() => openDossier(c.latitude, c.longitude)}
+                            disabled={c.latitude == null || c.longitude == null}
+                            title="產生會勘資料"
+                            className="p-1.5 rounded-lg text-accent hover:bg-accent-soft disabled:text-text-subtle disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors"
+                          >
+                            <FileSearch className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
 
@@ -856,7 +1024,7 @@ const RoadEngineeringPage: React.FC = () => {
                   </p>
 
                   {casesExpanded && (
-                    <div className="max-h-96 overflow-y-auto border border-surface-3 rounded-xl">
+                    <div className="max-h-96 overflow-y-auto border border-surface-3 rounded-xl print:max-h-none print:overflow-visible">
                       <table className="w-full text-sm">
                         <thead className="sticky top-0 bg-surface-2">
                           <tr className="text-text-muted">
@@ -887,7 +1055,7 @@ const RoadEngineeringPage: React.FC = () => {
                                   <span className="tabular-nums text-danger text-[10px] block">⚰30日亡{c.late_deaths}</span>
                                 )}
                               </td>
-                              <td className="px-3 py-2 max-w-[200px] truncate" title={c.location}>{c.location}</td>
+                              <td className="px-3 py-2 max-w-[200px] truncate print:max-w-none print:whitespace-normal print:overflow-visible" title={c.location}>{c.location}</td>
                             </tr>
                           ))}
                         </tbody>

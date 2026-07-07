@@ -984,6 +984,11 @@ class APIClient {
     return this.request(`/recommendations/dui-crash-cases?start_date=${startDate}&end_date=${endDate}`);
   }
 
+  /** A1（24 小時內死亡）事故清冊：依規定應辦理會勘檢討，供道路工程改善頁一鍵產生會勘資料包 */
+  async getA1Cases(startDate: string, endDate: string): Promise<any> {
+    return this.request(`/recommendations/a1-cases?start_date=${startDate}&end_date=${endDate}`);
+  }
+
   /** 系統操作稽核軌跡：最近 N 筆寫入操作與登入事件（預設 30 筆） */
   async getAuditLog(limit?: number): Promise<any> {
     return this.request(`/admin/audit-log?limit=${limit ?? 30}`);

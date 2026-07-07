@@ -2544,3 +2544,52 @@ async def get_dui_crash_cases(
         "total": len(items),
         "items": items,
     }
+
+
+# ============================================
+# A1 死亡事故清冊（供道路工程改善頁「A1 死亡事故清冊」卡使用）
+# ============================================
+@router.get("/a1-cases")
+async def get_a1_cases(
+    start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """A1（24 小時內死亡）事故清冊，依規定應辦理會勘檢討。
+
+    篩選期間內 Crash.severity == "A1" 的案件，依發生日期降冪排列，
+    附 GPS 座標供前端一鍵帶入「會勘資料產生器」。
+    """
+    try:
+        sd = datetime.strptime(start_date, "%Y-%m-%d").date()
+        ed = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return {"error": "日期格式錯誤"}
+
+    crashes = db.query(Crash).filter(
+        Crash.severity == "A1",
+        Crash.occurred_date >= sd,
+        Crash.occurred_date <= ed,
+    ).order_by(Crash.occurred_date.desc()).all()
+
+    items = [
+        {
+            "date": c.occurred_date.isoformat(),
+            "time": c.occurred_time.strftime("%H:%M") if c.occurred_time else "",
+            "district": c.district,
+            "sub_unit": c.sub_unit,
+            "location": c.location_desc,
+            "deaths": c.death_count or 0,
+            "late_deaths": c.late_death_count or 0,
+            "injuries": c.injury_count or 0,
+            "latitude": c.latitude,
+            "longitude": c.longitude,
+        }
+        for c in crashes
+    ]
+
+    return {
+        "period": {"start_date": start_date, "end_date": end_date},
+        "total": len(items),
+        "items": items,
+    }
