@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.core import Crash, Ticket, Topic
 from app.utils.data_health import run_batch_health_checks
+from app.utils.units import normalize_unit_name
 
 router = APIRouter()
 
@@ -448,6 +449,9 @@ def extract_sub_unit(row) -> Optional[str]:
     需剝除警察局 + 分局前綴成短名「那拔派出所」，才與既有 DB 的 sub_unit 值一致
     （否則派出所統計會因同所異名而分裂成兩組）。
     值本身就是「新化分局」（未特定所）時保留原名。
+
+    正規化邏輯統一委由 app.utils.units.normalize_unit_name 處理（全站共用，
+    與 core_ticket.unit_code 的正規化口徑一致）。
     """
     val = (
         _safe_eis_str(row, "所轄單位名稱")
@@ -456,11 +460,7 @@ def extract_sub_unit(row) -> Optional[str]:
     )
     if not val:
         return None
-    name = clean_precinct_name(val)  # 去「臺南市政府警察局」前綴 + 罕見字正規化
-    if name and "分局" in name:
-        suffix = name.split("分局", 1)[1].strip()
-        if suffix:
-            name = suffix
+    name = normalize_unit_name(val)
     return name[:100] if name else None
 
 
@@ -1936,6 +1936,14 @@ def _import_ticket_df(df: pd.DataFrame, batch_id: str, db, error_messages: list 
             enforcement_type = str(row.get("舉發類型", "")).strip() if not pd.isna(row.get("舉發類型")) else None
             enforcement_subtype = str(row.get("舉發子類型", "")).strip() if not pd.isna(row.get("舉發子類型")) else None
 
+            # 舉發單位（正規化為短名，剝除分局前綴，與 core_crash.sub_unit 口徑一致，
+            # 避免「各單位績效明細」因同一派出所字串不同而被拆成兩列）
+            unit_code_norm = (
+                normalize_unit_name(str(row.get("舉發單位", "")))
+                if not pd.isna(row.get("舉發單位"))
+                else None
+            )
+
             ticket = Ticket(
                 ticket_number=ticket_number,
                 import_batch_id=batch_id,
@@ -1956,9 +1964,7 @@ def _import_ticket_df(df: pd.DataFrame, batch_id: str, db, error_messages: list 
                 day_of_week=violation_dt.weekday(),
                 enforcement_type=enforcement_type[:20] if enforcement_type else None,
                 enforcement_subtype=enforcement_subtype[:50] if enforcement_subtype else None,
-                unit_code=str(row.get("舉發單位", ""))[:50]
-                if not pd.isna(row.get("舉發單位"))
-                else None,
+                unit_code=unit_code_norm[:50] if unit_code_norm else None,
                 driver_age=driver_age,
                 driver_age_group=age_group,
                 is_elderly=is_elderly,

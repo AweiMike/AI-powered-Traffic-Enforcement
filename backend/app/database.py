@@ -57,6 +57,9 @@ def init_db():
     # EIS 欄位自動遷移：若既有資料庫缺少新欄位則自動補上
     _migrate_eis_columns()
 
+    # 單位名稱正規化遷移：core_ticket.unit_code / core_crash.sub_unit 統一為短名
+    _canonicalize_unit_names()
+
     print("[OK] Database tables ready")
 
 
@@ -115,3 +118,65 @@ def _ensure_columns(inspector, table_name: str, columns: dict):
                 ))
                 print(f"  [+] {table_name}.{col_name} ({col_type}) added")
         conn.commit()
+
+
+def _canonicalize_unit_names():
+    """單位名稱正規化遷移：core_ticket.unit_code / core_crash.sub_unit 統一為短名。
+
+    背景：core_ticket.unit_code 舊資料帶分局前綴（如「新化分局唪口派出所」），
+    core_crash.sub_unit 已是短名（「唪口派出所」）。酒駕/大型車成效頁「各單位
+    績效明細」用 set(ticket鍵 ∪ crash鍵) 精確合併，字串不同就把同一派出所拆成
+    兩列。統一為短名（全站 canonical 慣例）後該頁會自動癒合，不需改合併邏輯。
+
+    冪等：值已是短名時 UPDATE 條件不會命中，第二次執行更新數為 0。
+    表格或欄位不存在（全新 DB、尚未跑過 _migrate_eis_columns 等情境）安全跳過。
+    失敗只印警告，絕不讓資料庫初始化/啟動失敗。
+    """
+    from app.utils.units import normalize_unit_name
+
+    targets = [
+        ("core_ticket", "unit_code", 50),
+        ("core_crash", "sub_unit", 100),
+    ]
+
+    try:
+        inspector = inspect(engine)
+        existing_tables = set(inspector.get_table_names())
+        summary_parts = []
+
+        with engine.connect() as conn:
+            for table_name, col_name, max_len in targets:
+                if table_name not in existing_tables:
+                    continue
+                existing_cols = {c["name"] for c in inspector.get_columns(table_name)}
+                if col_name not in existing_cols:
+                    continue
+
+                rows = conn.execute(text(
+                    f"SELECT DISTINCT {col_name} FROM {table_name} WHERE {col_name} IS NOT NULL"
+                )).fetchall()
+
+                changed_values = 0
+                changed_rows = 0
+                for (old_value,) in rows:
+                    new_value = normalize_unit_name(old_value)
+                    if new_value is not None:
+                        new_value = new_value[:max_len]
+                    if new_value == old_value:
+                        continue
+                    result = conn.execute(
+                        text(f"UPDATE {table_name} SET {col_name} = :new_value WHERE {col_name} = :old_value"),
+                        {"new_value": new_value, "old_value": old_value},
+                    )
+                    changed_values += 1
+                    changed_rows += result.rowcount or 0
+
+                conn.commit()
+                summary_parts.append(f"{table_name} 更新 {changed_values} 種值/{changed_rows} 筆")
+
+        if summary_parts:
+            print("[migrate] 單位名稱正規化: " + ", ".join(summary_parts))
+        else:
+            print("[migrate] 單位名稱正規化: 略過（表格/欄位不存在）")
+    except Exception as e:
+        print(f"[migrate][WARN] 單位名稱正規化失敗，已略過（不影響啟動）: {e}")
