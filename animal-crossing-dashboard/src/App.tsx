@@ -1122,18 +1122,35 @@ const App: React.FC = () => {
   const readOnly = useReadOnlyMode();
   const { authenticated, login, logout } = useAuth();
 
+  // In read-only mode, redirect admin-only views back to dashboard
+  // 唯讀模式下，管理頁面自動導回總覽
+  // NOTE: defined above the early `return <LoginPage/>` below (and so is the
+  // useEffect that follows) so hook call order stays identical across renders,
+  // 定義於下方 LoginPage 提前 return 之前（下方 useEffect 亦同），確保 hooks 呼叫順序在
+  // 登入前後每次 render 都一致，避免 React hooks 順序錯亂警告。
+  const safeSetView = (view: string) => {
+    if (readOnly && ADMIN_ONLY_VIEWS.has(view)) return;
+    setActiveView(view);
+  };
+
+  // 跨頁導頁事件：供其他頁面（如勤務建議單熱點 🔍）以 CustomEvent 觸發切換頁面
+  // Cross-page navigation event: lets other pages (e.g. patrol-plan hotspot
+  // dossier shortcut) switch views via a CustomEvent instead of prop drilling.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const view = (e as CustomEvent).detail?.view;
+      if (view) safeSetView(view);
+    };
+    window.addEventListener('app:navigate', handler);
+    return () => window.removeEventListener('app:navigate', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readOnly]);
+
   // Read-only mode: no login needed; admin mode: require login
   // 唯讀模式免登入，管理模式需登入
   if (!readOnly && !authenticated) {
     return <LoginPage onLogin={login} />;
   }
-
-  // In read-only mode, redirect admin-only views back to dashboard
-  // 唯讀模式下，管理頁面自動導回總覽
-  const safeSetView = (view: string) => {
-    if (readOnly && ADMIN_ONLY_VIEWS.has(view)) return;
-    setActiveView(view);
-  };
 
   const renderView = () => {
     switch (activeView) {

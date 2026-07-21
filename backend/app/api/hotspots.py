@@ -71,24 +71,36 @@ def _clean_district(district: str) -> str:
     return district or "未知區"
 
 
+def _collapse_self_pair(name: str) -> str:
+    """EIS 偶有「中正路 / 中正路」同路自交寫法（同路段非路口），折疊為單路名顯示"""
+    if '/' in name:
+        parts = [p.strip() for p in name.split('/')]
+        if len(parts) == 2 and parts[0] and parts[0] == parts[1]:
+            return parts[0]
+    return name
+
+
 def _pick_best_location(location_counts: dict) -> str:
     """
     從一組 location_desc -> count 中挑出最佳代表名稱。
     優先選含「/」的交叉路口描述（但其票數需 >= 最多單一名稱的 30%），
-    否則選票數最多的名稱。
+    否則選票數最多的名稱。「A / A」同路自交寫法不算路口且顯示時折疊為單路名。
     """
     if not location_counts:
         return "未知地點"
     top_name = max(location_counts, key=location_counts.get)
     top_count = location_counts[top_name]
-    # 找交叉路口中票數最多的
-    intersections = {k: v for k, v in location_counts.items() if '/' in k}
+    # 找交叉路口中票數最多的（排除「A / A」同路自交假路口）
+    intersections = {
+        k: v for k, v in location_counts.items()
+        if '/' in k and _collapse_self_pair(k) == k
+    }
     if intersections:
         best_inter = max(intersections, key=intersections.get)
         # 交叉路口票數夠多才優先選（至少佔最多單一名稱的 30%）
         if intersections[best_inter] >= top_count * 0.3:
             return best_inter
-    return top_name
+    return _collapse_self_pair(top_name)
 
 
 def cluster_crashes_by_gps(rows, radius_m=CLUSTER_RADIUS_M):

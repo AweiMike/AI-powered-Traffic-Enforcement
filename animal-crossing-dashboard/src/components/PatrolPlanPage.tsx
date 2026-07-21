@@ -220,15 +220,32 @@ const PatrolPlanPage: React.FC = () => {
                           <p className="text-sm text-text-muted">
                             {slot.top_crash_type || '型態不明'} / {slot.top_cause || '肇因不明'}
                           </p>
-                          {/* 第三行：熱點 chips */}
-                          {slot.hotspots?.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5">
-                              {slot.hotspots.map((h: any, i: number) => (
-                                <span key={i} className="bg-surface-3 rounded px-2 text-xs text-text-muted">
-                                  {h.location}×{h.count}
-                                </span>
-                              ))}
-                            </div>
+                          {/* 第三行：熱點 chips（GPS 聚類）／分散誠實標記 */}
+                          {slot.scattered ? (
+                            <p className="text-xs text-amber-600">事故點分散無明確熱點</p>
+                          ) : (
+                            slot.hotspots?.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5">
+                                {slot.hotspots.map((h: any, i: number) => (
+                                  <span key={i} className="inline-flex items-center gap-1 bg-surface-3 rounded px-2 text-xs text-text-muted">
+                                    {h.location}×{h.count}
+                                    {h.latitude != null && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          sessionStorage.setItem('pending_dossier', JSON.stringify({ lat: h.latitude, lng: h.longitude }));
+                                          window.dispatchEvent(new CustomEvent('app:navigate', { detail: { view: 'road-eng' } }));
+                                        }}
+                                        className="print:hidden leading-none hover:opacity-70"
+                                        title="開啟會勘卷宗"
+                                      >
+                                        🔍
+                                      </button>
+                                    )}
+                                  </span>
+                                ))}
+                              </div>
+                            )
                           )}
                           {/* 第四行：勤務建議 */}
                           <p className="text-sm bg-accent-soft/40 rounded-lg px-3 py-1.5">

@@ -14,6 +14,7 @@ from app.utils.dui_crash import dui_crash_filter, crash_dui_real_filter
 from app.utils.drug_drive import drug_drive_filter, drug_crash_filter, not_drug_filter
 from app.utils.trend_engine import weekly_trend
 from app.utils.epdo import crash_epdo, epdo_sum, epdo_sql_sum
+from app.api.hotspots import cluster_crashes_by_gps, _pick_best_location
 
 router = APIRouter()
 
@@ -2094,6 +2095,9 @@ async def get_patrol_plan(
     僅分析新化分局轄下 7 個轄區所，依「事故能量（EPDO）」找出每所前 3 高風險班別，
     並比對現有舉發張數，標記出 EPDO 高但取締密度偏低的「勤務缺口（gap）」，
     產出可直接排勤參考的建議文字。
+    熱點改採 GPS 100m 半徑聚類（cluster_crashes_by_gps，見 app/api/hotspots.py），
+    取代原本 location_desc 文字眾數，避免路口級地點被籠統路名稀釋；
+    聚類過於分散（無明確集中點）時以 scattered 誠實標記，建議改為機動巡邏。
     """
     try:
         sd = datetime.strptime(start_date, "%Y-%m-%d").date()
@@ -2121,11 +2125,6 @@ async def get_patrol_plan(
         if not filtered:
             return None
         return Counter(filtered).most_common(1)[0][0]
-
-    def top_locations(values, n=2):
-        """地點描述眾數前 n 名，排除「未知地點」"""
-        filtered = [v for v in values if v and v != "未知地點"]
-        return [{"location": k, "count": v} for k, v in Counter(filtered).most_common(n)]
 
     # 一次撈出 7 所在區間內的全部事故，於 Python 端依（單位, 班別）分組，
     # 避免對每個班別再各別查詢明細造成大量重複查詢。
@@ -2163,7 +2162,40 @@ async def get_patrol_plan(
             items = s["items"]
             top_crash_type = mode_value([c.crash_type for c in items])
             top_cause = mode_value([c.cause for c in items])
-            hotspots = top_locations([c.location_desc for c in items])
+
+            # 熱點改採 GPS 100m 半徑聚類（見 app/api/hotspots.py），
+            # 取代原本 location_desc 文字眾數，避免路口級地點被籠統路名稀釋
+            rows_for_cluster = [{
+                'lat': c.latitude, 'lng': c.longitude, 'district': c.district,
+                'location_desc': c.location_desc, 'severity': c.severity,
+                'death_count': c.death_count, 'late_death_count': c.late_death_count,
+                'injury_count': c.injury_count,
+            } for c in items]
+            clusters = cluster_crashes_by_gps(rows_for_cluster)
+
+            # 合格熱點 = 單一叢集 ≥3 件，或占該班別總件數 ≥4 成（小樣本班別用占比）。
+            # clusters 已依 EPDO 降冪 → 第一個合格者即「傷害能量最高的合格熱點」＝建議目標。
+            # 注意不能只看 EPDO 最高叢集的件數判分散：可能 EPDO 高者僅 2 件、
+            # 而另有 3 件的合格集中點（實測新化所 06-08 時即此情形）。
+            qualifying = [
+                cl for cl in clusters
+                if cl['total'] >= 3 or cl['total'] / s["count"] >= 0.4
+            ]
+            scattered = not qualifying
+            target = qualifying[0] if qualifying else None
+
+            # chips 取 EPDO 前 2；建議目標若不在其中則置首（建議文字必須有對應 chip 可點）
+            chip_clusters = clusters[:2]
+            if target is not None and all(target is not cl for cl in chip_clusters):
+                chip_clusters = [target] + chip_clusters[:1]
+
+            hotspots = [{
+                "location": _pick_best_location(cl['locations']),
+                "count": cl['total'],
+                "epdo": round(cl['epdo'], 1),
+                "latitude": round(cl['lat'], 6),
+                "longitude": round(cl['lng'], 6),
+            } for cl in chip_clusters]
 
             # 違規側：該所（unit_code 含該所名）該班區間內張數
             existing_tickets = db.query(func.count(Ticket.id)).filter(
@@ -2180,10 +2212,11 @@ async def get_patrol_plan(
             is_gap = s["epdo"] >= 15 and existing_tickets < s["count"] * 3
 
             label = shift_label(s["shift_id"])
-            if hotspots:
-                suggestion = f"{label}於{hotspots[0]['location']}等熱點加強{top_crash_type or '交通'}防制勤務"
+            if scattered:
+                suggestion = f"{label}事故點分散無明確熱點，建議機動巡邏提升見警率"
             else:
-                suggestion = "加強巡邏見警率"
+                target_name = _pick_best_location(target['locations'])
+                suggestion = f"{label}於{target_name}一帶（{target['total']}件）加強{top_crash_type or '交通'}防制勤務"
             if s["dui_count"] > 0:
                 suggestion += "，並列入酒駕攔檢"
 
@@ -2198,6 +2231,7 @@ async def get_patrol_plan(
                 "hotspots": hotspots,
                 "existing_tickets": existing_tickets,
                 "is_gap": is_gap,
+                "scattered": scattered,
                 "suggestion": suggestion,
             })
 

@@ -378,6 +378,21 @@ const RoadEngineeringPage: React.FC = () => {
     setTimeout(() => dossierSectionRef.current?.scrollIntoView({ behavior: 'smooth' }), 0);
   };
 
+  // 跨頁導頁接棒：其他頁面（如勤務建議單熱點 🔍）透過 sessionStorage 帶入座標，
+  // 掛載時取出並直接開啟會勘卷宗（openDossier 內建 scrollIntoView，見上，不需另補捲動）
+  useEffect(() => {
+    const raw = sessionStorage.getItem('pending_dossier');
+    if (!raw) return;
+    sessionStorage.removeItem('pending_dossier');
+    try {
+      const { lat, lng } = JSON.parse(raw);
+      if (lat != null && lng != null) openDossier(lat, lng);
+    } catch {
+      /* ignore malformed payload */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /** 列印會勘卷宗：先展開案件明細，再觸發瀏覽器列印（僅印 .print-area 範圍，見 index.css） */
   const handlePrintDossier = () => {
     setCasesExpanded(true);
