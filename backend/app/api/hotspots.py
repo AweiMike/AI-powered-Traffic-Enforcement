@@ -35,6 +35,9 @@ class HotspotItem(BaseModel):
     trend_pct: Optional[float] = None  # 與基準期比較（依 epdo 計算）
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    # 路口衝突方向引擎（Wave 28）
+    no_signal_pct: Optional[float] = None  # 無號誌案數 / signal_action 非空案數（分母0→None）
+    top_conflict: Optional[str] = None  # 該叢集 side_impact_direction 眾數
 
 
 class HotspotResponse(BaseModel):
@@ -147,8 +150,17 @@ def cluster_crashes_by_gps(rows, radius_m=CLUSTER_RADIUS_M):
             matched['locations'][loc] = matched['locations'].get(loc, 0) + 1
             # district 取最常見
             matched['districts'][row['district']] = matched['districts'].get(row['district'], 0) + 1
+            # 路口衝突方向引擎（Wave 28）：號誌動作 / 衝突方向累計（向下相容，row 缺鍵時 get 回傳 None）
+            sa = row.get('signal_action')
+            if sa:
+                matched['signal_action_counts'][sa] = matched['signal_action_counts'].get(sa, 0) + 1
+            sid = row.get('side_impact_direction')
+            if sid:
+                matched['conflict_counts'][sid] = matched['conflict_counts'].get(sid, 0) + 1
         else:
             sev = row.get('severity', '')
+            sa = row.get('signal_action')
+            sid = row.get('side_impact_direction')
             clusters.append({
                 'lat': lat,
                 'lng': lng,
@@ -159,7 +171,20 @@ def cluster_crashes_by_gps(rows, radius_m=CLUSTER_RADIUS_M):
                 'a3': 1 if sev != 'A1' and sev != 'A2' else 0,
                 'total': 1,
                 'epdo': row_epdo,
+                # 路口衝突方向引擎（Wave 28）：向下相容，row 無此鍵時累計為空 dict
+                'signal_action_counts': {sa: 1} if sa else {},
+                'conflict_counts': {sid: 1} if sid else {},
             })
+
+    # 路口衝突方向引擎（Wave 28）：由累計分布導出每叢集摘要欄位
+    # no_signal_pct：無號誌案數 / signal_action 非空案數（分母 0 → None）
+    # top_conflict：side_impact_direction 眾數（無資料 → None）
+    for c in clusters:
+        sig_counts = c.get('signal_action_counts', {})
+        sig_total = sum(sig_counts.values())
+        c['no_signal_pct'] = round(sig_counts.get('無號誌', 0) / sig_total, 2) if sig_total else None
+        conflict_counts = c.get('conflict_counts', {})
+        c['top_conflict'] = max(conflict_counts, key=conflict_counts.get) if conflict_counts else None
 
     # 排序鍵改為 epdo 降冪（原為 total 降冪；財損案多但死傷少的路口不再壓過死傷路口）
     clusters.sort(key=lambda c: c['epdo'], reverse=True)
@@ -190,6 +215,7 @@ def _fetch_crash_rows(db, start_dt, end_dt, severity=None, dui_only: bool = Fals
         Crash.latitude, Crash.longitude, Crash.district,
         Crash.location_desc, Crash.severity,
         Crash.death_count, Crash.late_death_count, Crash.injury_count,
+        Crash.signal_action, Crash.side_impact_direction,
     ).filter(
         and_(
             Crash.occurred_date >= start_dt,
@@ -214,7 +240,9 @@ def _fetch_crash_rows(db, start_dt, end_dt, severity=None, dui_only: bool = Fals
          'district': r.district or '', 'location_desc': r.location_desc or '',
          'severity': r.severity or '',
          'death_count': r.death_count, 'late_death_count': r.late_death_count,
-         'injury_count': r.injury_count}
+         'injury_count': r.injury_count,
+         # 路口衝突方向引擎（Wave 28）：號誌動作分流 / 主要衝突方向來源欄位
+         'signal_action': r.signal_action, 'side_impact_direction': r.side_impact_direction}
         for r in query.all()
     ]
 
@@ -303,6 +331,8 @@ async def get_accident_hotspots(
             trend_pct=trend_pct,
             latitude=round(c['lat'], 6),
             longitude=round(c['lng'], 6),
+            no_signal_pct=c.get('no_signal_pct'),
+            top_conflict=c.get('top_conflict'),
         ))
 
     # 總數

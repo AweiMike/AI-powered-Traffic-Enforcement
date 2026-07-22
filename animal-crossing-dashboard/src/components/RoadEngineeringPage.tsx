@@ -37,17 +37,29 @@ function SummaryMini({ label, value, valueClassName }: { label: string; value: R
   );
 }
 
-/** 會勘卷宗用：{name,count} 水平長條清單（事故型態 Top5 / 肇因 Top5 共用） */
-function HBarList({ items }: { items: Array<{ name: string; count: number }> | undefined }) {
+/**
+ * 會勘卷宗用：{name,count} 水平長條清單（事故型態 Top5 / 肇因 Top5 / 側撞衝突型態共用）
+ * barColorFor：可選的逐項顏色函式（衝突方向依嚴重性分色用），未提供時維持原本 accent 藍
+ * labelWidth：標籤欄寬（衝突型態名最長 14 字，用 w-44 避免截斷；預設 w-20 維持既有版面）
+ */
+function HBarList({
+  items,
+  barColorFor,
+  labelWidth = 'w-20',
+}: {
+  items: Array<{ name: string; count: number }> | undefined;
+  barColorFor?: (name: string) => string;
+  labelWidth?: string;
+}) {
   if (!items || items.length === 0) return <p className="text-xs text-text-subtle">無資料</p>;
   const max = Math.max(...items.map((i) => i.count), 1);
   return (
     <div className="space-y-1.5">
       {items.map((it) => (
         <div key={it.name} className="flex items-center gap-2">
-          <span className="w-20 shrink-0 text-xs text-text-muted truncate" title={it.name}>{it.name}</span>
+          <span className={`${labelWidth} shrink-0 text-xs text-text-muted truncate`} title={it.name}>{it.name}</span>
           <div className="flex-1 h-4 bg-surface-3 rounded overflow-hidden">
-            <div className="h-full bg-accent/70 rounded" style={{ width: `${(it.count / max) * 100}%` }} />
+            <div className={`h-full ${barColorFor ? barColorFor(it.name) : 'bg-accent/70'} rounded`} style={{ width: `${(it.count / max) * 100}%` }} />
           </div>
           <span className="w-6 text-right text-xs font-bold tabular-nums">{it.count}</span>
         </div>
@@ -629,7 +641,19 @@ const RoadEngineeringPage: React.FC = () => {
                         <td className="px-3 py-2 text-center tabular-nums">
                           {h.rank === 1 ? '🥇' : h.rank === 2 ? '🥈' : h.rank === 3 ? '🥉' : h.rank}
                         </td>
-                        <td className="px-3 py-2 max-w-[220px] truncate" title={h.location}>{h.location}</td>
+                        <td className="px-3 py-2 max-w-[220px]">
+                          <div className="truncate" title={h.location}>{h.location}</div>
+                          {(h.top_conflict || (h.no_signal_pct != null && h.no_signal_pct >= 0.5)) && (
+                            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                              {h.no_signal_pct != null && h.no_signal_pct >= 0.5 && (
+                                <span className="bg-slate-200 text-slate-600 text-[10px] px-1.5 rounded">無號誌</span>
+                              )}
+                              {h.top_conflict && (
+                                <span className="text-[10px] text-text-muted">⚔ {h.top_conflict}</span>
+                              )}
+                            </div>
+                          )}
+                        </td>
                         <td className="px-3 py-2 whitespace-nowrap">{h.district}</td>
                         <td className="px-3 py-2 text-right font-bold text-danger tabular-nums">{h.epdo}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{h.total}</td>
@@ -995,6 +1019,82 @@ const RoadEngineeringPage: React.FC = () => {
                       ))}
                     </div>
                   </div>
+                </div>
+
+                {/* c2. 路口衝突方向分析（Wave 28：conflict_directions / action_pairs / signal_actions，三者皆可能為空陣列/空物件/缺鍵） */}
+                <div className="p-5 border-b border-surface-3">
+                  <h4 className="text-sm font-bold text-nook-text mb-2">🧭 路口衝突方向分析</h4>
+                  {(() => {
+                    const conflictDirections = dossier.patterns?.conflict_directions;
+                    const actionPairs = dossier.patterns?.action_pairs;
+                    const signalEntries = Object.entries((dossier.patterns?.signal_actions || {}) as Record<string, number>);
+
+                    const hasConflictDirections = Array.isArray(conflictDirections) && conflictDirections.length > 0;
+                    const hasActionPairs = Array.isArray(actionPairs) && actionPairs.length > 0;
+                    const hasSignalActions = signalEntries.length > 0;
+
+                    if (!hasConflictDirections && !hasActionPairs && !hasSignalActions) {
+                      return (
+                        <p className="text-xs text-text-subtle">
+                          本點位無衝突方向資料（側撞行向僅側撞案件記載，112 年 7 月後始有此欄位）
+                        </p>
+                      );
+                    }
+
+                    const signalTotal = signalEntries.reduce((sum, [, count]) => sum + (count || 0), 0);
+                    const noSignalEntry = signalEntries.find(([name]) => name === '無號誌');
+                    const noSignalDominant = !!noSignalEntry && signalTotal > 0 && noSignalEntry[1] / signalTotal > 0.5;
+
+                    return (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {hasConflictDirections && (
+                          <div>
+                            <h5 className="text-xs font-bold text-nook-text/70 mb-1.5">側撞衝突型態</h5>
+                            <HBarList
+                              items={conflictDirections}
+                              barColorFor={(name) => (name.startsWith('對向') ? 'bg-danger' : name.startsWith('橫向') ? 'bg-warning' : 'bg-accent/70')}
+                              labelWidth="w-44"
+                            />
+                          </div>
+                        )}
+
+                        {hasActionPairs && (
+                          <div>
+                            <h5 className="text-xs font-bold text-nook-text/70 mb-1.5">當事者行動配對</h5>
+                            <div className="flex flex-wrap gap-1.5">
+                              {actionPairs.map((it: any) => (
+                                <span key={it.name} className="bg-surface-3 rounded px-2 text-xs text-text-muted">{it.name}×{it.count}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {hasSignalActions && (
+                          <div>
+                            <h5 className="text-xs font-bold text-nook-text/70 mb-1.5">號誌狀態</h5>
+                            <div className="space-y-1">
+                              {signalEntries.map(([name, count]) => {
+                                const pct = signalTotal > 0 ? count / signalTotal : 0;
+                                const isDominantNoSignal = name === '無號誌' && pct > 0.5;
+                                return (
+                                  <div
+                                    key={name}
+                                    className={`flex items-center justify-between text-xs ${isDominantNoSignal ? 'text-danger font-bold' : 'text-text-muted'}`}
+                                  >
+                                    <span>{name}</span>
+                                    <span className="tabular-nums">{count}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {noSignalDominant && (
+                              <p className="text-[10px] text-danger mt-1.5">⚠ 本點位多數事故發生於無號誌狀態</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* d. 涉入對象 */}

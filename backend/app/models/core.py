@@ -125,6 +125,11 @@ class Crash(Base):
     is_hit_and_run = Column(Boolean, default=False, index=True, comment="是否肇事逃逸（35. 任一當事者=是）")
     delivery_platform = Column(String(50), comment="共享經濟或外送平台（37. 任一當事者非空）")
 
+    # === 路口衝突方向引擎欄位（Wave 28，來源=全選條件 EIS 匯出）===
+    side_impact_direction = Column(String(50), comment="側撞時行車方向（EIS 11207新增，衝突型態：對向直行、左轉 等）")
+    conflict_action_pair = Column(String(80), comment="順位1×順位2當事者行動狀態配對（如：向前直行中×左轉彎）")
+    signal_action = Column(String(20), comment="號誌動作（無號誌/正常/閃光/不正常，12-2欄）")
+
     # === 慢車/微電車分析欄位 ===
     evehicle_type = Column(
         String(50), index=True,

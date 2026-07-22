@@ -1945,6 +1945,11 @@ async def get_site_dossier(
     signal_types = top_n([c.signal_type for c in crashes])
     by_weather = top_n([c.weather for c in crashes])
 
+    # 路口衝突方向引擎（Wave 28）：衝突方向 / 行動狀態配對 / 號誌動作分布
+    conflict_directions = top_n([c.side_impact_direction for c in crashes], 6)
+    action_pairs = top_n([c.conflict_action_pair for c in crashes], 6)
+    signal_actions = dict(Counter(c.signal_action for c in crashes if c.signal_action))
+
     NIGHT_SHIFTS = {"10", "11", "12", "01", "02", "03"}
     night_count = sum(1 for c in crashes if c.shift_id in NIGHT_SHIFTS)
     night_pct = round(night_count * 100 / total, 1) if total else 0.0
@@ -2039,6 +2044,42 @@ async def get_site_dossier(
             "reason": f"酒駕事故 {dui} 件，建議列入夜間攔檢點",
         })
 
+    # 規則 6.5：無號誌路口 → 增設號誌或改善管制
+    sig_total = sum(signal_actions.values())
+    no_signal = signal_actions.get("無號誌", 0)
+    side_crashes = sum(t["count"] for t in top_crash_types if "側撞" in t["name"])
+    cross_conflicts = sum(d["count"] for d in conflict_directions if "橫向" in d["name"])
+    if sig_total >= 10 and no_signal / sig_total > 0.5 and (side_crashes >= 5 or cross_conflicts >= 3):
+        suggestions.append({
+            "title": "評估增設號誌或改善路口管制",
+            "reason": (
+                f"本點位 {no_signal}/{sig_total} 件事故發生於無號誌狀態，"
+                f"且橫向/側撞衝突 {cross_conflicts + side_crashes} 件，"
+                "建議會勘評估號誌化或增設停讓管制"
+            ),
+        })
+
+    # 規則 6.6：對向左轉衝突 → 左轉保護時相
+    opposing_left = sum(
+        d["count"] for d in conflict_directions if "對向" in d["name"] and "左轉" in d["name"]
+    )
+    same_left = sum(
+        d["count"] for d in conflict_directions if "同向" in d["name"] and "左轉" in d["name"]
+    )
+    if opposing_left >= 3:
+        suggestions.append({
+            "title": "評估左轉保護時相或禁止左轉",
+            "reason": (
+                f"「對向直行、左轉」衝突 {opposing_left} 件——對向左轉未讓直行為主要衝突型態，"
+                "建議評估左轉專用時相、待轉區或尖峰禁左"
+            ),
+        })
+    elif same_left >= 3:
+        suggestions.append({
+            "title": "評估車道配置與左轉動線",
+            "reason": f"「同向直行、左轉」衝突 {same_left} 件，建議檢視左轉車道長度/標線引導",
+        })
+
     # 規則 7：都未觸發時的預設項
     if not suggestions:
         suggestions.append({
@@ -2070,6 +2111,10 @@ async def get_site_dossier(
             "lighting_issue_count": lighting_issue_count,
             "by_shift": by_shift,
             "by_weather": by_weather,
+            # 路口衝突方向引擎（Wave 28）
+            "conflict_directions": conflict_directions,
+            "action_pairs": action_pairs,
+            "signal_actions": signal_actions,
         },
         "involved": {
             "elderly": elderly,

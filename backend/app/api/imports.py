@@ -543,14 +543,19 @@ def backfill_road_fields(existing, row, rollup) -> None:
             existing.is_hit_and_run = True
         if existing.delivery_platform is None and rollup.get("delivery_platform"):
             existing.delivery_platform = rollup["delivery_platform"]
+        # 路口衝突方向引擎（Wave 28）：順位1×順位2 行動狀態配對回補
+        if existing.conflict_action_pair is None and rollup.get("conflict_action_pair"):
+            existing.conflict_action_pair = rollup["conflict_action_pair"]
 
 
 def extract_road_engineering_fields(row) -> dict:
     """案件級道路工程欄位（Phase 1 擴充；全選條件匯出才有值，欄位缺時皆為 None）。
 
     對應 Crash model 的 speed_limit / crash_type / road_type / signal_type /
-    road_lighting / route_name / route_km 七欄。這些為 EIS 案件級屬性
-    （同案各當事者列相同），取當前列即可。
+    road_lighting / route_name / route_km / side_impact_direction /
+    signal_action 九欄。這些為 EIS 案件級屬性（同案各當事者列相同），
+    取當前列即可。side_impact_direction / signal_action 為 Wave 28
+    路口衝突方向引擎新增欄位。
     """
     speed_limit = None
     sl = _safe_eis_str(row, "7.速限(第1當事者)")
@@ -583,6 +588,9 @@ def extract_road_engineering_fields(row) -> dict:
         "road_lighting": lighting or None,
         "route_name": route if route and route != "無" else None,
         "route_km": route_km,
+        # 路口衝突方向引擎（Wave 28）：案件級欄位，取當前列即可
+        "side_impact_direction": (_safe_eis_str(row, "側撞時行車方向名稱(11207新增)")[:50] or None),
+        "signal_action": (_safe_eis_str(row, "12-2.號誌-號誌動作")[:20] or None),
     }
 
 
@@ -862,6 +870,10 @@ async def import_crash_file(
                     "driver_protective_gear": None,
                     "any_hit_and_run": False,
                     "delivery_platform": None,
+                    # 路口衝突方向引擎（Wave 28）：順位1×順位2 當事者行動狀態配對
+                    "_conflict_act1": None,
+                    "_conflict_act2": None,
+                    "conflict_action_pair": None,
                     "_picked_priority": 0,  # 內部用：1=肇事駕駛飲酒, 2=非行人, 3=fallback
                 })
 
@@ -877,6 +889,20 @@ async def import_crash_file(
                     # 值域含「其他(非共享經濟與外送平台)」「非駕駛人」等雜訊，僅收真外送/共享
                     if _dp and ("外送" in _dp or "共享" in _dp) and "非共享" not in _dp:
                         bucket["delivery_platform"] = _dp[:50]
+
+                # 路口衝突方向引擎（Wave 28）：順位1×順位2 當事者行動狀態配對
+                # 「當事者順位」值可能有前導零（"01"），lstrip("0") 正規化比對
+                _pos_raw = _safe_eis_str(row, "當事者順位").strip()
+                _pos = _pos_raw.lstrip("0") or _pos_raw
+                _action_status = _safe_eis_str(row, "29.當事者行動狀態類別名稱") or None
+                if _pos == "1" and bucket["_conflict_act1"] is None and _action_status:
+                    bucket["_conflict_act1"] = _action_status
+                elif _pos == "2" and bucket["_conflict_act2"] is None and _action_status:
+                    bucket["_conflict_act2"] = _action_status
+                if bucket["_conflict_act1"] and bucket["_conflict_act2"]:
+                    bucket["conflict_action_pair"] = (
+                        f"{bucket['_conflict_act1']}×{bucket['_conflict_act2']}"[:80]
+                    )
 
                 # 駕駛代表 row 選擇（priority 越高越佳，3>2>1）
                 priority = 3 if (not is_pedestrian and is_drinking) else (2 if not is_pedestrian else 1)
@@ -1028,6 +1054,7 @@ async def import_crash_file(
                     protective_gear = rollup.get("driver_protective_gear")
                     is_hit_and_run = bool(rollup.get("any_hit_and_run", False))
                     delivery_platform = rollup.get("delivery_platform")
+                    conflict_action_pair = rollup.get("conflict_action_pair")
 
                     # 舊邏輯 fallback（若資料未含新欄位，例如歷史檔）
                     if not is_dui_crash_party and (drinking_code is None and party_subtype_code is None):
@@ -1119,6 +1146,7 @@ async def import_crash_file(
                     protective_gear = None
                     is_hit_and_run = False
                     delivery_platform = None
+                    conflict_action_pair = None
 
                 # ============================
                 # 共用欄位（兩種格式皆走此路徑）
@@ -1235,6 +1263,8 @@ async def import_crash_file(
                     protective_gear=protective_gear,
                     is_hit_and_run=is_hit_and_run,
                     delivery_platform=delivery_platform,
+                    # 路口衝突方向引擎（Wave 28）
+                    conflict_action_pair=conflict_action_pair,
                     **road_fields,
                 )
 
@@ -1384,9 +1414,17 @@ def _do_batch_import(txt_files: list, db):
 
     # 檢查是否有舊版 sub_unit（= 交通分隊，代表尚未套用「所轄單位名稱」欄位）
     # 若有，允許已匯入的檔案重新進入流程以回補 sub_unit 欄位
-    needs_backfill = db.query(func.count(Crash.id)).filter(
+    needs_backfill_subunit = db.query(func.count(Crash.id)).filter(
         Crash.sub_unit.like('%交通分隊%')
     ).scalar() > 0
+    # 路口衝突方向引擎（Wave 28）回補哨兵：signal_action 全史 87% 案件應有值，
+    # 若全庫皆為 NULL 代表尚未跑過回補，允許已匯入檔案重新進入流程補值；
+    # 回補後 signal_action 必非零，冪等不再重跑。
+    conflict_backfill_needed = (
+        db.query(func.count(Crash.id)).scalar() > 0
+        and db.query(func.count(Crash.id)).filter(Crash.signal_action.isnot(None)).scalar() == 0
+    )
+    needs_backfill = needs_backfill_subunit or conflict_backfill_needed
 
     for txt_path in txt_files:
         fname = os.path.basename(txt_path)
@@ -1451,6 +1489,10 @@ def _do_batch_import(txt_files: list, db):
                         "driver_protective_gear": None,
                         "any_hit_and_run": False,
                         "delivery_platform": None,
+                        # 路口衝突方向引擎（Wave 28）：順位1×順位2 當事者行動狀態配對
+                        "_conflict_act1": None,
+                        "_conflict_act2": None,
+                        "conflict_action_pair": None,
                         "_picked_priority": 0,
                     })
                     if not _is_pedestrian and _is_drinking:
@@ -1463,6 +1505,18 @@ def _do_batch_import(txt_files: list, db):
                         # 僅收真外送/共享（排除「其他(非共享經濟與外送平台)」「非駕駛人」雜訊）
                         if _dp and ("外送" in _dp or "共享" in _dp) and "非共享" not in _dp:
                             _bucket["delivery_platform"] = _dp[:50]
+                    # 路口衝突方向引擎（Wave 28）：順位1×順位2 當事者行動狀態配對
+                    _pos_raw = _safe_eis_str(_row, "當事者順位").strip()
+                    _pos = _pos_raw.lstrip("0") or _pos_raw
+                    _action_status = _safe_eis_str(_row, "29.當事者行動狀態類別名稱") or None
+                    if _pos == "1" and _bucket["_conflict_act1"] is None and _action_status:
+                        _bucket["_conflict_act1"] = _action_status
+                    elif _pos == "2" and _bucket["_conflict_act2"] is None and _action_status:
+                        _bucket["_conflict_act2"] = _action_status
+                    if _bucket["_conflict_act1"] and _bucket["_conflict_act2"]:
+                        _bucket["conflict_action_pair"] = (
+                            f"{_bucket['_conflict_act1']}×{_bucket['_conflict_act2']}"[:80]
+                        )
                     _priority = 3 if (not _is_pedestrian and _is_drinking) else (2 if not _is_pedestrian else 1)
                     if _priority > _bucket["_picked_priority"]:
                         _bucket["_picked_priority"] = _priority
@@ -1594,6 +1648,7 @@ def _do_batch_import(txt_files: list, db):
                         protective_gear = rollup.get("driver_protective_gear")
                         is_hit_and_run = bool(rollup.get("any_hit_and_run", False))
                         delivery_platform = rollup.get("delivery_platform")
+                        conflict_action_pair = rollup.get("conflict_action_pair")
 
                         # 舊邏輯 fallback
                         if not is_dui_crash_party and (drinking_code is None and party_subtype_code is None):
@@ -1714,6 +1769,8 @@ def _do_batch_import(txt_files: list, db):
                         protective_gear=protective_gear,
                         is_hit_and_run=is_hit_and_run,
                         delivery_platform=delivery_platform,
+                        # 路口衝突方向引擎（Wave 28）
+                        conflict_action_pair=conflict_action_pair,
                         **road_fields,
                     )
                     db.add(crash)
@@ -2027,9 +2084,17 @@ async def import_crash_upload_batch(
     batch_ids_this_run = []  # 本次上傳產生的所有 batch_id（各檔各自時間戳，健檢需收集全部）
 
     # 檢查是否需要回補 sub_unit（舊版匯入時未讀「所轄單位名稱」）
-    needs_backfill = db.query(func.count(Crash.id)).filter(
+    needs_backfill_subunit = db.query(func.count(Crash.id)).filter(
         Crash.sub_unit.like('%交通分隊%')
     ).scalar() > 0
+    # 路口衝突方向引擎（Wave 28）回補哨兵：signal_action 全史 87% 案件應有值，
+    # 若全庫皆為 NULL 代表尚未跑過回補，允許已匯入檔案重新進入流程補值；
+    # 回補後 signal_action 必非零，冪等不再重跑。
+    conflict_backfill_needed = (
+        db.query(func.count(Crash.id)).scalar() > 0
+        and db.query(func.count(Crash.id)).filter(Crash.signal_action.isnot(None)).scalar() == 0
+    )
+    needs_backfill = needs_backfill_subunit or conflict_backfill_needed
 
     for file in files:
         if not file.filename or not file.filename.endswith(ALLOWED_EXTENSIONS):
@@ -2114,6 +2179,10 @@ async def import_crash_upload_batch(
                         "driver_protective_gear": None,
                         "any_hit_and_run": False,
                         "delivery_platform": None,
+                        # 路口衝突方向引擎（Wave 28）：順位1×順位2 當事者行動狀態配對
+                        "_conflict_act1": None,
+                        "_conflict_act2": None,
+                        "conflict_action_pair": None,
                         "_picked_priority": 0,
                     })
                     if not _is_pedestrian and _is_drinking:
@@ -2126,6 +2195,18 @@ async def import_crash_upload_batch(
                         # 僅收真外送/共享（排除「其他(非共享經濟與外送平台)」「非駕駛人」雜訊）
                         if _dp and ("外送" in _dp or "共享" in _dp) and "非共享" not in _dp:
                             _bucket["delivery_platform"] = _dp[:50]
+                    # 路口衝突方向引擎（Wave 28）：順位1×順位2 當事者行動狀態配對
+                    _pos_raw = _safe_eis_str(_row, "當事者順位").strip()
+                    _pos = _pos_raw.lstrip("0") or _pos_raw
+                    _action_status = _safe_eis_str(_row, "29.當事者行動狀態類別名稱") or None
+                    if _pos == "1" and _bucket["_conflict_act1"] is None and _action_status:
+                        _bucket["_conflict_act1"] = _action_status
+                    elif _pos == "2" and _bucket["_conflict_act2"] is None and _action_status:
+                        _bucket["_conflict_act2"] = _action_status
+                    if _bucket["_conflict_act1"] and _bucket["_conflict_act2"]:
+                        _bucket["conflict_action_pair"] = (
+                            f"{_bucket['_conflict_act1']}×{_bucket['_conflict_act2']}"[:80]
+                        )
                     _priority = 3 if (not _is_pedestrian and _is_drinking) else (2 if not _is_pedestrian else 1)
                     if _priority > _bucket["_picked_priority"]:
                         _bucket["_picked_priority"] = _priority
@@ -2257,6 +2338,7 @@ async def import_crash_upload_batch(
                         protective_gear = rollup.get("driver_protective_gear")
                         is_hit_and_run = bool(rollup.get("any_hit_and_run", False))
                         delivery_platform = rollup.get("delivery_platform")
+                        conflict_action_pair = rollup.get("conflict_action_pair")
 
                         # 舊邏輯 fallback
                         if not is_dui_crash_party and (drinking_code is None and party_subtype_code is None):
@@ -2337,6 +2419,7 @@ async def import_crash_upload_batch(
                         protective_gear = None
                         is_hit_and_run = False
                         delivery_platform = None
+                        conflict_action_pair = None
 
                     # 共用欄位
                     age_val = (
@@ -2429,6 +2512,8 @@ async def import_crash_upload_batch(
                         protective_gear=protective_gear,
                         is_hit_and_run=is_hit_and_run,
                         delivery_platform=delivery_platform,
+                        # 路口衝突方向引擎（Wave 28）
+                        conflict_action_pair=conflict_action_pair,
                         **road_fields,
                     )
 

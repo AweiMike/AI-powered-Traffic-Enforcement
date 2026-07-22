@@ -93,6 +93,10 @@ def _migrate_eis_columns():
         "protective_gear": "VARCHAR(30)",
         "is_hit_and_run": "BOOLEAN DEFAULT 0",
         "delivery_platform": "VARCHAR(50)",
+        # 路口衝突方向引擎欄位（Wave 28）
+        "side_impact_direction": "VARCHAR(50)",
+        "conflict_action_pair": "VARCHAR(80)",
+        "signal_action": "VARCHAR(20)",
     })
 
     # core_ticket 表可能缺少的欄位
