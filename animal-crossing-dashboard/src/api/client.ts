@@ -455,6 +455,86 @@ export interface EnforcementMismatchResponse {
 }
 
 // ============================================
+// 事故處理時效型別（Wave 30-1 — 發生→到場→排除全程時間分析）
+// ============================================
+
+export interface ClearanceSeverityStat {
+  severity: string;
+  median_clearance: number;
+  p90: number;
+  count: number;
+}
+
+export interface ClearanceShiftStat {
+  shift_id: string;
+  label: string;
+  median_clearance: number;
+  count: number;
+}
+
+export interface ClearanceRouteStat {
+  route_name: string;
+  median_clearance: number;
+  count: number;
+}
+
+export interface ClearanceSlowCase {
+  date: string;
+  time: string;
+  location: string;
+  severity: string;
+  clearance_min: number;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+export interface ClearanceEfficiencySummary {
+  median_response_min: number;
+  median_clearance_min: number;
+  p90_clearance_min: number;
+  sample_n: number;
+}
+
+export interface ClearanceEfficiencyResponse {
+  period: { start_date: string; end_date: string };
+  summary: ClearanceEfficiencySummary;
+  by_severity: ClearanceSeverityStat[];
+  by_shift: ClearanceShiftStat[];
+  by_route: ClearanceRouteStat[];
+  slow_cases: ClearanceSlowCase[];
+}
+
+// ============================================
+// 停讓標誌與行人事故型別（Wave 30-2）
+// ============================================
+
+export interface PedestrianYieldSignHotspot {
+  location: string;
+  district?: string;
+  count: number;
+  epdo?: number;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+export interface PedestrianYieldSignSuggestion {
+  title: string;
+  reason: string;
+}
+
+export interface PedestrianYieldSignResponse {
+  period: { start_date: string; end_date: string };
+  coverage_note: string;
+  distribution: {
+    has_sign: number;
+    no_sign: number;
+    unknown: number;
+  };
+  no_sign_hotspots: PedestrianYieldSignHotspot[];
+  suggestion: PedestrianYieldSignSuggestion;
+}
+
+// ============================================
 // API Client Class
 // ============================================
 
@@ -625,6 +705,11 @@ class APIClient {
     return this.request(`/stats/violations?${params}`);
   }
 
+  /** 事故處理時效（Wave 30-1）：發生→到場→排除全程時間分析，供道安治理視角評估道路恢復效率 */
+  async getClearanceEfficiency(startDate: string, endDate: string): Promise<ClearanceEfficiencyResponse> {
+    return this.request(`/stats/clearance-efficiency?start_date=${startDate}&end_date=${endDate}`);
+  }
+
   // ============================================
   // Recommendations API
   // ============================================
@@ -667,6 +752,11 @@ class APIClient {
     if (date) params.append('date', date);
 
     return this.request(`/recommendations/briefing-card?${params}`);
+  }
+
+  /** 停讓標誌與行人事故分布（Wave 30-2）：無停讓標誌熱點供工程改善建議參考 */
+  async getPedestrianYieldSign(startDate: string, endDate: string): Promise<PedestrianYieldSignResponse> {
+    return this.request(`/recommendations/pedestrian-yield-sign?start_date=${startDate}&end_date=${endDate}`);
   }
 
   // ============================================

@@ -4,7 +4,7 @@
  */
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAccidentHotspots, useAccidentPeakTimes, useCrossAnalysis } from '../hooks/useAPI';
-import { apiClient, AccidentHotspot, ShiftData, EnforcementMismatchResponse } from '../api/client';
+import { apiClient, AccidentHotspot, ShiftData, EnforcementMismatchResponse, ClearanceEfficiencyResponse } from '../api/client';
 import DateRangePicker, { type DateRange, getCompareRange } from './DateRangePicker';
 
 /** 執法錯位分析主題代碼（對應後端 /hotspots/enforcement-mismatch?topic= 參數） */
@@ -107,6 +107,22 @@ const HotspotCard: React.FC<{ hotspot: AccidentHotspot; rank: number; onSelect: 
         );
     };
 
+// ============================================
+// 事故處理時效（Wave 30-1）共用格式化與色彩定義
+// ============================================
+
+/** 分鐘數轉換為易讀格式：<60 分顯示「X 分」，≥60 分顯示「X.X 小時」 */
+function formatClearanceMinutes(min: number | null | undefined): string {
+    if (min == null || Number.isNaN(min)) return '—';
+    if (min >= 60) return `${(min / 60).toFixed(1)} 小時`;
+    return `${Number.isInteger(min) ? min : min.toFixed(1)} 分`;
+}
+
+/** 嚴重度色彩（依規格：A1 紅／A2 橙／A3 琥珀） */
+const CLEARANCE_SEV_BAR: Record<string, string> = { A1: 'bg-red-500', A2: 'bg-orange-500', A3: 'bg-amber-500' };
+const CLEARANCE_SEV_TEXT: Record<string, string> = { A1: 'text-red-600', A2: 'text-orange-600', A3: 'text-amber-600' };
+const CLEARANCE_SEV_BADGE: Record<string, string> = { A1: 'bg-red-50 text-red-600', A2: 'bg-orange-50 text-orange-600', A3: 'bg-amber-50 text-amber-600' };
+
 // 主頁面組件
 const AccidentAnalysisPage: React.FC = () => {
     const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
@@ -150,6 +166,30 @@ const AccidentAnalysisPage: React.FC = () => {
             console.error('Failed to export DUI crash cases', e);
         }
     };
+
+    // ============================================
+    // 事故處理時效（Wave 30-1）— 發生→到場→排除全程時間分析
+    // 獨立於上方分頁切換之外的區塊，沿用本頁 dateRange；日期變動即重新 fetch
+    // ============================================
+    const [clearanceData, setClearanceData] = useState<ClearanceEfficiencyResponse | null>(null);
+    const [clearanceLoading, setClearanceLoading] = useState<boolean>(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        const fetchClearance = async () => {
+            setClearanceLoading(true);
+            try {
+                const result = await apiClient.getClearanceEfficiency(dateRange.startDate, dateRange.endDate);
+                if (!cancelled) setClearanceData(result);
+            } catch (e) {
+                console.error('Failed to fetch clearance efficiency', e);
+                if (!cancelled) setClearanceData(null);
+            }
+            if (!cancelled) setClearanceLoading(false);
+        };
+        fetchClearance();
+        return () => { cancelled = true; };
+    }, [dateRange.startDate, dateRange.endDate]);
 
     // ============================================
     // 執法錯位分析（Wave 29）— 肇事熱區 vs 取締熱區對照＋移防建議
@@ -688,6 +728,214 @@ const AccidentAnalysisPage: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* ============================================
+                事故處理時效（Wave 30-1）— 發生→到場→排除全程時間分析
+                獨立區塊，插在「執法錯位分析」之前，同樣 mt-10 pt-8 border-t 分隔
+               ============================================ */}
+            <div className="mt-10 pt-8 border-t border-nook-wood/30">
+                <div className="mb-4">
+                    <h2 className="text-2xl font-bold text-nook-text mb-1">⏱ 事故處理時效 — 道路恢復效率</h2>
+                    <p className="text-sm text-nook-text/60">發生→到場→排除全程時間分析（道安治理視角）</p>
+                    {clearanceData?.summary && (
+                        <p className="text-xs text-nook-text/40 mt-0.5">樣本數 n={clearanceData.summary.sample_n ?? 0} 件</p>
+                    )}
+                </div>
+
+                {clearanceLoading ? (
+                    <div className="bg-white/80 rounded-2xl p-8 text-center">
+                        <p className="text-nook-text/60">載入中...</p>
+                    </div>
+                ) : !clearanceData ? (
+                    <div className="bg-white/80 rounded-2xl p-8 text-center">
+                        <p className="text-nook-text/40">尚無資料</p>
+                    </div>
+                ) : (
+                    <>
+                        {/* 三張 stat 卡 */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                            <div className="bg-white/80 rounded-2xl p-4 nook-shadow text-center">
+                                <p className="text-3xl font-bold text-sky-600 tabular-nums">
+                                    {formatClearanceMinutes(clearanceData.summary?.median_response_min)}
+                                </p>
+                                <p className="text-sm text-nook-text/60 mt-1">反應中位數</p>
+                                <p className="text-[11px] text-nook-text/40">發生 → 到場</p>
+                            </div>
+                            <div className="bg-white/80 rounded-2xl p-4 nook-shadow text-center">
+                                <p className="text-3xl font-bold text-orange-600 tabular-nums">
+                                    {formatClearanceMinutes(clearanceData.summary?.median_clearance_min)}
+                                </p>
+                                <p className="text-sm text-nook-text/60 mt-1">排除中位數</p>
+                                <p className="text-[11px] text-nook-text/40">到場 → 排除（道路恢復）</p>
+                            </div>
+                            <div className="bg-white/80 rounded-2xl p-4 nook-shadow text-center">
+                                <p className="text-3xl font-bold text-red-600 tabular-nums">
+                                    {formatClearanceMinutes(clearanceData.summary?.p90_clearance_min)}
+                                </p>
+                                <p className="text-sm text-nook-text/60 mt-1">P90 排除</p>
+                                <p className="text-[11px] text-nook-text/40">9 成案件在此時間內排除</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            {/* 嚴重度排除時長 */}
+                            <div className="bg-white/80 rounded-2xl p-4 nook-shadow">
+                                <h4 className="font-bold text-nook-text mb-1">📊 嚴重度排除時長</h4>
+                                <p className="text-xs text-nook-text/50 mb-3">死亡事故佔道時間長=會勘與快速處理機制的依據</p>
+                                <div className="space-y-3">
+                                    {(clearanceData.by_severity || []).map(s => {
+                                        const maxV = Math.max(...(clearanceData.by_severity || []).map(x => x.median_clearance || 0), 1);
+                                        const width = ((s.median_clearance || 0) / maxV) * 100;
+                                        return (
+                                            <div key={s.severity}>
+                                                <div className="flex justify-between text-sm mb-1">
+                                                    <span className={`font-medium ${CLEARANCE_SEV_TEXT[s.severity] || 'text-nook-text'}`}>{s.severity}</span>
+                                                    <span className="text-xs text-nook-text/60 tabular-nums">
+                                                        {formatClearanceMinutes(s.median_clearance)}（{s.count ?? 0} 件）
+                                                    </span>
+                                                </div>
+                                                <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                                                    <div
+                                                        className={`h-full rounded-full ${CLEARANCE_SEV_BAR[s.severity] || 'bg-gray-400'}`}
+                                                        style={{ width: `${width}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    {(!clearanceData.by_severity || clearanceData.by_severity.length === 0) && (
+                                        <p className="text-sm text-nook-text/40 text-center py-4">無資料</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* 班別排除時長 */}
+                            <div className="bg-white/80 rounded-2xl p-4 nook-shadow">
+                                <h4 className="font-bold text-nook-text mb-1">🕐 班別排除時長</h4>
+                                <p className="text-xs text-nook-text/50 mb-3">
+                                    <span className="text-red-600 font-bold">紅字</span> 為高於全體中位數 1.5 倍的班別
+                                </p>
+                                <div className="space-y-1.5 max-h-80 overflow-y-auto">
+                                    {(clearanceData.by_shift || []).map(s => {
+                                        const maxV = Math.max(...(clearanceData.by_shift || []).map(x => x.median_clearance || 0), 1);
+                                        const width = ((s.median_clearance || 0) / maxV) * 100;
+                                        const overallMedian = clearanceData.summary?.median_clearance_min ?? 0;
+                                        const isSlow = overallMedian > 0 && (s.median_clearance || 0) > overallMedian * 1.5;
+                                        return (
+                                            <div key={s.shift_id} className="flex items-center gap-2 text-xs">
+                                                <span className="w-16 shrink-0 text-nook-text/70">{s.label || s.shift_id}</span>
+                                                <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
+                                                    <div
+                                                        className={`h-full rounded-full ${isSlow ? 'bg-red-500' : 'bg-sky-500'}`}
+                                                        style={{ width: `${width}%` }}
+                                                    />
+                                                </div>
+                                                <span className={`w-24 shrink-0 text-right tabular-nums ${isSlow ? 'text-red-600 font-bold' : 'text-nook-text/70'}`}>
+                                                    {formatClearanceMinutes(s.median_clearance)}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                    {(!clearanceData.by_shift || clearanceData.by_shift.length === 0) && (
+                                        <p className="text-sm text-nook-text/40 text-center py-4">無資料</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 主要路線排除時長（by_route 有資料才顯示） */}
+                        {clearanceData.by_route && clearanceData.by_route.length > 0 && (
+                            <div className="bg-white/80 rounded-2xl nook-shadow overflow-hidden mb-6">
+                                <div className="p-4 border-b border-nook-cream/50">
+                                    <h4 className="font-bold text-nook-text">🛣 主要路線排除時長</h4>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="bg-sky-50 text-nook-text/80">
+                                                <th className="px-4 py-2.5 text-left font-medium">路線</th>
+                                                <th className="px-4 py-2.5 text-right font-medium">排除中位數</th>
+                                                <th className="px-4 py-2.5 text-right font-medium">件數</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {clearanceData.by_route.map((r, i) => (
+                                                <tr key={r.route_name || i} className={i % 2 === 0 ? 'bg-white' : 'bg-sky-50/30'}>
+                                                    <td className="px-4 py-2 font-medium text-nook-text">{r.route_name || '—'}</td>
+                                                    <td className="px-4 py-2 text-right tabular-nums">{formatClearanceMinutes(r.median_clearance)}</td>
+                                                    <td className="px-4 py-2 text-right tabular-nums text-nook-text/60">{r.count ?? 0}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 排除最久案件 Top10 */}
+                        <div className="bg-white/80 rounded-2xl nook-shadow overflow-hidden">
+                            <div className="p-4 border-b border-nook-cream/50">
+                                <h4 className="font-bold text-nook-text">🐢 排除最久案件 Top 10</h4>
+                                <p className="text-[11px] text-nook-text/50 mt-0.5">佔道時間最長案件，可能反映會勘、拖吊調度或跨機關協調延遲</p>
+                            </div>
+                            {clearanceData.slow_cases && clearanceData.slow_cases.length > 0 ? (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="bg-red-50 text-nook-text/80">
+                                                <th className="px-4 py-2.5 text-left font-medium">日期</th>
+                                                <th className="px-4 py-2.5 text-left font-medium">地點</th>
+                                                <th className="px-4 py-2.5 text-center font-medium">嚴重度</th>
+                                                <th className="px-4 py-2.5 text-right font-medium">排除時長</th>
+                                                <th className="px-4 py-2.5 text-center font-medium">會勘</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {clearanceData.slow_cases.map((c, i) => {
+                                                const lat = c.latitude;
+                                                const lng = c.longitude;
+                                                return (
+                                                    <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-red-50/20'}>
+                                                        <td className="px-4 py-2 whitespace-nowrap tabular-nums">
+                                                            {c.date || '—'}{c.time ? ` ${c.time}` : ''}
+                                                        </td>
+                                                        <td className="px-4 py-2 max-w-[240px] truncate" title={c.location || ''}>{c.location || '—'}</td>
+                                                        <td className="px-4 py-2 text-center">
+                                                            <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${CLEARANCE_SEV_BADGE[c.severity] || 'bg-gray-50 text-gray-600'}`}>
+                                                                {c.severity || '—'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-2 text-right font-bold text-nook-text tabular-nums">
+                                                            {formatClearanceMinutes(c.clearance_min)}
+                                                        </td>
+                                                        <td className="px-4 py-2 text-center">
+                                                            {lat != null && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        sessionStorage.setItem('pending_dossier', JSON.stringify({ lat, lng }));
+                                                                        window.dispatchEvent(new CustomEvent('app:navigate', { detail: { view: 'road-eng' } }));
+                                                                    }}
+                                                                    className="leading-none hover:opacity-70"
+                                                                    title="開啟會勘卷宗"
+                                                                >
+                                                                    🔍
+                                                                </button>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <p className="text-sm text-nook-text/40 text-center py-8">本區間無排除時長資料</p>
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
 
             {/* ============================================
                 執法錯位分析（Wave 29）— 肇事熱區 vs 取締熱區對照＋移防建議

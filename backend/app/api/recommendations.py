@@ -2021,10 +2021,20 @@ async def get_site_dossier(
                 })
 
     # 規則 4：行人安全設施
+    # Wave 30-2：無停讓標誌路段行人事故數，僅補強證據文字（has_yield_sign 為
+    # EIS 112年7月後新增欄位，早期案件多為 NULL，不影響本規則觸發門檻）
+    ped_no_sign = sum(
+        1 for c in crashes
+        if c.party_type and ("行人" in c.party_type or c.party_type == "人")
+        and c.has_yield_sign == "N"
+    )
     if pedestrian >= 3:
+        reason = f"行人事故 {pedestrian} 件，建議檢視行穿線、行人庇護與照明"
+        if ped_no_sign >= 2:
+            reason += f"；其中 {ped_no_sign} 件位於無停讓標誌路段，建議一併評估增設"
         suggestions.append({
             "title": "行人安全設施",
-            "reason": f"行人事故 {pedestrian} 件，建議檢視行穿線、行人庇護與照明",
+            "reason": reason,
         })
 
     # 規則 5：防追撞宣導與執法（肇因前五名含「未保持行車安全距離」）
@@ -2504,6 +2514,93 @@ async def get_topic_profile(
             "by_shift": by_shift,
             "top_routes": top_routes,
         },
+    }
+
+
+# ============================================
+# 專區共通強化：停讓標誌 × 行人事故（Wave 30-2）
+# ============================================
+@router.get("/pedestrian-yield-sign")
+async def get_pedestrian_yield_sign(
+    start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """行人事故 × 停讓標誌（Wave 30-2）。
+
+    has_yield_sign 為 EIS 112年7月新增欄位（僅全選條件匯出且該時點後的案件
+    才有記載，全史約 43% 充填率），本端點統計查詢期間內行人事故的停讓標誌
+    記載分布，並將「無停讓標誌」案件依 GPS 聚類找出熱點，供停讓標誌／
+    行穿線增設會勘排序參考。行人事故判定沿用本檔 crash_topic_filter("pedestrian")
+    既有慣例（party_type 含「行人」或等於「人」）。
+    """
+    try:
+        sd = datetime.strptime(start_date, "%Y-%m-%d").date()
+        ed = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return {"error": "日期格式錯誤"}
+
+    topic_condition = crash_topic_filter("pedestrian")
+
+    pedestrian_crashes = db.query(Crash).filter(
+        topic_condition,
+        Crash.occurred_date >= sd,
+        Crash.occurred_date <= ed,
+    ).all()
+
+    total_pedestrian = len(pedestrian_crashes)
+    has_sign = sum(1 for c in pedestrian_crashes if c.has_yield_sign == "Y")
+    no_sign = sum(1 for c in pedestrian_crashes if c.has_yield_sign == "N")
+    unknown = total_pedestrian - has_sign - no_sign
+    recorded = has_sign + no_sign
+
+    coverage_note = (
+        f"停讓標誌欄位 112 年 7 月後始有記載，本區間行人事故 {total_pedestrian} 件中 "
+        f"{recorded} 件有記載"
+    )
+
+    no_sign_crashes = [
+        c for c in pedestrian_crashes
+        if c.has_yield_sign == "N" and c.latitude is not None and c.longitude is not None
+    ]
+
+    if no_sign_crashes:
+        rows_for_cluster = [{
+            'lat': c.latitude, 'lng': c.longitude, 'district': c.district,
+            'location_desc': c.location_desc, 'severity': c.severity,
+            'death_count': c.death_count, 'late_death_count': c.late_death_count,
+            'injury_count': c.injury_count,
+        } for c in no_sign_crashes]
+        clusters = cluster_crashes_by_gps(rows_for_cluster)
+        no_sign_hotspots = [{
+            "location": _pick_best_location(cl['locations']),
+            "district": max(cl['districts'], key=cl['districts'].get),
+            "count": cl['total'],
+            "epdo": round(cl['epdo'], 1),
+            "latitude": round(cl['lat'], 6),
+            "longitude": round(cl['lng'], 6),
+        } for cl in clusters[:5]]
+        no_sign_pct = round(no_sign / recorded * 100, 1) if recorded else 0
+        suggestion = {
+            "title": "行人穿越安全改善",
+            "reason": (
+                f"無停讓標誌處行人事故 {no_sign} 件（占有記載案 {no_sign_pct}%），"
+                "建議優先於下列熱點會勘增設停讓標誌/行穿線"
+            ),
+        }
+    else:
+        no_sign_hotspots = []
+        suggestion = {
+            "title": "行人穿越安全改善",
+            "reason": "本區間無停讓標誌行人事故資料",
+        }
+
+    return {
+        "period": {"start_date": start_date, "end_date": end_date},
+        "coverage_note": coverage_note,
+        "distribution": {"has_sign": has_sign, "no_sign": no_sign, "unknown": unknown},
+        "no_sign_hotspots": no_sign_hotspots,
+        "suggestion": suggestion,
     }
 
 

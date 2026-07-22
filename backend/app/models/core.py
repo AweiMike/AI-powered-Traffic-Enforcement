@@ -130,6 +130,11 @@ class Crash(Base):
     conflict_action_pair = Column(String(80), comment="順位1×順位2當事者行動狀態配對（如：向前直行中×左轉彎）")
     signal_action = Column(String(20), comment="號誌動作（無號誌/正常/閃光/不正常，12-2欄）")
 
+    # === 事故處理時效／道路恢復效率欄位（Wave 30-1）＋ 停讓標誌（Wave 30-2）===
+    response_minutes = Column(Float, comment="發生→到場反應時間（分鐘，0-720 夾制外為 NULL）")
+    clearance_minutes = Column(Float, comment="到場→排除處理時長（分鐘，0-1440 夾制外為 NULL；道路恢復效率）")
+    has_yield_sign = Column(String(4), comment="有無停讓標誌（Y/N，EIS 11207新增，112年7月後始有值）")
+
     # === 慢車/微電車分析欄位 ===
     evehicle_type = Column(
         String(50), index=True,

@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { PersonStanding, TrendingUp, TrendingDown, Minus, AlertTriangle, Users, MapPin } from 'lucide-react';
 import DateRangePicker, { type DateRange } from './DateRangePicker';
-import { apiClient } from '../api/client';
+import { apiClient, PedestrianYieldSignResponse } from '../api/client';
 import TrendCardSkeleton from './TrendCardSkeleton';
 import ProfileCard from './ProfileCard';
 
@@ -45,6 +45,30 @@ const PedestrianAnalysisPage: React.FC = () => {
         };
         fetchData();
     }, [range]);
+
+    // ============================================
+    // 停讓標誌與行人事故（Wave 30-2）— 停讓標誌欄位 x 行人事故分布
+    // 獨立於主資料 fetch 之外，沿用本頁 range；日期變動即重新 fetch
+    // ============================================
+    const [yieldSignData, setYieldSignData] = useState<PedestrianYieldSignResponse | null>(null);
+    const [yieldSignLoading, setYieldSignLoading] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        const fetchYieldSign = async () => {
+            setYieldSignLoading(true);
+            try {
+                const result = await apiClient.getPedestrianYieldSign(range.startDate, range.endDate);
+                if (!cancelled) setYieldSignData(result);
+            } catch (e) {
+                console.error('Failed to fetch pedestrian yield sign', e);
+                if (!cancelled) setYieldSignData(null);
+            }
+            if (!cancelled) setYieldSignLoading(false);
+        };
+        fetchYieldSign();
+        return () => { cancelled = true; };
+    }, [range.startDate, range.endDate]);
 
     const curr = data?.current;
     const prev = data?.previous;
@@ -259,6 +283,89 @@ const PedestrianAnalysisPage: React.FC = () => {
                     </div>
                 </>
             )}
+
+            {/* ============================================
+                停讓標誌與行人事故（Wave 30-2）
+                獨立區塊，插在行人事故熱點 Top5 之後；沿用本頁 range，不受主資料 loading/data 影響
+               ============================================ */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 nook-shadow mt-6">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                    🚸 停讓標誌與行人事故
+                </h3>
+                {yieldSignLoading ? (
+                    <p className="text-slate-400 text-sm py-4">載入中...</p>
+                ) : !yieldSignData ? (
+                    <p className="text-slate-400 text-sm py-4">尚無資料</p>
+                ) : (
+                    <>
+                        <p className="text-xs text-slate-400 mt-1 mb-4">{yieldSignData.coverage_note}</p>
+
+                        {/* 三數字列 */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                            <div className="bg-slate-50 rounded-xl p-3 text-center">
+                                <p className="text-2xl font-bold text-slate-700 tabular-nums">{yieldSignData.distribution?.has_sign ?? 0}</p>
+                                <p className="text-xs text-slate-500 mt-0.5">件 · 有停讓標誌</p>
+                            </div>
+                            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-center">
+                                <p className="text-2xl font-bold text-red-600 tabular-nums">{yieldSignData.distribution?.no_sign ?? 0}</p>
+                                <p className="text-xs text-red-600 font-bold mt-0.5">件 · 無停讓標誌</p>
+                            </div>
+                            <div className="bg-slate-50 rounded-xl p-3 text-center">
+                                <p className="text-2xl font-bold text-slate-400 tabular-nums">{yieldSignData.distribution?.unknown ?? 0}</p>
+                                <p className="text-xs text-slate-400 mt-0.5">件 · 未記載</p>
+                            </div>
+                        </div>
+
+                        {/* 無停讓標誌行人事故熱點 Top5 */}
+                        <h4 className="font-semibold text-slate-700 text-sm mb-2">無停讓標誌行人事故熱點 Top 5</h4>
+                        {yieldSignData.no_sign_hotspots && yieldSignData.no_sign_hotspots.length > 0 ? (
+                            <div className="space-y-2 mb-4">
+                                {yieldSignData.no_sign_hotspots.slice(0, 5).map((h, idx) => {
+                                    const lat = h.latitude;
+                                    const lng = h.longitude;
+                                    return (
+                                        <div key={idx} className="flex items-center gap-3 py-2 px-3 bg-red-50/60 rounded-lg">
+                                            <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold bg-red-100 text-red-700 shrink-0">
+                                                {idx + 1}
+                                            </span>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-semibold text-slate-800 truncate" title={h.location}>{h.location}</p>
+                                                <p className="text-xs text-slate-500">{h.district || '—'}</p>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-xs text-slate-600 shrink-0">
+                                                <span className="tabular-nums">{h.count ?? 0} 件 · EPDO {h.epdo ?? '—'}</span>
+                                                {lat != null && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            sessionStorage.setItem('pending_dossier', JSON.stringify({ lat, lng }));
+                                                            window.dispatchEvent(new CustomEvent('app:navigate', { detail: { view: 'road-eng' } }));
+                                                        }}
+                                                        className="leading-none hover:opacity-70"
+                                                        title="開啟會勘卷宗"
+                                                    >
+                                                        🔍
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <p className="text-slate-400 text-sm py-4 text-center">本區間無停讓標誌行人事故熱點資料</p>
+                        )}
+
+                        {/* 建議卡 */}
+                        {yieldSignData.suggestion && (
+                            <div className="bg-sky-50 border border-sky-200 rounded-xl p-3">
+                                <p className="font-bold text-sky-800 text-sm">{yieldSignData.suggestion.title}</p>
+                                <p className="text-xs text-sky-700/80 mt-0.5">{yieldSignData.suggestion.reason}</p>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
         </div>
     );
 };

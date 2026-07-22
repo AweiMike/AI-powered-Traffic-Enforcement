@@ -2,6 +2,7 @@
 統計分析 API
 """
 
+import statistics
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_, extract
@@ -48,6 +49,22 @@ def _data_end_date(db: Session):
     max_ticket = db.query(func.max(Ticket.violation_date)).scalar()
     dates = [d for d in [max_crash, max_ticket] if d is not None]
     return max(dates) if dates else datetime.now().date()
+
+
+def _median(values: list) -> Optional[float]:
+    """中位數（Python 端計算，SQLite 無 percentile 函數）。空列回傳 None。"""
+    if not values:
+        return None
+    return round(statistics.median(values), 1)
+
+
+def _p90(values: list) -> Optional[float]:
+    """P90 = sorted(values)[int(len*0.9)]，索引界內取（超界夾到最後一筆）。空列回傳 None。"""
+    if not values:
+        return None
+    s = sorted(values)
+    idx = min(int(len(s) * 0.9), len(s) - 1)
+    return round(s[idx], 1)
 
 
 @router.get("/overview")
@@ -819,4 +836,158 @@ async def get_data_info(db: Session = Depends(get_db)):
             "last_upload": last_ticket_upload.isoformat() if last_ticket_upload else None,
         },
         "last_upload": last_upload.isoformat() if last_upload else None,
+    }
+
+
+@router.get("/clearance-efficiency")
+async def get_clearance_efficiency(
+    days: int = 90,
+    start_date: Optional[str] = Query(default=None, description="起始日期 YYYY-MM-DD"),
+    end_date: Optional[str] = Query(default=None, description="結束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """
+    事故處理時效／道路恢復效率統計（Wave 30-1）。
+
+    以「到場反應時間」（發生→到場，response_minutes）與「排除清空時長」
+    （到場→排除，clearance_minutes，即道路恢復所需時間）衡量事故處理效率。
+    兩者皆於匯入時依 EIS 到場/排除日期時間欄位計算並夾制界外離群值
+    （見 app/api/imports.py extract_road_engineering_fields）。
+
+    框架鐵則（用戶拍板）：道路恢復效率為主，不做各所反應時間排名——
+    本端點刻意不提供任何 per-unit／per-所 反應時間拆分，避免跨單位比較
+    （反應時間受案發地點、警力配置等因素影響，非單位績效指標）。
+
+    median/p90 皆於 Python 端計算（SQLite 無 percentile 函數）；
+    count<1 的分組（by_severity/by_shift 為固定 3/12 列全列）median/p90 回 None。
+
+    參數：
+    - days: 統計天數（備援，未提供 start_date/end_date 時使用）
+    - start_date / end_date: 自訂日期區間（優先）
+    """
+    start_date, end_date = _resolve_range(days, start_date, end_date, fallback_end=_data_end_date(db))
+
+    base_filter = and_(Crash.occurred_date >= start_date, Crash.occurred_date <= end_date)
+
+    # --- 總覽：反應/排除中位數、排除 P90 ---
+    response_vals = [
+        v for (v,) in db.query(Crash.response_minutes)
+        .filter(base_filter, Crash.response_minutes.isnot(None))
+        .all()
+    ]
+    clearance_vals = [
+        v for (v,) in db.query(Crash.clearance_minutes)
+        .filter(base_filter, Crash.clearance_minutes.isnot(None))
+        .all()
+    ]
+
+    summary = {
+        "median_response_min": _median(response_vals),
+        "median_clearance_min": _median(clearance_vals),
+        "p90_clearance_min": _p90(clearance_vals),
+        "sample_n": len(clearance_vals),
+    }
+
+    # --- by_severity：A1/A2/A3 固定三列全列 ---
+    severity_rows = (
+        db.query(Crash.severity, Crash.clearance_minutes)
+        .filter(base_filter, Crash.clearance_minutes.isnot(None))
+        .all()
+    )
+    severity_groups = {"A1": [], "A2": [], "A3": []}
+    for sev, cm in severity_rows:
+        if sev in severity_groups:
+            severity_groups[sev].append(cm)
+    by_severity = [
+        {
+            "severity": sev,
+            "median_clearance": _median(vals),
+            "p90": _p90(vals),
+            "count": len(vals),
+        }
+        for sev, vals in severity_groups.items()
+    ]
+
+    # --- by_shift：12 班固定全列 ---
+    shift_rows = (
+        db.query(Crash.shift_id, Crash.clearance_minutes)
+        .filter(base_filter, Crash.clearance_minutes.isnot(None))
+        .all()
+    )
+    shift_groups = {f"{i:02d}": [] for i in range(1, 13)}
+    for sid, cm in shift_rows:
+        if sid in shift_groups:
+            shift_groups[sid].append(cm)
+
+    def _shift_label(shift_id: str) -> str:
+        """班別代碼轉時段文字，如 "01" -> "00-02時"（(int-1)*2 起，2 小時一段）"""
+        n = int(shift_id)
+        start_hour = (n - 1) * 2
+        return f"{start_hour:02d}-{start_hour + 2:02d}時"
+
+    by_shift = [
+        {
+            "shift_id": sid,
+            "label": _shift_label(sid),
+            "median_clearance": _median(vals),
+            "count": len(vals),
+        }
+        for sid, vals in shift_groups.items()
+    ]
+
+    # --- by_route：route_name 非空，top5 依 count ---
+    route_rows = (
+        db.query(Crash.route_name, Crash.clearance_minutes)
+        .filter(
+            base_filter,
+            Crash.clearance_minutes.isnot(None),
+            Crash.route_name.isnot(None),
+        )
+        .all()
+    )
+    route_groups = {}
+    for route_name, cm in route_rows:
+        route_groups.setdefault(route_name, []).append(cm)
+    by_route = sorted(
+        (
+            {"route_name": rn, "median_clearance": _median(vals), "count": len(vals)}
+            for rn, vals in route_groups.items()
+        ),
+        key=lambda x: x["count"],
+        reverse=True,
+    )[:5]
+
+    # --- slow_cases：clearance 最久 top10 ---
+    slow_crashes = (
+        db.query(Crash)
+        .filter(base_filter, Crash.clearance_minutes.isnot(None))
+        .order_by(Crash.clearance_minutes.desc())
+        .limit(10)
+        .all()
+    )
+    slow_cases = [
+        {
+            "date": c.occurred_date.isoformat(),
+            "time": c.occurred_time.strftime("%H:%M") if c.occurred_time else "",
+            "location": c.location_desc,
+            "severity": c.severity,
+            "clearance_min": c.clearance_minutes,
+            "latitude": c.latitude,
+            "longitude": c.longitude,
+        }
+        for c in slow_crashes
+    ]
+
+    return {
+        "period": {
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "days": (end_date - start_date).days,
+        },
+        "summary": summary,
+        "by_severity": by_severity,
+        "by_shift": by_shift,
+        "by_route": by_route,
+        "slow_cases": slow_cases,
+        "note": "道路恢復效率統計（不提供各單位反應時間排名）",
     }

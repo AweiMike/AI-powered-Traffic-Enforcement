@@ -97,6 +97,10 @@ def _migrate_eis_columns():
         "side_impact_direction": "VARCHAR(50)",
         "conflict_action_pair": "VARCHAR(80)",
         "signal_action": "VARCHAR(20)",
+        # 事故處理時效／道路恢復效率（Wave 30-1）＋ 停讓標誌（Wave 30-2）
+        "response_minutes": "FLOAT",
+        "clearance_minutes": "FLOAT",
+        "has_yield_sign": "VARCHAR(4)",
     })
 
     # core_ticket 表可能缺少的欄位

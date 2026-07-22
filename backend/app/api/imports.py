@@ -548,14 +548,43 @@ def backfill_road_fields(existing, row, rollup) -> None:
             existing.conflict_action_pair = rollup["conflict_action_pair"]
 
 
+def _parse_eis_dt(dstr: str, tstr: str) -> Optional[datetime]:
+    """將 EIS 日期字串(YYYYMMDD) + 時間字串(HHMMSS) 解析為 datetime。
+
+    輸入為 _safe_eis_str() 已取出的字串（可能帶小數尾巴如 "20240108.0"；
+    時間可能不足 6 位如 "93000"，需 zfill 補齊）。缺日期或格式錯誤回傳 None；
+    時間缺值視為 00:00:00。供 Wave 30-1 到場反應/排除時長計算用。
+    """
+    if not dstr:
+        return None
+    try:
+        date_str = str(int(float(dstr))).zfill(8)
+        year = int(date_str[:4])
+        month = int(date_str[4:6])
+        day = int(date_str[6:8])
+
+        hour, minute, second = 0, 0, 0
+        if tstr:
+            time_str = str(int(float(tstr))).zfill(6)
+            hour = int(time_str[0:2])
+            minute = int(time_str[2:4])
+            second = int(time_str[4:6])
+
+        return datetime(year, month, day, hour, minute, second)
+    except (ValueError, TypeError):
+        return None
+
+
 def extract_road_engineering_fields(row) -> dict:
     """案件級道路工程欄位（Phase 1 擴充；全選條件匯出才有值，欄位缺時皆為 None）。
 
     對應 Crash model 的 speed_limit / crash_type / road_type / signal_type /
     road_lighting / route_name / route_km / side_impact_direction /
-    signal_action 九欄。這些為 EIS 案件級屬性（同案各當事者列相同），
-    取當前列即可。side_impact_direction / signal_action 為 Wave 28
-    路口衝突方向引擎新增欄位。
+    signal_action / response_minutes / clearance_minutes / has_yield_sign
+    十二欄。這些為 EIS 案件級屬性（同案各當事者列相同），取當前列即可。
+    side_impact_direction / signal_action 為 Wave 28 路口衝突方向引擎新增欄位；
+    response_minutes / clearance_minutes / has_yield_sign 為 Wave 30-1（事故
+    處理時效／道路恢復效率）與 Wave 30-2（停讓標誌）新增欄位。
     """
     speed_limit = None
     sl = _safe_eis_str(row, "7.速限(第1當事者)")
@@ -580,6 +609,27 @@ def extract_road_engineering_fields(row) -> dict:
     route = _safe_eis_str(row, "2-2.發生-路線-公路(國道/省道/縣道/鄉道)")
     lighting = (_safe_eis_str(row, "5.道路照明設備(11207新增)")
                 or _safe_eis_str(row, "5.道路照明設備"))
+
+    # 事故處理時效（Wave 30-1：道路恢復效率框架）
+    # 發生→到場＝response_minutes（反應時間，0-720分鐘內夾制）；
+    # 到場→排除＝clearance_minutes（排除清空時長＝道路恢復效率，0-1440分鐘內夾制）。
+    # 逾夾制範圍視為資料異常，回 None 而非寫入離群值。
+    occ = _parse_eis_dt(_safe_eis_str(row, "發生日期"), _safe_eis_str(row, "1.發生時間"))
+    arr = _parse_eis_dt(_safe_eis_str(row, "到場處理日期"), _safe_eis_str(row, "到場處理時間"))
+    end = _parse_eis_dt(_safe_eis_str(row, "結束(事故排除)日期"), _safe_eis_str(row, "結束(事故排除)時間"))
+
+    response_minutes = None
+    if occ and arr:
+        diff = (arr - occ).total_seconds() / 60.0
+        if 0 <= diff <= 720:
+            response_minutes = round(diff, 1)
+
+    clearance_minutes = None
+    if arr and end:
+        diff = (end - arr).total_seconds() / 60.0
+        if 0 <= diff <= 1440:
+            clearance_minutes = round(diff, 1)
+
     return {
         "speed_limit": speed_limit,
         "crash_type": (_safe_eis_str(row, "15.事故類型及型態") or None),
@@ -591,6 +641,10 @@ def extract_road_engineering_fields(row) -> dict:
         # 路口衝突方向引擎（Wave 28）：案件級欄位，取當前列即可
         "side_impact_direction": (_safe_eis_str(row, "側撞時行車方向名稱(11207新增)")[:50] or None),
         "signal_action": (_safe_eis_str(row, "12-2.號誌-號誌動作")[:20] or None),
+        # 事故處理時效／停讓標誌（Wave 30-1、30-2）
+        "response_minutes": response_minutes,
+        "clearance_minutes": clearance_minutes,
+        "has_yield_sign": (_safe_eis_str(row, "有無停讓標誌(11207新增)")[:4] or None),
     }
 
 
@@ -1424,7 +1478,14 @@ def _do_batch_import(txt_files: list, db):
         db.query(func.count(Crash.id)).scalar() > 0
         and db.query(func.count(Crash.id)).filter(Crash.signal_action.isnot(None)).scalar() == 0
     )
-    needs_backfill = needs_backfill_subunit or conflict_backfill_needed
+    # 事故處理時效／道路恢復效率（Wave 30-1）回補哨兵：clearance_minutes 全庫皆為
+    # NULL 代表尚未跑過回補，允許已匯入檔案重新進入流程補值；
+    # 回補後 clearance_minutes 必非零，冪等不再重跑。
+    clearance_backfill_needed = (
+        db.query(func.count(Crash.id)).scalar() > 0
+        and db.query(func.count(Crash.id)).filter(Crash.clearance_minutes.isnot(None)).scalar() == 0
+    )
+    needs_backfill = needs_backfill_subunit or conflict_backfill_needed or clearance_backfill_needed
 
     for txt_path in txt_files:
         fname = os.path.basename(txt_path)
@@ -2094,7 +2155,14 @@ async def import_crash_upload_batch(
         db.query(func.count(Crash.id)).scalar() > 0
         and db.query(func.count(Crash.id)).filter(Crash.signal_action.isnot(None)).scalar() == 0
     )
-    needs_backfill = needs_backfill_subunit or conflict_backfill_needed
+    # 事故處理時效／道路恢復效率（Wave 30-1）回補哨兵：clearance_minutes 全庫皆為
+    # NULL 代表尚未跑過回補，允許已匯入檔案重新進入流程補值；
+    # 回補後 clearance_minutes 必非零，冪等不再重跑。
+    clearance_backfill_needed = (
+        db.query(func.count(Crash.id)).scalar() > 0
+        and db.query(func.count(Crash.id)).filter(Crash.clearance_minutes.isnot(None)).scalar() == 0
+    )
+    needs_backfill = needs_backfill_subunit or conflict_backfill_needed or clearance_backfill_needed
 
     for file in files:
         if not file.filename or not file.filename.endswith(ALLOWED_EXTENSIONS):
