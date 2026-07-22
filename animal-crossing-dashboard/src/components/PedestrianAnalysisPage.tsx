@@ -82,6 +82,9 @@ const PedestrianAnalysisPage: React.FC = () => {
                     行人事故發生率
                 </h2>
                 <p className="text-nook-text/60 mt-1">行人事故件數、占比、死傷與高齡行人特別關注</p>
+                <p className="text-[11px] text-slate-400 mt-1">
+                    行人事故＝涉及行人（含輔助代步器材使用者）之事故；115.7 口徑精確化，行人傷亡計行人本身（不含其他當事者）
+                </p>
             </div>
 
             {/* 日期區間 */}

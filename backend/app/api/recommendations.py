@@ -42,7 +42,10 @@ def crash_topic_filter(topic: str):
     if topic == "elderly":
         return Crash.is_elderly == True
     if topic == "pedestrian":
-        return or_(Crash.party_type.like("%行人%"), Crash.party_type == "人")
+        # Wave 31-A：改用 involves_pedestrian 精確口徑（任一當事者子類含行人/
+        # 輔助代步器材），取代舊版 party_type LIKE 判定（誤把「全案當事者皆人類」
+        # 當作行人事故、漏掉「行人被車撞、代表當事者是駕駛」的案件）
+        return Crash.involves_pedestrian == True
     if topic == "evehicle":
         return Crash.evehicle_type.isnot(None)
     if topic == "dui":
@@ -1966,7 +1969,7 @@ async def get_site_dossier(
     youth = sum(1 for c in crashes if c.is_youth)
     dui = sum(1 for c in crashes if c.is_dui_crash_party)
     unlicensed = sum(1 for c in crashes if c.license_status and "無照" in c.license_status)
-    pedestrian = sum(1 for c in crashes if c.party_type and ("行人" in c.party_type or c.party_type == "人"))
+    pedestrian = sum(1 for c in crashes if c.involves_pedestrian)  # Wave 31-A：精確口徑
     hit_and_run = sum(1 for c in crashes if c.is_hit_and_run)
 
     sorted_cases = sorted(
@@ -2023,10 +2026,10 @@ async def get_site_dossier(
     # 規則 4：行人安全設施
     # Wave 30-2：無停讓標誌路段行人事故數，僅補強證據文字（has_yield_sign 為
     # EIS 112年7月後新增欄位，早期案件多為 NULL，不影響本規則觸發門檻）
+    # Wave 31-A：行人判定改用 involves_pedestrian 精確口徑
     ped_no_sign = sum(
         1 for c in crashes
-        if c.party_type and ("行人" in c.party_type or c.party_type == "人")
-        and c.has_yield_sign == "N"
+        if c.involves_pedestrian and c.has_yield_sign == "N"
     )
     if pedestrian >= 3:
         reason = f"行人事故 {pedestrian} 件，建議檢視行穿線、行人庇護與照明"
@@ -2532,7 +2535,8 @@ async def get_pedestrian_yield_sign(
     才有記載，全史約 43% 充填率），本端點統計查詢期間內行人事故的停讓標誌
     記載分布，並將「無停讓標誌」案件依 GPS 聚類找出熱點，供停讓標誌／
     行穿線增設會勘排序參考。行人事故判定沿用本檔 crash_topic_filter("pedestrian")
-    既有慣例（party_type 含「行人」或等於「人」）。
+    （Wave 31-A 起改為 involves_pedestrian 精確口徑：任一當事者子類含「行人」
+    或「輔助代步器材」，取代舊版 party_type 判定）。
     """
     try:
         sd = datetime.strptime(start_date, "%Y-%m-%d").date()

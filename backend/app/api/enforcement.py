@@ -863,7 +863,6 @@ async def get_speed_performance(
 # ============================================
 # 行人事故專區
 # ============================================
-_PEDESTRIAN_PARTY_TYPES = ["行人", "人", "其他人"]
 # 明確屬於「車輛對行人」的事故肇因關鍵字 — 行人為受害者
 _CAUSE_DRIVER_FAULT = ["未禮讓", "車輛未依規定暫停讓", "未讓行人"]
 # 行人自身違規的肇因關鍵字
@@ -878,8 +877,10 @@ async def get_pedestrian_analysis(
 ):
     """
     行人事故發生率專區統計
-    - 行人事故件數 + 佔比
-    - 實際死傷人數
+    - 行人事故件數 + 佔比（Wave 31-A：改用 involves_pedestrian 精確口徑，
+      取代舊版 party_type in ["行人","人","其他人"] 判定）
+    - 死傷人數＝行人本身傷亡（ped_death_count/ped_injury_count，Wave 31-A 與
+      AI 報告 _sum_pedestrian_casualties 口徑一致；不含同案其他當事者傷亡）
     - 高齡行人占比
     - 肇因分類（駕駛違規 / 行人違規）
     - 熱點地點
@@ -903,12 +904,14 @@ async def get_pedestrian_analysis(
             Crash.location_desc,
             Crash.death_count,
             Crash.injury_count,
+            Crash.ped_death_count,
+            Crash.ped_injury_count,
         ).filter(
             Crash.occurred_date >= s,
             Crash.occurred_date <= e,
         )
         if pedestrian_only:
-            q = q.filter(Crash.party_type.in_(_PEDESTRIAN_PARTY_TYPES))
+            q = q.filter(Crash.involves_pedestrian == True)  # Wave 31-A：精確口徑
         return q.all()
 
     def classify_cause(cause: str | None) -> str:
@@ -926,8 +929,11 @@ async def get_pedestrian_analysis(
         a1 = sum(1 for r in rows if r.severity == 'A1')
         a2 = sum(1 for r in rows if r.severity == 'A2')
         a3 = sum(1 for r in rows if r.severity == 'A3')
-        deaths = sum(r.death_count or 0 for r in rows)
-        injuries = sum(r.injury_count or 0 for r in rows)
+        # Wave 31-A 指揮官裁決：死傷改計「行人本身」（ped_death/injury_count），
+        # 與頁面口徑註記及 AI 報告 _sum_pedestrian_casualties 一致；
+        # 案件總死傷（含駕駛）不再作為行人傷亡呈現
+        deaths = sum(r.ped_death_count or 0 for r in rows)
+        injuries = sum(r.ped_injury_count or 0 for r in rows)
         elderly = sum(1 for r in rows if r.is_elderly)
 
         fault_counts = {"driver_fault": 0, "pedestrian_fault": 0, "other": 0}

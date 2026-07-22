@@ -546,6 +546,14 @@ def backfill_road_fields(existing, row, rollup) -> None:
         # 路口衝突方向引擎（Wave 28）：順位1×順位2 行動狀態配對回補
         if existing.conflict_action_pair is None and rollup.get("conflict_action_pair"):
             existing.conflict_action_pair = rollup["conflict_action_pair"]
+        # 行人涉入精確口徑（Wave 31-A）：舊檔先建案時可能沒有「26.當事者區分(類別)」
+        # 子類別文字欄，新檔（全選條件匯出）帶了才回補；False→True 時四欄一併原子寫入，
+        # 避免只補旗標卻漏補死傷數（與其他 Wave 28/30 欄位同一套「只補空/False」語意）。
+        if not existing.involves_pedestrian and rollup.get("involves_pedestrian"):
+            existing.involves_pedestrian = True
+            existing.ped_death_count = rollup.get("ped_death_count", 0)
+            existing.ped_late_death_count = rollup.get("ped_late_death_count", 0)
+            existing.ped_injury_count = rollup.get("ped_injury_count", 0)
 
 
 def _parse_eis_dt(dstr: str, tstr: str) -> Optional[datetime]:
@@ -929,11 +937,30 @@ async def import_crash_file(
                     "_conflict_act2": None,
                     "conflict_action_pair": None,
                     "_picked_priority": 0,  # 內部用：1=肇事駕駛飲酒, 2=非行人, 3=fallback
+                    # 行人涉入精確口徑（Wave 31-A）
+                    "involves_pedestrian": False,
+                    "ped_death_count": 0,
+                    "ped_late_death_count": 0,
+                    "ped_injury_count": 0,
                 })
 
                 # 旗標：只要有任何非行人飲酒就標記
                 if not is_pedestrian and is_drinking:
                     bucket["has_drinking_party"] = True
+
+                # 行人涉入精確口徑（Wave 31-A）：任一當事者「26.當事者區分(類別)」
+                # 子類別文字含「行人」或「輔助代步器材」（電動代步車使用者道交視同行人）。
+                # ⚠️ 不可用大類別「人」判定，該大類含乘客，乘客不是行人。
+                party_sub_type = _safe_eis_str(row, "26.當事者區分(類別)")
+                if "行人" in party_sub_type or "輔助代步器材" in party_sub_type:
+                    bucket["involves_pedestrian"] = True
+                    ped_injury = _safe_eis_str(row, "22.受傷程度")
+                    if ped_injury == "24小時內死亡":
+                        bucket["ped_death_count"] += 1
+                    elif ped_injury == "2-30日內死亡":
+                        bucket["ped_late_death_count"] += 1
+                    elif ped_injury == "受傷":
+                        bucket["ped_injury_count"] += 1
 
                 # 案件級聚合：任一當事者肇逃=是；外送平台取第一個有效值
                 if _safe_eis_str(row, "35.肇事逃逸(是否肇逃)") == "是":
@@ -1109,6 +1136,11 @@ async def import_crash_file(
                     is_hit_and_run = bool(rollup.get("any_hit_and_run", False))
                     delivery_platform = rollup.get("delivery_platform")
                     conflict_action_pair = rollup.get("conflict_action_pair")
+                    # 行人涉入精確口徑（Wave 31-A）
+                    involves_pedestrian = bool(rollup.get("involves_pedestrian", False))
+                    ped_death_count = rollup.get("ped_death_count", 0)
+                    ped_late_death_count = rollup.get("ped_late_death_count", 0)
+                    ped_injury_count = rollup.get("ped_injury_count", 0)
 
                     # 舊邏輯 fallback（若資料未含新欄位，例如歷史檔）
                     if not is_dui_crash_party and (drinking_code is None and party_subtype_code is None):
@@ -1201,6 +1233,11 @@ async def import_crash_file(
                     is_hit_and_run = False
                     delivery_platform = None
                     conflict_action_pair = None
+                    # LEGACY 無 26.當事者區分(類別) 子類別文字欄，行人精確口徑無法判定
+                    involves_pedestrian = False
+                    ped_death_count = 0
+                    ped_late_death_count = 0
+                    ped_injury_count = 0
 
                 # ============================
                 # 共用欄位（兩種格式皆走此路徑）
@@ -1319,6 +1356,11 @@ async def import_crash_file(
                     delivery_platform=delivery_platform,
                     # 路口衝突方向引擎（Wave 28）
                     conflict_action_pair=conflict_action_pair,
+                    # 行人涉入精確口徑（Wave 31-A）
+                    involves_pedestrian=involves_pedestrian,
+                    ped_death_count=ped_death_count,
+                    ped_late_death_count=ped_late_death_count,
+                    ped_injury_count=ped_injury_count,
                     **road_fields,
                 )
 
@@ -1485,7 +1527,16 @@ def _do_batch_import(txt_files: list, db):
         db.query(func.count(Crash.id)).scalar() > 0
         and db.query(func.count(Crash.id)).filter(Crash.clearance_minutes.isnot(None)).scalar() == 0
     )
-    needs_backfill = needs_backfill_subunit or conflict_backfill_needed or clearance_backfill_needed
+    # 行人涉入精確口徑（Wave 31-A）回補哨兵：全庫皆無 involves_pedestrian=True 但已有資料，
+    # 代表尚未跑過回補，允許已匯入檔案重新進入流程補值；回補後必有部分案件為 True，冪等不再重跑。
+    pedestrian_backfill_needed = (
+        db.query(func.count(Crash.id)).scalar() > 0
+        and db.query(func.count(Crash.id)).filter(Crash.involves_pedestrian == True).scalar() == 0
+    )
+    needs_backfill = (
+        needs_backfill_subunit or conflict_backfill_needed or clearance_backfill_needed
+        or pedestrian_backfill_needed
+    )
 
     for txt_path in txt_files:
         fname = os.path.basename(txt_path)
@@ -1555,9 +1606,27 @@ def _do_batch_import(txt_files: list, db):
                         "_conflict_act2": None,
                         "conflict_action_pair": None,
                         "_picked_priority": 0,
+                        # 行人涉入精確口徑（Wave 31-A）
+                        "involves_pedestrian": False,
+                        "ped_death_count": 0,
+                        "ped_late_death_count": 0,
+                        "ped_injury_count": 0,
                     })
                     if not _is_pedestrian and _is_drinking:
                         _bucket["has_drinking_party"] = True
+                    # 行人涉入精確口徑（Wave 31-A）：任一當事者「26.當事者區分(類別)」
+                    # 子類別文字含「行人」或「輔助代步器材」（電動代步車使用者道交視同行人）。
+                    # ⚠️ 不可用大類別「人」判定，該大類含乘客，乘客不是行人。
+                    _party_sub_type = _safe_eis_str(_row, "26.當事者區分(類別)")
+                    if "行人" in _party_sub_type or "輔助代步器材" in _party_sub_type:
+                        _bucket["involves_pedestrian"] = True
+                        _ped_injury = _safe_eis_str(_row, "22.受傷程度")
+                        if _ped_injury == "24小時內死亡":
+                            _bucket["ped_death_count"] += 1
+                        elif _ped_injury == "2-30日內死亡":
+                            _bucket["ped_late_death_count"] += 1
+                        elif _ped_injury == "受傷":
+                            _bucket["ped_injury_count"] += 1
                     # 案件級聚合：任一當事者肇逃=是；外送平台取第一個有效值
                     if _safe_eis_str(_row, "35.肇事逃逸(是否肇逃)") == "是":
                         _bucket["any_hit_and_run"] = True
@@ -1710,6 +1779,11 @@ def _do_batch_import(txt_files: list, db):
                         is_hit_and_run = bool(rollup.get("any_hit_and_run", False))
                         delivery_platform = rollup.get("delivery_platform")
                         conflict_action_pair = rollup.get("conflict_action_pair")
+                        # 行人涉入精確口徑（Wave 31-A）
+                        involves_pedestrian = bool(rollup.get("involves_pedestrian", False))
+                        ped_death_count = rollup.get("ped_death_count", 0)
+                        ped_late_death_count = rollup.get("ped_late_death_count", 0)
+                        ped_injury_count = rollup.get("ped_injury_count", 0)
 
                         # 舊邏輯 fallback
                         if not is_dui_crash_party and (drinking_code is None and party_subtype_code is None):
@@ -1832,6 +1906,11 @@ def _do_batch_import(txt_files: list, db):
                         delivery_platform=delivery_platform,
                         # 路口衝突方向引擎（Wave 28）
                         conflict_action_pair=conflict_action_pair,
+                        # 行人涉入精確口徑（Wave 31-A）
+                        involves_pedestrian=involves_pedestrian,
+                        ped_death_count=ped_death_count,
+                        ped_late_death_count=ped_late_death_count,
+                        ped_injury_count=ped_injury_count,
                         **road_fields,
                     )
                     db.add(crash)
@@ -2162,7 +2241,16 @@ async def import_crash_upload_batch(
         db.query(func.count(Crash.id)).scalar() > 0
         and db.query(func.count(Crash.id)).filter(Crash.clearance_minutes.isnot(None)).scalar() == 0
     )
-    needs_backfill = needs_backfill_subunit or conflict_backfill_needed or clearance_backfill_needed
+    # 行人涉入精確口徑（Wave 31-A）回補哨兵：全庫皆無 involves_pedestrian=True 但已有資料，
+    # 代表尚未跑過回補，允許已匯入檔案重新進入流程補值；回補後必有部分案件為 True，冪等不再重跑。
+    pedestrian_backfill_needed = (
+        db.query(func.count(Crash.id)).scalar() > 0
+        and db.query(func.count(Crash.id)).filter(Crash.involves_pedestrian == True).scalar() == 0
+    )
+    needs_backfill = (
+        needs_backfill_subunit or conflict_backfill_needed or clearance_backfill_needed
+        or pedestrian_backfill_needed
+    )
 
     for file in files:
         if not file.filename or not file.filename.endswith(ALLOWED_EXTENSIONS):
@@ -2252,9 +2340,27 @@ async def import_crash_upload_batch(
                         "_conflict_act2": None,
                         "conflict_action_pair": None,
                         "_picked_priority": 0,
+                        # 行人涉入精確口徑（Wave 31-A）
+                        "involves_pedestrian": False,
+                        "ped_death_count": 0,
+                        "ped_late_death_count": 0,
+                        "ped_injury_count": 0,
                     })
                     if not _is_pedestrian and _is_drinking:
                         _bucket["has_drinking_party"] = True
+                    # 行人涉入精確口徑（Wave 31-A）：任一當事者「26.當事者區分(類別)」
+                    # 子類別文字含「行人」或「輔助代步器材」（電動代步車使用者道交視同行人）。
+                    # ⚠️ 不可用大類別「人」判定，該大類含乘客，乘客不是行人。
+                    _party_sub_type = _safe_eis_str(_row, "26.當事者區分(類別)")
+                    if "行人" in _party_sub_type or "輔助代步器材" in _party_sub_type:
+                        _bucket["involves_pedestrian"] = True
+                        _ped_injury = _safe_eis_str(_row, "22.受傷程度")
+                        if _ped_injury == "24小時內死亡":
+                            _bucket["ped_death_count"] += 1
+                        elif _ped_injury == "2-30日內死亡":
+                            _bucket["ped_late_death_count"] += 1
+                        elif _ped_injury == "受傷":
+                            _bucket["ped_injury_count"] += 1
                     # 案件級聚合：任一當事者肇逃=是；外送平台取第一個有效值
                     if _safe_eis_str(_row, "35.肇事逃逸(是否肇逃)") == "是":
                         _bucket["any_hit_and_run"] = True
@@ -2407,6 +2513,11 @@ async def import_crash_upload_batch(
                         is_hit_and_run = bool(rollup.get("any_hit_and_run", False))
                         delivery_platform = rollup.get("delivery_platform")
                         conflict_action_pair = rollup.get("conflict_action_pair")
+                        # 行人涉入精確口徑（Wave 31-A）
+                        involves_pedestrian = bool(rollup.get("involves_pedestrian", False))
+                        ped_death_count = rollup.get("ped_death_count", 0)
+                        ped_late_death_count = rollup.get("ped_late_death_count", 0)
+                        ped_injury_count = rollup.get("ped_injury_count", 0)
 
                         # 舊邏輯 fallback
                         if not is_dui_crash_party and (drinking_code is None and party_subtype_code is None):
@@ -2488,6 +2599,11 @@ async def import_crash_upload_batch(
                         is_hit_and_run = False
                         delivery_platform = None
                         conflict_action_pair = None
+                        # LEGACY 無 26.當事者區分(類別) 子類別文字欄，行人精確口徑無法判定
+                        involves_pedestrian = False
+                        ped_death_count = 0
+                        ped_late_death_count = 0
+                        ped_injury_count = 0
 
                     # 共用欄位
                     age_val = (
@@ -2582,6 +2698,11 @@ async def import_crash_upload_batch(
                         delivery_platform=delivery_platform,
                         # 路口衝突方向引擎（Wave 28）
                         conflict_action_pair=conflict_action_pair,
+                        # 行人涉入精確口徑（Wave 31-A）
+                        involves_pedestrian=involves_pedestrian,
+                        ped_death_count=ped_death_count,
+                        ped_late_death_count=ped_late_death_count,
+                        ped_injury_count=ped_injury_count,
                         **road_fields,
                     )
 

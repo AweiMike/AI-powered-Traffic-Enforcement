@@ -101,6 +101,11 @@ def _migrate_eis_columns():
         "response_minutes": "FLOAT",
         "clearance_minutes": "FLOAT",
         "has_yield_sign": "VARCHAR(4)",
+        # 行人涉入精確口徑欄位（Wave 31-A）
+        "involves_pedestrian": "BOOLEAN DEFAULT 0",
+        "ped_death_count": "INTEGER DEFAULT 0",
+        "ped_late_death_count": "INTEGER DEFAULT 0",
+        "ped_injury_count": "INTEGER DEFAULT 0",
     })
 
     # core_ticket 表可能缺少的欄位

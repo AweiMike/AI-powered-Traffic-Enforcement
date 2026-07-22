@@ -319,29 +319,34 @@ class AnalyticsEngine:
                 count += 1
         return count
 
-    # 行人 party_type 值（與 enforcement.py 保持一致）
-    _PEDESTRIAN_PARTY_TYPES = ["行人", "人", "其他人"]
-
     def _count_pedestrian_crashes(self, start: date, end: date, extra_filter=None) -> int:
-        """行人涉入事故件數"""
+        """行人涉入事故件數（Wave 31-A：involves_pedestrian 精確口徑，取代舊版
+        party_type LIKE/等於 判定——舊版誤把「全案當事者皆人類」當行人事故，
+        漏掉「行人被車撞、代表當事者是駕駛」的案件）"""
         q = self.db.query(func.count(Crash.id)).filter(
             Crash.occurred_date >= start,
             Crash.occurred_date <= end,
-            Crash.party_type.in_(self._PEDESTRIAN_PARTY_TYPES),
+            Crash.involves_pedestrian == True,
         )
         if extra_filter is not None:
             q = q.filter(extra_filter)
         return q.scalar() or 0
 
     def _sum_pedestrian_casualties(self, start: date, end: date) -> tuple[int, int]:
-        """回傳 (死亡人數, 受傷人數) — 僅針對行人事故"""
-        rows = self.db.query(Crash.death_count, Crash.injury_count).filter(
+        """回傳 (死亡人數, 受傷人數) — 僅行人當事者本身傷亡。
+
+        Wave 31-A：改用 ped_death_count/ped_injury_count（行人當事者本身傷亡），
+        取代舊版 Crash.death_count/injury_count（案件總死傷，若同案有非行人
+        當事者死傷會高估行人死傷數）。ped_late_death_count（2-30日內死亡）
+        比照全站口徑不併入死亡數，僅供未來如需展示時取用。
+        """
+        rows = self.db.query(Crash.ped_death_count, Crash.ped_injury_count).filter(
             Crash.occurred_date >= start,
             Crash.occurred_date <= end,
-            Crash.party_type.in_(self._PEDESTRIAN_PARTY_TYPES),
+            Crash.involves_pedestrian == True,
         ).all()
-        deaths = sum(r.death_count or 0 for r in rows)
-        injuries = sum(r.injury_count or 0 for r in rows)
+        deaths = sum(r.ped_death_count or 0 for r in rows)
+        injuries = sum(r.ped_injury_count or 0 for r in rows)
         return deaths, injuries
 
     def _sum_late_deaths(self, start: date, end: date) -> int:

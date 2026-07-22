@@ -147,6 +147,12 @@ class Crash(Base):
         Boolean, default=False, index=True, comment="未滿14歲騎乘微電車"
     )
 
+    # === 行人涉入精確口徑欄位（Wave 31-A，來源=EIS 26.當事者區分(類別) 子類別文字欄）===
+    involves_pedestrian = Column(Boolean, default=False, index=True, comment="涉及行人（任一當事者子類含行人/輔助代步器材；口徑精確化 Wave 31）")
+    ped_death_count = Column(Integer, default=0, comment="行人當事者 24hr 內死亡數")
+    ped_late_death_count = Column(Integer, default=0, comment="行人當事者 2-30 日內死亡數")
+    ped_injury_count = Column(Integer, default=0, comment="行人當事者受傷數")
+
     # === 系統欄位 ===
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
