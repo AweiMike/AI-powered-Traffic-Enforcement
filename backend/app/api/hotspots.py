@@ -4,15 +4,18 @@
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, desc, case
+from sqlalchemy import func, and_, or_, desc, case
 from typing import List, Optional
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 from math import radians, cos, sqrt
+import re
 
 from app.database import get_db
 from app.models.core import Crash, Ticket
 from app.utils.epdo import crash_epdo
+from app.utils.drug_drive import not_drug_filter
+from app.api.enforcement import HEAVY_VEHICLE_KEYWORDS
 
 
 router = APIRouter()
@@ -616,4 +619,286 @@ async def get_a1_accident_list(
         "period": {"start": str(sd), "end": str(ed)},
         "total": len(items),
         "items": items,
+    }
+
+
+# ============================================
+# 執法錯位引擎（Wave 29）：事故熱區 vs 取締熱區雙榜對照
+# ============================================
+# 背景：事故 GPS 覆蓋率 100% → 走 GPS 100m 聚類；取締 GPS 覆蓋率僅約 19% → 不可聚類，
+# 改走 district + location_desc 文字分組。雙榜以路名 token 交集比對（非 GPS 距離）。
+
+TOPIC_LABELS = {"dui": "酒駕", "heavy": "大型車", "speed": "超速", "evehicle": "微電車"}
+
+# 道路等級前綴（由長至短無關，逐一比對開頭）— _road_tokens 用於剝除路名前綴以歸一比對
+_ROAD_PREFIXES = ("省道", "縣道", "區道", "鄉道", "市道")
+
+
+_ADMIN_PREFIX_RE = re.compile(r"^[一-鿿]{1,3}[區里]")
+
+
+def _road_tokens(name: str) -> set:
+    """地點名稱 → 路名 token 集合。全形臺→台、剝行政區/村里前綴（新化區/榮和里，可連續）、
+    剝「省道/縣道/區道/鄉道/市道」前綴、依「/」拆路口、去空白。
+    例：「中山路 / 省道臺39線」→ {"中山路", "台39線"}；「左鎮區榮和里 臺20線23.9公里處」→ {"台20線23.9公里處"}
+    （比對階段用包含判定，「台20線」可命中「台20線23.9公里處」——見 _tokens_hit）"""
+    if not name:
+        return set()
+    tokens = set()
+    normalized = name.replace("臺", "台")
+    for part in normalized.split("/"):
+        token = part.strip()
+        # 剝行政區/村里前綴（取締側 location_desc 常帶「新化區」「左鎮區榮和里」，事故側不帶）
+        while True:
+            m = _ADMIN_PREFIX_RE.match(token)
+            if not m:
+                break
+            token = token[m.end():].strip()
+        for prefix in _ROAD_PREFIXES:
+            if token.startswith(prefix):
+                token = token[len(prefix):]
+                break
+        if token:
+            tokens.add(token)
+    return tokens
+
+
+def _tokens_hit(a: set, b: set) -> set:
+    """兩組路名 token 的命中集合：完全相等，或（≥3 字保護下）一方包含另一方。
+    取締側常帶公里數/門牌尾綴（「台20線23.9公里處」），包含判定讓「台20線」可命中；
+    ≥3 字下限避免過短 token 誤配。回傳命中的「較短代表名」集合。"""
+    hits = set()
+    for x in a:
+        for y in b:
+            if x == y:
+                hits.add(x)
+            elif len(x) >= 3 and x in y:
+                hits.add(x)
+            elif len(y) >= 3 and y in x:
+                hits.add(y)
+    return hits
+
+
+def _topic_crash_filter(topic: str):
+    """依主題回傳事故側 SQLAlchemy 篩選條件（dui/heavy/speed/evehicle）"""
+    if topic == "dui":
+        return Crash.is_dui_crash_party == True
+    if topic == "heavy":
+        return or_(*[Crash.party_type.ilike(f"%{kw}%") for kw in HEAVY_VEHICLE_KEYWORDS])
+    if topic == "speed":
+        return Crash.cause.like("%超速%")
+    if topic == "evehicle":
+        return Crash.evehicle_type.isnot(None) & (Crash.evehicle_type != "")
+    return None
+
+
+def _topic_ticket_filter(topic: str):
+    """依主題回傳取締側 SQLAlchemy 篩選條件（dui/heavy/speed/evehicle）"""
+    if topic == "dui":
+        return and_(Ticket.topic_dui == True, not_drug_filter())
+    if topic == "heavy":
+        return or_(*[Ticket.vehicle_type.ilike(f"%{kw}%") for kw in HEAVY_VEHICLE_KEYWORDS])
+    if topic == "speed":
+        return Ticket.violation_name.like("%超速%")
+    if topic == "evehicle":
+        return Ticket.evehicle_type.isnot(None) & (Ticket.evehicle_type != "")
+    return None
+
+
+def _fetch_topic_crash_rows(db: Session, start_dt, end_dt, topic: str):
+    """查詢指定日期範圍與主題（dui/heavy/speed/evehicle）且有 GPS 座標的事故記錄，
+    回傳 list of dicts 供 cluster_crashes_by_gps 聚類使用（欄位比照 _fetch_crash_rows）。"""
+    query = db.query(
+        Crash.latitude, Crash.longitude, Crash.district,
+        Crash.location_desc, Crash.severity,
+        Crash.death_count, Crash.late_death_count, Crash.injury_count,
+    ).filter(
+        and_(
+            Crash.occurred_date >= start_dt,
+            Crash.occurred_date <= end_dt,
+            Crash.latitude.isnot(None),
+            Crash.longitude.isnot(None),
+        ),
+        _topic_crash_filter(topic),
+    )
+    return [
+        {'lat': r.latitude, 'lng': r.longitude,
+         'district': r.district or '', 'location_desc': r.location_desc or '',
+         'severity': r.severity or '',
+         'death_count': r.death_count, 'late_death_count': r.late_death_count,
+         'injury_count': r.injury_count}
+        for r in query.all()
+    ]
+
+
+def _match_hotspots(crash_hotspots: list, ticket_hotspots: list):
+    """路名 token 交集比對事故熱區與取締熱區雙榜（純函式，無 DB 相依）。
+
+    回傳 (matched, crash_only, ticket_only, overlap_rate)：
+    - matched: [{"crash": ch, "tickets": [th, ...], "common_tokens": [...]}]
+      對每個事故熱區，找出所有 token 交集非空的取締熱區
+    - crash_only: 無任何配對的事故熱區（高事故低取締 → 移防目標）
+    - ticket_only: 未被任何事故熱區配到的取締熱區（→ 檢討候選）
+    - overlap_rate: len(matched) / len(crash_hotspots) * 100（事故榜空 → 0.0）
+    """
+    crash_token_sets = [_road_tokens(h["location"]) for h in crash_hotspots]
+    ticket_token_sets = [_road_tokens(h["location"]) for h in ticket_hotspots]
+
+    matched = []
+    matched_ticket_idx = set()
+    crash_only = []
+    for ci, ch in enumerate(crash_hotspots):
+        ct = crash_token_sets[ci]
+        paired_tickets = []
+        common_all = set()
+        for ti, th in enumerate(ticket_hotspots):
+            common = _tokens_hit(ct, ticket_token_sets[ti])
+            if common:
+                paired_tickets.append(th)
+                matched_ticket_idx.add(ti)
+                common_all |= common
+        if paired_tickets:
+            matched.append({
+                "crash": ch,
+                "tickets": paired_tickets,
+                "common_tokens": sorted(common_all),
+            })
+        else:
+            crash_only.append(ch)
+
+    ticket_only = [th for ti, th in enumerate(ticket_hotspots) if ti not in matched_ticket_idx]
+    overlap_rate = round(len(matched) / len(crash_hotspots) * 100, 1) if crash_hotspots else 0.0
+
+    return matched, crash_only, ticket_only, overlap_rate
+
+
+def _build_mismatch_suggestions(topic_label: str, crash_only: list, ticket_only: list, matched: list) -> list:
+    """組裝移防建議（純函式，無 DB 相依）：
+    crash_only 前 3 各一條 + ticket_only 前 2 合一條 + matched 第 1 名一條"""
+    suggestions = []
+    for h in crash_only[:3]:
+        suggestions.append({
+            "title": f"移入攔檢能量：{h['location']}",
+            "reason": f"{topic_label}肇事熱區（{h['count']} 件/EPDO {h['epdo']}）目前不在取締熱區榜上，建議優先移設攔檢點",
+        })
+    if len(ticket_only) >= 2:
+        t1, t2 = ticket_only[0], ticket_only[1]
+        suggestions.append({
+            "title": "檢討既有攔檢點配置",
+            "reason": f"{t1['location']}（{t1['count']} 張）、{t2['location']}（{t2['count']} 張）取締量大但未對應肇事熱區，可評估將部分能量移往上述肇事熱區",
+        })
+    if matched:
+        m0 = matched[0]
+        ch0 = m0["crash"]
+        ticket_count_sum = sum(t["count"] for t in m0["tickets"])
+        suggestions.append({
+            "title": f"布防正確：{ch0['location']}",
+            "reason": f"肇事與取締熱區重合（{ch0['count']} 件/{ticket_count_sum} 張），維持並持續監測",
+        })
+    return suggestions
+
+
+@router.get("/enforcement-mismatch")
+async def get_enforcement_mismatch(
+    topic: str = Query(..., description="dui|heavy|speed|evehicle"),
+    start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    top_n: int = Query(default=8, description="事故/取締熱區各取前 N 名"),
+    db: Session = Depends(get_db),
+):
+    """
+    執法錯位引擎（Wave 29）：四主題（酒駕/大型車/超速/微電車）事故熱區 vs 取締熱區雙榜對照。
+
+    - 事故側 GPS 覆蓋率 100% → 走 GPS 100m 聚類（cluster_crashes_by_gps）
+    - 取締側 GPS 覆蓋率僅約 19%，不可聚類 → 改走 district + location_desc 文字分組
+    - 雙榜以路名 token 交集比對（_road_tokens），非 GPS 距離比對
+    - crash_only：肇事熱區未見取締覆蓋（高事故低取締）→ 移防建議目標
+    - ticket_only：取締熱區未對應肇事熱區 → 檢討候選
+    - 精準執法理念：事故熱區反映真風險位置，取締熱區反映警力當前部署，兩者對照找出錯位
+    """
+    if topic not in TOPIC_LABELS:
+        return {"error": f"不支援的 topic: {topic}（限 dui|heavy|speed|evehicle）"}
+
+    try:
+        sd = datetime.strptime(start_date, "%Y-%m-%d").date()
+        ed = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return {"error": "日期格式錯誤"}
+
+    topic_label = TOPIC_LABELS[topic]
+
+    # --- 事故熱區（GPS 聚類）---
+    crash_n = db.query(func.count(Crash.id)).filter(
+        Crash.occurred_date >= sd,
+        Crash.occurred_date <= ed,
+        _topic_crash_filter(topic),
+    ).scalar() or 0
+
+    crash_rows = _fetch_topic_crash_rows(db, sd, ed, topic)
+    clusters = cluster_crashes_by_gps(crash_rows)
+
+    crash_hotspots = []
+    for i, c in enumerate(clusters[:top_n], 1):
+        district = max(c['districts'], key=c['districts'].get)
+        crash_hotspots.append({
+            "rank": i,
+            "location": _pick_best_location(c['locations']),
+            "district": _clean_district(district),
+            "count": c['total'],
+            "epdo": round(c['epdo'], 1),
+            "latitude": round(c['lat'], 6),
+            "longitude": round(c['lng'], 6),
+        })
+
+    # --- 取締熱區（location_desc 文字分組；GPS 覆蓋率過低不可聚類）---
+    ticket_rows = db.query(
+        Ticket.district, Ticket.location_desc,
+        func.count(Ticket.id).label('count'),
+    ).filter(
+        and_(
+            Ticket.violation_date >= sd,
+            Ticket.violation_date <= ed,
+            Ticket.location_desc.isnot(None),
+            Ticket.location_desc != "未知地點",
+        ),
+        _topic_ticket_filter(topic),
+    ).group_by(
+        Ticket.district, Ticket.location_desc,
+    ).order_by(
+        desc('count'),
+    ).limit(top_n).all()
+
+    ticket_hotspots = []
+    for i, row in enumerate(ticket_rows, 1):
+        ticket_hotspots.append({
+            "rank": i,
+            "location": row.location_desc or "未知地點",
+            "district": _clean_district(row.district),
+            "count": row.count,
+        })
+
+    # --- 路名 token 歸一比對（純函式，見 _match_hotspots）---
+    matched, crash_only, ticket_only, overlap_rate = _match_hotspots(crash_hotspots, ticket_hotspots)
+
+    # --- 樣本警語 ---
+    if crash_n < 30:
+        crash_sample_note = f"⚠ 事故樣本僅 {crash_n} 件，熱區分布僅供參考"
+    else:
+        crash_sample_note = f"事故樣本 {crash_n} 件"
+
+    # --- 移防建議（純函式，見 _build_mismatch_suggestions）---
+    suggestions = _build_mismatch_suggestions(topic_label, crash_only, ticket_only, matched)
+
+    return {
+        "topic": topic,
+        "topic_label": topic_label,
+        "period": {"start_date": start_date, "end_date": end_date},
+        "crash_sample_note": crash_sample_note,
+        "crash_hotspots": crash_hotspots,
+        "ticket_hotspots": ticket_hotspots,
+        "matched": matched,
+        "crash_only": crash_only,
+        "ticket_only": ticket_only,
+        "overlap_rate": overlap_rate,
+        "suggestions": suggestions,
     }

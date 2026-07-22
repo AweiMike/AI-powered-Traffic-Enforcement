@@ -2,10 +2,13 @@
  * 事故分析頁面 - 獨立的事故熱點與趨勢分析
  * 參考「歸仁分局114年12月份順安專案執法與事故關聯性分析」樣式
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAccidentHotspots, useAccidentPeakTimes, useCrossAnalysis } from '../hooks/useAPI';
-import { apiClient, AccidentHotspot, ShiftData } from '../api/client';
+import { apiClient, AccidentHotspot, ShiftData, EnforcementMismatchResponse } from '../api/client';
 import DateRangePicker, { type DateRange, getCompareRange } from './DateRangePicker';
+
+/** 執法錯位分析主題代碼（對應後端 /hotspots/enforcement-mismatch?topic= 參數） */
+type MismatchTopicId = 'dui' | 'heavy' | 'speed' | 'evehicle';
 
 // 同期比較標籤
 const YoYBadge: React.FC<{ current: number; previous: number }> = ({ current, previous }) => {
@@ -147,6 +150,40 @@ const AccidentAnalysisPage: React.FC = () => {
             console.error('Failed to export DUI crash cases', e);
         }
     };
+
+    // ============================================
+    // 執法錯位分析（Wave 29）— 肇事熱區 vs 取締熱區對照＋移防建議
+    // 獨立於上方分頁切換之外的區塊，沿用本頁 dateRange；主題切換/日期變動皆重新 fetch
+    // ============================================
+    const [mismatchTopic, setMismatchTopic] = useState<MismatchTopicId>('dui');
+    const [mismatchData, setMismatchData] = useState<EnforcementMismatchResponse | null>(null);
+    const [mismatchLoading, setMismatchLoading] = useState<boolean>(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        const fetchMismatch = async () => {
+            setMismatchLoading(true);
+            try {
+                const result = await apiClient.getEnforcementMismatch(mismatchTopic, dateRange.startDate, dateRange.endDate);
+                if (!cancelled) setMismatchData(result);
+            } catch (e) {
+                console.error('Failed to fetch enforcement mismatch', e);
+                if (!cancelled) setMismatchData(null);
+            }
+            if (!cancelled) setMismatchLoading(false);
+        };
+        fetchMismatch();
+        return () => { cancelled = true; };
+    }, [mismatchTopic, dateRange.startDate, dateRange.endDate]);
+
+    const overlapRate = mismatchData?.overlap_rate ?? 0;
+
+    const mismatchTopics: { id: MismatchTopicId; label: string }[] = [
+        { id: 'dui', label: '🍺 酒駕' },
+        { id: 'heavy', label: '🚛 大型車' },
+        { id: 'speed', label: '🚀 超速' },
+        { id: 'evehicle', label: '🛴 微電車' },
+    ];
 
     const tabs = [
         { id: 'list' as const, label: '📊 詳細分析', desc: '時段與缺口' },
@@ -651,6 +688,170 @@ const AccidentAnalysisPage: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* ============================================
+                執法錯位分析（Wave 29）— 肇事熱區 vs 取締熱區對照＋移防建議
+                獨立區塊，不併入上方「詳細分析／酒駕分析」分頁切換
+               ============================================ */}
+            <div className="mt-10 pt-8 border-t border-nook-wood/30">
+                <div className="mb-4">
+                    <h2 className="text-2xl font-bold text-nook-text mb-1">🎯 執法錯位分析 — 肇事熱區 vs 取締熱區</h2>
+                    <p className="text-sm text-nook-text/60">精準執法＝把能量放在事故發生的地方；兩榜以路名歸一比對</p>
+                </div>
+
+                {/* 主題切換 */}
+                <div className="flex gap-2 mb-4 flex-wrap">
+                    {mismatchTopics.map(t => (
+                        <button
+                            key={t.id}
+                            onClick={() => setMismatchTopic(t.id)}
+                            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${t.id === mismatchTopic
+                                ? 'bg-nook-leaf text-white shadow-lg'
+                                : 'bg-white/60 text-nook-text hover:bg-nook-leaf/10'
+                                }`}
+                        >
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
+
+                {mismatchLoading ? (
+                    <div className="bg-white/80 rounded-2xl p-8 text-center">
+                        <p className="text-nook-text/60">載入中...</p>
+                    </div>
+                ) : !mismatchData ? (
+                    <div className="bg-white/80 rounded-2xl p-8 text-center">
+                        <p className="text-nook-text/40">尚無資料</p>
+                    </div>
+                ) : (
+                    <>
+                        {/* 摘要列：重疊率 + 樣本數說明 */}
+                        <div className="bg-white/80 rounded-2xl p-4 nook-shadow mb-4 flex items-center gap-6 flex-wrap">
+                            <div className="text-center px-2">
+                                <p className={`text-4xl font-bold tabular-nums ${overlapRate >= 50 ? 'text-green-600' :
+                                    overlapRate >= 25 ? 'text-amber-600' :
+                                        'text-red-600'
+                                    }`}>
+                                    {overlapRate}%
+                                </p>
+                                <p className="text-xs text-nook-text/50 mt-1">肇事熱區中有取締熱區對應的比例</p>
+                            </div>
+                            {mismatchData.crash_sample_note && (
+                                mismatchData.crash_sample_note.includes('⚠') ? (
+                                    <div className="bg-amber-50 border border-amber-300 rounded-xl px-3 py-2 text-xs text-amber-700 flex-1 min-w-[200px]">
+                                        {mismatchData.crash_sample_note}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-nook-text/50 flex-1 min-w-[200px]">{mismatchData.crash_sample_note}</p>
+                                )
+                            )}
+                        </div>
+
+                        {/* 三欄清單：肇事熱區未布防／布防正確／取締熱區低肇事 */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
+                            {/* 左欄：肇事熱區未布防 */}
+                            <div className="space-y-3">
+                                <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+                                    <h4 className="font-bold text-red-700 mb-1">🔴 肇事熱區未布防</h4>
+                                    <p className="text-xs text-red-600/70">有肇事、榜內無對應取締紀錄</p>
+                                </div>
+                                <div className="bg-white/80 rounded-2xl p-4 nook-shadow space-y-2 max-h-96 overflow-y-auto">
+                                    {mismatchData.crash_only?.length ? mismatchData.crash_only.map((item, idx) => {
+                                        const lat = item.latitude;
+                                        const lng = item.longitude;
+                                        return (
+                                            <div key={idx} className="bg-red-50/60 rounded-lg p-2.5 flex items-start justify-between gap-2">
+                                                <div className="min-w-0">
+                                                    <p className="font-bold text-nook-text text-sm truncate">{item.location}</p>
+                                                    <p className="text-xs text-nook-text/50">{item.district || '—'}</p>
+                                                    <p className="text-xs text-red-600 mt-0.5">{item.count} 件 · EPDO {item.epdo ?? '—'}</p>
+                                                </div>
+                                                {lat != null && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            sessionStorage.setItem('pending_dossier', JSON.stringify({ lat, lng }));
+                                                            window.dispatchEvent(new CustomEvent('app:navigate', { detail: { view: 'road-eng' } }));
+                                                        }}
+                                                        className="shrink-0 leading-none hover:opacity-70"
+                                                        title="開啟會勘卷宗"
+                                                    >
+                                                        🔍
+                                                    </button>
+                                                )}
+                                            </div>
+                                        );
+                                    }) : (
+                                        <p className="text-sm text-nook-text/40 text-center py-4">無</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* 中欄：布防正確 */}
+                            <div className="space-y-3">
+                                <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
+                                    <h4 className="font-bold text-green-700 mb-1">🟢 布防正確</h4>
+                                    <p className="text-xs text-green-600/70">肇事熱區與取締熱區已對應</p>
+                                </div>
+                                <div className="bg-white/80 rounded-2xl p-4 nook-shadow space-y-2 max-h-96 overflow-y-auto">
+                                    {mismatchData.matched?.length ? mismatchData.matched.map((pair, idx) => {
+                                        const ticketTotal = pair.tickets?.reduce((sum, t) => sum + (t.count || 0), 0) || 0;
+                                        return (
+                                            <div key={idx} className="bg-green-50/60 rounded-lg p-2.5">
+                                                <p className="font-bold text-nook-text text-sm truncate">
+                                                    {pair.crash.location}
+                                                    <span className="text-green-500 mx-1">↔</span>
+                                                    {pair.tickets?.[0]?.location || '—'}
+                                                    {(pair.tickets?.length || 0) > 1 && (
+                                                        <span className="text-xs text-nook-text/50"> 等 {pair.tickets.length} 處</span>
+                                                    )}
+                                                </p>
+                                                <p className="text-xs text-green-600 mt-0.5">{pair.crash.count} 件 · {ticketTotal} 張</p>
+                                            </div>
+                                        );
+                                    }) : (
+                                        <p className="text-sm text-nook-text/40 text-center py-4">無</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* 右欄：取締熱區低肇事 */}
+                            <div className="space-y-3">
+                                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                                    <h4 className="font-bold text-blue-700 mb-1">🔵 取締熱區低肇事</h4>
+                                    <p className="text-xs text-blue-600/70">有取締、榜內無對應肇事熱區</p>
+                                </div>
+                                <div className="bg-white/80 rounded-2xl p-4 nook-shadow space-y-2 max-h-96 overflow-y-auto">
+                                    {mismatchData.ticket_only?.length ? mismatchData.ticket_only.map((item, idx) => (
+                                        <div key={idx} className="bg-blue-50/60 rounded-lg p-2.5">
+                                            <p className="font-bold text-nook-text text-sm truncate">{item.location}</p>
+                                            <p className="text-xs text-blue-600 mt-0.5">{item.count} 張</p>
+                                            <p className="text-[11px] text-nook-text/40">榜內無對應肇事熱區</p>
+                                        </div>
+                                    )) : (
+                                        <p className="text-sm text-nook-text/40 text-center py-4">無</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 移防建議卡 */}
+                        <div className="bg-white/80 rounded-2xl p-4 nook-shadow">
+                            <h5 className="font-bold text-nook-text mb-3">💡 移防建議</h5>
+                            <div className="space-y-2">
+                                {mismatchData.suggestions?.length ? mismatchData.suggestions.map((s, idx) => (
+                                    <div key={idx} className="bg-nook-leaf/10 rounded-lg p-3">
+                                        <p className="font-bold text-nook-leaf-dark text-sm">{s.title}</p>
+                                        <p className="text-xs text-nook-text/60 mt-0.5">{s.reason}</p>
+                                    </div>
+                                )) : (
+                                    <p className="text-sm text-nook-text/40 text-center py-4">無建議</p>
+                                )}
+                            </div>
+                        </div>
+                    </>
+                )}
+            </div>
         </div>
     );
 };

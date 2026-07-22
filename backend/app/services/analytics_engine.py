@@ -405,7 +405,7 @@ class AnalyticsEngine:
             "members": ["山上分駐所"],
         },
         {
-            "display": "左鎮分駐所（含岡林）",
+            "display": "左鎮分駐所",
             "members": ["左鎮分駐所", "岡林派出所"],
         },
     ]

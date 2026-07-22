@@ -2155,7 +2155,7 @@ async def get_patrol_plan(
     # 僅分析這 7 個轄區所（清單寫死）
     PATROL_UNITS = [
         "新化派出所", "唪口派出所", "知義派出所", "那拔派出所",
-        "山上分駐所", "左鎮分駐所", "岡林派出所",
+        "山上分駐所", "左鎮分駐所",
     ]
 
     def shift_label(shift_id: str) -> str:
@@ -2315,7 +2315,7 @@ async def get_risk_forecast(
     # 僅分析這 7 個轄區所（與 patrol-plan 一致）
     PATROL_UNITS = [
         "新化派出所", "唪口派出所", "知義派出所", "那拔派出所",
-        "山上分駐所", "左鎮分駐所", "岡林派出所",
+        "山上分駐所", "左鎮分駐所",
     ]
 
     def shift_label(shift_id: str) -> str:

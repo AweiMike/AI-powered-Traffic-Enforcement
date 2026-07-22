@@ -408,6 +408,53 @@ export interface CrossAnalysisResponse {
 
 
 // ============================================
+// 執法錯位分析型別（Wave 29 — 肇事熱區 vs 取締熱區對照）
+// ============================================
+
+export interface MismatchCrashHotspot {
+  rank: number;
+  location: string;
+  district?: string;
+  count: number;
+  epdo?: number;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+export interface MismatchTicketHotspot {
+  rank: number;
+  location: string;
+  district?: string;
+  count: number;
+}
+
+export interface MismatchMatchedPair {
+  crash: MismatchCrashHotspot;
+  tickets: MismatchTicketHotspot[];
+  common_tokens?: string[];
+}
+
+export interface MismatchSuggestion {
+  title: string;
+  reason: string;
+}
+
+export interface EnforcementMismatchResponse {
+  topic: string;
+  topic_label: string;
+  period: { start_date: string; end_date: string };
+  /** 事故樣本數說明；含 ⚠ 開頭時代表樣本過少，前端需以警示樣式呈現 */
+  crash_sample_note?: string;
+  crash_hotspots: MismatchCrashHotspot[];
+  ticket_hotspots: MismatchTicketHotspot[];
+  matched: MismatchMatchedPair[];
+  crash_only: MismatchCrashHotspot[];
+  ticket_only: MismatchTicketHotspot[];
+  overlap_rate: number;
+  suggestions: MismatchSuggestion[];
+}
+
+// ============================================
 // API Client Class
 // ============================================
 
@@ -807,6 +854,11 @@ class APIClient {
     topN: number = 10
   ): Promise<any> {
     return this.request(`/hotspots/hotspot-overlap?days=${days}&top_n=${topN}`);
+  }
+
+  /** 執法錯位分析（Wave 29）：四主題（dui/heavy/speed/evehicle）肇事熱區 vs 取締熱區對照＋移防建議 */
+  async getEnforcementMismatch(topic: string, startDate: string, endDate: string): Promise<EnforcementMismatchResponse> {
+    return this.request(`/hotspots/enforcement-mismatch?topic=${topic}&start_date=${startDate}&end_date=${endDate}`);
   }
 
   // ============================================
