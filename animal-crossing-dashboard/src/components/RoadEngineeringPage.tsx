@@ -13,6 +13,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Construction, Lightbulb, Download, MapPin, Moon, AlertTriangle, FileSearch, Milestone, ChevronDown, ChevronUp, Hammer, Trash2 } from 'lucide-react';
 import DateRangePicker, { type DateRange } from './DateRangePicker';
 import { apiClient } from '../api/client';
+const SpecialCausesCard = React.lazy(() => import('./SpecialCausesCard'));
 
 function defaultRange(): DateRange {
   const now = new Date();
@@ -486,6 +487,13 @@ const RoadEngineeringPage: React.FC = () => {
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 nook-shadow mb-6">
         <DateRangePicker value={range} onChange={setRange} />
       </div>
+
+      {/* 特殊致因：琥珀色標籤（路面坑洞／油漬路滑／視線遮蔽）為工程可改善項目，
+          可直接作為會勘提報依據。不限主題＝涵蓋全部事故。 */}
+      <React.Suspense fallback={<div className="bg-white/80 rounded-2xl p-6 nook-shadow h-40 animate-pulse mb-6" />}>
+        <SpecialCausesCard range={range} casualtyOnly={false}
+                           title="特殊致因（會勘提報線索）" />
+      </React.Suspense>
 
       {loading ? (
         <div className="p-12 text-center text-text-subtle">載入中...</div>

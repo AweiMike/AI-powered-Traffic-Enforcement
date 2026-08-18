@@ -1166,6 +1166,20 @@ class APIClient {
     );
   }
 
+  /**
+   * 特殊致因（摘要文本挖掘）。補結構化肇因欄之低登錄。
+   * ⚠️ 後端只存標籤與命中關鍵詞，不存原文（摘要含車牌/姓名/地址）。
+   */
+  async getSpecialCauses(
+    startDate: string, endDate: string, topic?: string, casualtyOnly = true,
+  ): Promise<any> {
+    const t = topic ? `&topic=${topic}` : '';
+    return this.request(
+      `/stats/special-causes?start_date=${startDate}&end_date=${endDate}` +
+      `${t}&casualty_only=${casualtyOnly}`,
+    );
+  }
+
   async getCrashProfile(topic: string, startDate: string, endDate: string): Promise<any> {
     return this.request(`/recommendations/profile?topic=${topic}&start_date=${startDate}&end_date=${endDate}`);
   }

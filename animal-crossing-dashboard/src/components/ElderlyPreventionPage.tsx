@@ -11,6 +11,7 @@ import TrendCardSkeleton from './TrendCardSkeleton';
 // recharts 依賴較重，動態載入讓它獨立成 chunk，不灌進主 bundle
 const TrendCard = React.lazy(() => import('./TrendCard'));
 const SignalCheckCard = React.lazy(() => import('./SignalCheckCard'));
+const SpecialCausesCard = React.lazy(() => import('./SpecialCausesCard'));
 
 // 同期比較標籤
 const YoYBadge: React.FC<{ current: number; previous: number }> = ({ current, previous }) => {
@@ -242,6 +243,11 @@ const ElderlyPreventionPage: React.FC = () => {
 
             {/* 高齡者事故特徵剖析 */}
             <ProfileCard topic="elderly" title="高齡者事故特徵剖析" range={dateRange} />
+
+            {/* 特殊致因：補結構化肇因欄之低登錄（動物竄出、油漬、視線遮蔽…） */}
+            <React.Suspense fallback={<div className="bg-white/80 rounded-2xl p-6 nook-shadow h-40 animate-pulse mb-6" />}>
+                <SpecialCausesCard range={dateRange} topic="elderly" />
+            </React.Suspense>
 
             <div className="grid grid-cols-12 gap-6">
                 {/* 左欄：高齡事故熱區 */}
