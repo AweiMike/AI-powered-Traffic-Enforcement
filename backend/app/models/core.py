@@ -213,6 +213,10 @@ class CrashParty(Base):
     vehicle_group = Column(String(20), index=True, comment="機車／小客車／貨車／慢速載具／其他")
     license_status = Column(String(30), comment="30.駕照狀態")
     protective_gear = Column(String(30), comment="24.保護裝備")
+    distraction_device = Column(
+        String(30), index=True,
+        comment="25.行動電話/電腦等裝置使用情形（未使用／手持／非手持；充填約 70%）"
+    )
 
     # === 傷亡（本人，非案件總數）===
     injury = Column(String(20), comment="22.受傷程度原文")

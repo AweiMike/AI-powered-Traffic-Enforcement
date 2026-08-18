@@ -63,6 +63,20 @@ def crash_topic_filter(topic: str):
 # 週事故趨勢（總覽用）：傷亡事故 A1+A2(total=primary 主訊號) + A1 死亡(secondary)，
 # 另附 A3 財損事故第三參考序列（tertiary），higher_is_worse
 # ============================================
+def _dedupe_signal_suggestions(items: list) -> list:
+    """卷宗建議去重：規則 2「路口管制設施」與規則 6.5「評估增設號誌或改善路口管制」
+    結論幾乎相同（皆為無號誌 >50% ＋ 側撞 → 建議號誌化／停讓管制），
+    差別僅在前者用號誌**種類**、後者用號誌**動作**判定。
+
+    兩者同時觸發時保留 6.5——它另有樣本量門檻（≥10 件）與衝突方向證據，
+    文字對現場會勘更有指向性。避免同一份卷宗出現兩段意思相近的建議。
+    """
+    titles = {x.get("title") for x in items}
+    if "評估增設號誌或改善路口管制" in titles and "路口管制設施" in titles:
+        return [x for x in items if x.get("title") != "路口管制設施"]
+    return items
+
+
 @router.get("/accidents/trend")
 async def get_accident_weekly_trend(
     start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
@@ -2142,7 +2156,7 @@ async def get_site_dossier(
             "hit_and_run": hit_and_run,
         },
         "cases": cases,
-        "suggestions": suggestions,
+        "suggestions": _dedupe_signal_suggestions(suggestions),
     }
 
 

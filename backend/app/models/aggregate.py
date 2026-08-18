@@ -236,6 +236,14 @@ class ShiftStats(Base):
 
 
 # 聚合計算函數（示例）
+# ⚠️ 以下為**未使用之預留程式碼**（2026-08-17 查證）：
+#    calculate_site_metrics 全專案無任何呼叫點，agg_site_metrics 等四張表皆為 0 列。
+#    其 VPI/CRI 使用 Crash.severity_weight（A1=5/A2=3/A3=1）而非 EPDO，
+#    曾被誤判為「口徑不一致風險」——實際上這些數字從未被計算或顯示，無風險。
+#    severity_weight 與 EPDO 本就是兩套體系（見 app/utils/epdo.py 模組說明）：
+#      · severity_weight：視覺化權重（地圖點位大小、hotspots 內部 severity_score）
+#      · EPDO：統計指標（Top10 排名、勤務建議、AI 報告）
+#    若日後要啟用本函式，請先決定 CRI 要採哪一套，勿直接沿用。
 def calculate_site_metrics(db, site_id: int, topic_code: str, shift_id: str = None, days: int = 30):
     """
     計算特定點位的 VPI/CRI/Score

@@ -328,6 +328,11 @@ def collect_crash_parties(df) -> Dict[str, list]:
             "vehicle_group": _party_vehicle_group(subtype),
             "license_status": (_safe_eis_str(row, "30.駕照狀態") or None),
             "protective_gear": (_safe_eis_str(row, "24.保護裝備") or None),
+            # Wave 30 彈藥庫剩餘項：分心裝置。數量僅適合個案標記（熱區不可行），
+            # 落在當事者層剛好——可精確指出「哪一位當事者」在使用裝置。
+            "distraction_device": (
+                _safe_eis_str(row, "25.行動電話、電腦或其他相類功能裝置名稱") or None
+            ),
             "injury": (injury[:20] or None),
             "is_death_24h": injury == "24小時內死亡",
             "is_death_late": injury == "2-30日內死亡",
@@ -439,6 +444,12 @@ def recompute_party_rollups(db, case_ids: Optional[list] = None) -> Dict[str, in
       is_youth   = COALESCE((SELECT MAX(p.is_youth)   FROM core_crash_party p
                              WHERE p.case_id = core_crash.case_id
                                AND p.role = '駕駛'), 0),
+      -- involves_pedestrian 併入本處統一推導（Wave 32 收斂）：
+      -- 原由匯入 pre-pass 另行計算，與本表形成雙機制、有 drift 風險。
+      -- 實測兩者完全一致（125 = 125，差異 0），故改以當事者表為唯一真實來源。
+      involves_pedestrian = COALESCE((SELECT MAX(CASE WHEN p.role = '行人' THEN 1 ELSE 0 END)
+                             FROM core_crash_party p
+                             WHERE p.case_id = core_crash.case_id), 0),
       elderly_party_count = COALESCE((SELECT COUNT(*) FROM core_crash_party p
                              WHERE p.case_id = core_crash.case_id AND p.is_elderly = 1), 0),
       elderly_death_count = COALESCE((SELECT COUNT(*) FROM core_crash_party p

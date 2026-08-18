@@ -116,6 +116,11 @@ def _migrate_eis_columns():
         "elderly_no_fault_count": "INTEGER DEFAULT 0",
     })
 
+    # core_crash_party 後續新增欄位（Wave 32 之後）
+    _ensure_columns(inspector, "core_crash_party", {
+        "distraction_device": "VARCHAR(30)",
+    })
+
     # core_ticket 表可能缺少的欄位
     _ensure_columns(inspector, "core_ticket", {
         "evehicle_type": "VARCHAR(50)",
