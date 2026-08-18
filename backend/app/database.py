@@ -60,6 +60,10 @@ def init_db():
     # 單位名稱正規化遷移：core_ticket.unit_code / core_crash.sub_unit 統一為短名
     _canonicalize_unit_names()
 
+    # 資料回補提醒：新增資料表若為空，功能會顯示空白或沿用舊值。
+    # 同事端更新後常忘記重跑匯入，此處主動點名（僅提示，不擋啟動）。
+    _warn_if_backfill_needed()
+
     print("[OK] Database tables ready")
 
 
@@ -206,3 +210,40 @@ def _canonicalize_unit_names():
             print("[migrate] 單位名稱正規化: 略過（表格/欄位不存在）")
     except Exception as e:
         print(f"[migrate][WARN] 單位名稱正規化失敗，已略過（不影響啟動）: {e}")
+
+
+def _warn_if_backfill_needed():
+    """檢查需回補之資料表是否為空，於啟動時提醒操作者重跑匯入。
+
+    背景：core_crash_party 等表由匯入流程建立（needs_backfill 哨兵），
+    僅執行更新包並重啟並不會產生資料。未回補時 is_elderly 會沿用舊的
+    「代表當事者」值（低估 54%），使用者看到的是**舊的錯誤數字**而非空白，
+    比空白更危險，故必須主動提示。
+    """
+    try:
+        inspector = inspect(engine)
+        tables = set(inspector.get_table_names())
+        if "core_crash" not in tables:
+            return
+        with engine.connect() as conn:
+            crashes = conn.execute(text("SELECT COUNT(*) FROM core_crash")).scalar() or 0
+            if crashes == 0:
+                return
+            pending = []
+            for tbl, label in (("core_crash_party", "事故當事者層（高齡口徑、年齡分層）"),
+                               ("core_crash_text_tag", "特殊致因標籤")):
+                if tbl not in tables:
+                    continue
+                n = conn.execute(text(f"SELECT COUNT(*) FROM {tbl}")).scalar() or 0
+                if n == 0:
+                    pending.append(label)
+        if pending:
+            print("=" * 60)
+            print("[!] 尚有資料未回補，請執行一次「匯入資料.bat」：")
+            for p in pending:
+                print(f"      - {p}")
+            print("    未回補前，高齡相關數字仍為舊值（低估約 54%）。")
+            print("    匯入為冪等作業，重複執行不會產生重複資料。")
+            print("=" * 60)
+    except Exception as e:
+        print(f"[migrate][WARN] 回補檢查略過: {e}")
