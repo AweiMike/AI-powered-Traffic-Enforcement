@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>高齡者交通事故防制簡報｜新化分局交通組</title>
+<style>
+:root{
+  --bg:#0b1220; --bg-2:#111c2e; --surface:rgba(255,255,255,.055);
+  --line:rgba(255,255,255,.13); --line-2:rgba(255,255,255,.22);
+  --ink:#f1f5f9; --ink-2:#b6c2d4; --ink-3:#7e8ea6;
+  --primary:#3b8fe0; --accent:#eb6834; --teal:#1baf7a;
+  --crit:#f2555a; --warn:#f2b134; --good:#2ec27e;
+  --grad:linear-gradient(120deg,#5aa9f0 0%,#3b8fe0 45%,#7fd4ff 100%);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--ink); overflow:hidden;
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.slide-deck{position:relative;width:100vw;height:100vh;overflow:hidden}
+@media (min-width:769px){
+  .slide-deck{max-width:calc(100vh*16/9);max-height:calc(100vw*9/16);margin:auto;position:absolute;inset:0}
+}
+.slide{
+  position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;
+  padding:clamp(26px,4vh,54px) clamp(26px,4.6vw,72px);
+  opacity:0;visibility:hidden;transition:opacity .35s ease;
+  background:radial-gradient(1200px 600px at 82% -8%,#16273f 0%,var(--bg) 62%);
+  overflow:hidden;
+}
+.slide.active{opacity:1;visibility:visible}
+/* ⚠ 不可設 max-height/overflow：會使 scrollHeight 被截斷，
+     fitSlide 因而量不到真實內容高度、誤判未溢出而不縮放，底部內容遭裁切。
+     裁切由 .slide 的 overflow 負責。 */
+.slide-content{width:100%;max-width:100%;
+  display:flex;flex-direction:column;justify-content:center;gap:clamp(10px,1.6vh,20px)}
+
+/* ---- 標題系統 ---- */
+.eyebrow{font-size:clamp(13.2px,1.54vw,18.8px);letter-spacing:.24em;color:#7fb6ee;font-weight:600}
+h1.title{font-size:clamp(30px,5.4vw,66px);font-weight:800;line-height:1.16;letter-spacing:-.02em;
+  background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+h2.head{font-size:clamp(23.9px,3.31vw,43.3px);font-weight:800;line-height:1.25;letter-spacing:-.01em}
+h2.head em{font-style:normal;color:var(--warn)}
+h2.head b{color:var(--crit)}
+.sub{font-size:clamp(15.0px,1.81vw,22.8px);color:var(--ink-2);line-height:1.7}
+.kicker{font-size:clamp(14.4px,1.68vw,20.1px);color:var(--ink-3)}
+
+/* ---- 卡片 / 指標 ---- */
+.grid{display:grid;gap:clamp(9px,1.2vw,16px)}
+.g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)} .g6{grid-template-columns:repeat(6,1fr)}
+.g-2-3{grid-template-columns:1.05fr 1fr}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:clamp(11px,1.5vh,20px) clamp(12px,1.3vw,20px)}
+.card.hl{border-color:rgba(242,85,90,.5);background:rgba(242,85,90,.09)}
+.card.ok{border-color:rgba(46,194,126,.45);background:rgba(46,194,126,.08)}
+.card.wn{border-color:rgba(242,177,52,.45);background:rgba(242,177,52,.08)}
+.m-k{font-size:clamp(12.6px,1.45vw,18.5px);color:var(--ink-2);font-weight:600;letter-spacing:.02em}
+.m-v{font-size:clamp(26px,3.5vw,48px);font-weight:800;line-height:1.02;letter-spacing:-.025em;margin-top:4px}
+.m-v small{font-size:.42em;font-weight:700;color:var(--ink-2);margin-left:3px}
+.m-n{font-size:clamp(12.0px,1.35vw,17.8px);color:var(--ink-3);margin-top:6px;line-height:1.5}
+.c-crit{color:var(--crit)} .c-good{color:var(--good)} .c-warn{color:var(--warn)}
+.c-pri{color:var(--primary)} .c-acc{color:var(--accent)}
+
+/* ---- 大數字英雄 ---- */
+.hero-num{font-size:clamp(64px,13vw,168px);font-weight:800;line-height:.92;letter-spacing:-.045em;
+  background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero-num.red{background:linear-gradient(120deg,#ff8a8e,#f2555a);-webkit-background-clip:text;background-clip:text}
+
+/* ---- 條列 ---- */
+ul.pts{list-style:none;display:flex;flex-direction:column;gap:clamp(7px,1vh,13px)}
+ul.pts li{display:flex;gap:11px;align-items:flex-start;font-size:clamp(15.0px,1.77vw,22.8px);
+  color:var(--ink-2);line-height:1.6}
+ul.pts li b{color:var(--ink)}
+.dot{flex:0 0 auto;width:7px;height:7px;border-radius:99px;background:var(--primary);margin-top:.6em}
+.dot.r{background:var(--crit)} .dot.g{background:var(--good)} .dot.w{background:var(--warn)}
+
+/* ---- 標籤 ---- */
+.tag{display:inline-block;padding:2px 10px;border-radius:99px;font-size:clamp(12.0px,1.39vw,17.8px);
+  font-weight:700;letter-spacing:.02em}
+.t-r{background:rgba(242,85,90,.18);color:#ff9296} .t-g{background:rgba(46,194,126,.18);color:#6ee0aa}
+.t-w{background:rgba(242,177,52,.18);color:#ffd27a} .t-b{background:rgba(59,143,224,.2);color:#8fc4f5}
+.t-n{background:rgba(255,255,255,.09);color:var(--ink-2)}
+
+/* ---- 表格 ---- */
+table{width:100%;border-collapse:collapse;font-size:clamp(13.2px,1.53vw,20.1px)}
+th{text-align:left;color:var(--ink-3);font-weight:600;padding:6px 9px;border-bottom:1px solid var(--line-2);
+  font-size:clamp(12.0px,1.39vw,18.5px);letter-spacing:.03em;white-space:nowrap}
+td{padding:7px 9px;border-bottom:1px solid rgba(255,255,255,.07);color:var(--ink-2)}
+td b{color:var(--ink)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+tr.hi td{background:rgba(242,85,90,.1)}
+
+svg{display:block;width:100%;height:auto;overflow:visible}
+.legend{display:flex;gap:clamp(10px,1.5vw,22px);flex-wrap:wrap;font-size:clamp(12.6px,1.45vw,18.5px);color:var(--ink-2)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
+/* ---- 動畫 ---- */
+@keyframes fadeUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+.slide.active .animate-fade-up{animation:fadeUp .5s ease-out both}
+.slide.active .animate-scale{animation:scaleIn .45s ease-out both}
+.slide.active .animate-stagger>*{animation:fadeUp .45s ease-out both}
+.slide.active .animate-stagger>*:nth-child(1){animation-delay:.05s}
+.slide.active .animate-stagger>*:nth-child(2){animation-delay:.12s}
+.slide.active .animate-stagger>*:nth-child(3){animation-delay:.19s}
+.slide.active .animate-stagger>*:nth-child(4){animation-delay:.26s}
+.slide.active .animate-stagger>*:nth-child(5){animation-delay:.33s}
+.slide.active .animate-stagger>*:nth-child(6){animation-delay:.40s}
+
+/* ---- 導覽 ---- */
+.progress-bar{position:fixed;top:0;left:0;height:3px;background:var(--primary);
+  transition:width .3s;z-index:1000;box-shadow:0 0 14px rgba(59,143,224,.7)}
+.nav{position:fixed;bottom:clamp(12px,2.2vh,26px);left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:clamp(9px,1.4vw,18px);z-index:1000}
+.nav-btn{background:rgba(255,255,255,.09);border:1px solid var(--line);color:var(--ink);
+  width:clamp(30px,3vw,38px);height:clamp(30px,3vw,38px);border-radius:50%;cursor:pointer;
+  font-size:clamp(15.6px,1.74vw,22.8px);line-height:1;transition:.2s}
+.nav-btn:hover{background:rgba(255,255,255,.2)}
+.counter{color:var(--ink-3);font-size:clamp(13.2px,1.49vw,19.2px);font-variant-numeric:tabular-nums;min-width:52px;text-align:center}
+.brandmark{position:fixed;top:clamp(12px,2vh,22px);right:clamp(16px,2.4vw,34px);z-index:900;
+  font-size:clamp(11.4px,1.31vw,17.0px);color:var(--ink-3);letter-spacing:.14em}
+@media (max-width:768px){ .g6{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(2,1fr)}
+  .g3{grid-template-columns:1fr} .g-2-3{grid-template-columns:1fr} }
+@media (max-width:480px){ .g6,.g4{grid-template-columns:repeat(2,1fr)} .g2{grid-template-columns:1fr} }
+/* ---- 列印：頁面設為 16:9（297×167mm），與螢幕版面 1:1 對應 ----
+   關鍵：頁面比例與螢幕相同，clamp(vw/vh) 與 fitSlide 縮放才會等比成立；
+   若改用 A4 橫向(1.41:1)，響應式斷點會誤觸發導致多欄變單欄、內容溢出。
+   16:9 PDF 送 A4 印表機會自動縮放置中，為簡報講義之常規做法。 */
+@media print{
+  @page{ size:297mm 167mm; margin:0 }
+  /* 列印內距收斂，釋出版面給內容（螢幕版維持原內距） */
+  .slide{padding:16px 34px !important}
+  html,body{height:auto;overflow:visible;background:#0b1220;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .slide-deck{position:static;max-width:none;max-height:none;width:297mm;height:auto;margin:0}
+  .slide{
+    position:relative;inset:auto;width:297mm;height:167mm;
+    page-break-after:always;break-after:page;
+    page-break-inside:avoid;break-inside:avoid;
+    opacity:1!important;visibility:visible!important;
+  }
+  .slide:last-child{page-break-after:auto;break-after:auto}
+  .nav,.progress-bar,.brandmark{display:none!important}
+  /* ⚠ 停用進場動畫：animation-fill-mode:both 在列印時會停在起始狀態(opacity:0)，
+     使唯一帶 .active 的封面頁整頁空白。此處強制顯示。
+     注意選擇器僅涵蓋 .animate-* 子元素，不影響 .slide-content 上的 fitSlide 縮放。 */
+  .slide.active .animate-fade-up,
+  .slide.active .animate-scale,
+  .slide.active .animate-stagger>*{
+    animation:none!important; opacity:1!important; transform:none!important;
+  }
+  /* 漸層文字（background-clip:text）在 PDF 會洩漏出背景框線，且黑白列印易糊，改純色 */
+  h1.title{background:none!important;-webkit-text-fill-color:#5aa9f0!important;color:#5aa9f0!important}
+  .hero-num{background:none!important;-webkit-text-fill-color:#5aa9f0!important;color:#5aa9f0!important}
+  .hero-num.red{-webkit-text-fill-color:#f2555a!important;color:#f2555a!important}
+  /* 明確鎖定欄數，避免列印寬度誤觸發窄螢幕斷點 */
+  .g2{grid-template-columns:repeat(2,1fr)!important}
+  .g3{grid-template-columns:repeat(3,1fr)!important}
+  .g4{grid-template-columns:repeat(4,1fr)!important}
+  .g6{grid-template-columns:repeat(6,1fr)!important}
+  .g-2-3{grid-template-columns:1.05fr 1fr!important}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<div class="progress-bar" id="pb"></div>
+<div class="brandmark">新化分局交通組｜115 年上半年</div>
+<div class="slide-deck">
+
+<!-- 1 封面 -->
+<div class="slide active">
+  <div class="slide-content" style="align-items:center;text-align:center">
+    <div class="eyebrow animate-fade-up">臺南市政府警察局新化分局　交通組</div>
+    <h1 class="title animate-fade-up" style="animation-delay:.08s">高齡者交通事故<br>防制分析簡報</h1>
+    <p class="sub animate-fade-up" style="animation-delay:.16s;max-width:44em">
+      統計口徑：<b style="color:var(--warn)">A1＋A2 傷亡事故</b>（已排除 A3 純財損）　·
+      分析期間：115 年 1–6 月，趨勢回溯至 112 年
+    </p>
+    <div class="grid g3 animate-stagger" style="margin-top:clamp(10px,2vh,26px);max-width:46em;align-self:center">
+      <div class="card" style="text-align:center"><div class="m-k">高齡傷亡事故</div>
+        <div class="m-v c-warn">198<small>件</small></div><div class="m-n">占全般 36.7%</div></div>
+      <div class="card ok" style="text-align:center"><div class="m-k">死亡人數</div>
+        <div class="m-v c-good">1<small>人</small></div><div class="m-n">去年同期 5 人</div></div>
+      <div class="card hl" style="text-align:center"><div class="m-k">無肇事責任者</div>
+        <div class="m-v c-crit">42<small>人</small></div><div class="m-n">占高齡當事者 19.1%</div></div>
+    </div>
+    <p class="kicker animate-fade-up" style="animation-delay:.5s;margin-top:clamp(6px,1.4vh,16px)">
+      按 → 或點擊畫面翻頁　·　全簡報 11 頁　·　可離線使用
+    </p>
+  </div>
+</div>
+
+<!-- 2 一頁看懂 -->
+<div class="slide">
+  <div class="slide-content">
+    <div class="eyebrow animate-fade-up">ONE-PAGE OVERVIEW</div>
+    <h2 class="head animate-fade-up" style="animation-delay:.06s">一頁看懂：<em>嚴重度在改善，規模仍在擴大</em></h2>
+    <div class="grid g6 animate-stagger" style="margin-top:clamp(4px,1vh,10px)">
+      <div class="card"><div class="m-k">高齡傷亡事故</div><div class="m-v">198<small>件</small></div>
+        <div class="m-n">全般 540 件之 36.7%</div></div>
+      <div class="card ok"><div class="m-k">A1 死亡事故</div><div class="m-v c-good">1<small>件</small></div>
+        <div class="m-n">去年 4 件　↓75%</div></div>
+      <div class="card hl"><div class="m-k">受傷（含死亡）</div><div class="m-v c-crit">154<small>人</small></div>
+        <div class="m-n">受傷率 70.3%　四年新高</div></div>
+      <div class="card ok"><div class="m-k">高齡事故率</div><div class="m-v c-good">157.5</div>
+        <div class="m-n">每萬高齡人口　↓1.9%</div></div>
+      <div class="card hl"><div class="m-k">全般事故率</div><div class="m-v c-crit">102.6</div>
+        <div class="m-n">每萬人　<b class="c-crit">↑16.6%</b></div></div>
+      <div class="card wn"><div class="m-k">執法投入落差</div><div class="m-v c-warn">8.7<small>倍</small></div>
+        <div class="m-n">事故 36.7% vs 舉發 4.2%</div></div>
+    </div>
+    <div class="grid g3 animate-stagger" style="margin-top:clamp(6px,1.4vh,16px)">
+      <div class="card"><ul class="pts"><li><span class="dot g"></span><span><b>好消息</b>　死亡自 5 人降為 1 人（↓80%）；高齡事故率不升反降 1.9%</span></li></ul></div>
+      <div class="card"><ul class="pts"><li><span class="dot r"></span><span><b>壞消息</b>　件數 198、受傷 262 人、傷害能量 EPDO 1,124.5 均創四年新高</span></li></ul></div>
+      <div class="card"><ul class="pts"><li><span class="dot w"></span><span><b>要注意</b>　全般傷亡事故較去年暴增 15.9%，是分局整體警訊</span></li></ul></div>
+    </div>
+  </div>
+</div>
+
+<!-- 3 四年趨勢 -->
+<div class="slide">
+  <div class="slide-content">
+    <div class="eyebrow animate-fade-up">TREND 112–115</div>
+    <h2 class="head animate-fade-up" style="animation-delay:.06s"><b>114 年是惡化高峰</b>，115 年正在回落</h2>
+    <div class="grid g-2-3" style="align-items:center;margin-top:clamp(4px,1vh,10px)">
+      <div class="card animate-scale">
+        <div class="legend" style="margin-bottom:8px">
+          <span><i style="background:#3b8fe0"></i>高齡事故率（每萬高齡人口）</span>
+          <span><i style="background:#eb6834"></i>全般事故率（每萬人）</span>
+        </div>
+        <svg id="s3" viewBox="0 0 520 250" role="img" aria-label="四年事故率走勢"></svg>
+        <p class="kicker" style="margin-top:4px">各年 1–6 月對照，期間長度一致</p>
+      </div>
+      <div class="animate-stagger" style="display:flex;flex-direction:column;gap:clamp(8px,1.2vh,14px)">
+        <div class="card hl"><div class="m-k">114 年上半年　各項最差</div>
+          <ul class="pts" style="margin-top:6px"><li><span class="dot r"></span><span>事故率 <b>160.5</b>（四年最高）</span></li>
+          <li><span class="dot r"></span><span>死亡 <b>5 人</b>、全年達 <b>7 人</b></span></li>
+          <li><span class="dot r"></span><span>無照 <b>33 人</b>、過度代表 <b>1.83 倍</b></span></li></ul></div>
+        <div class="card ok"><div class="m-k">115 年上半年　多數回落</div>
+          <ul class="pts" style="margin-top:6px"><li><span class="dot g"></span><span>死亡降至 <b>1 人</b>、過度代表 <b>1.53</b></span></li>
+          <li><span class="dot w"></span><span>惟件數、受傷、EPDO 仍創新高</span></li></ul></div>
+        <div class="card"><ul class="pts"><li><span class="dot"></span><span>
+          <b>113 年「最佳」經查核為統計假象</b>（p=0.136 不顯著、非高齡同步降）　→　<b class="c-warn">真正該追查的是 114 年</b></span></li></ul></div>
+      </div>
+    </div>
+    <div class="card wn animate-fade-up" style="animation-delay:.5s">
+      <ul class="pts"><li><span class="dot w"></span><span><b>結構性壓力：</b>高齡人口四年增 <b>10.7%</b>（占比 21.08%→23.89%）——
+        <b class="c-warn">事故率不變，件數也會自然上升</b>。防制目標應訂「率下降」，而非「件數持平」。</span></li></ul>
+    </div>
+  </div>
+</div>
+
+<!-- 4 洞察1 -->
+<div class="slide">
+  <div class="slide-content">
+    <div class="eyebrow animate-fade-up">INSIGHT 01</div>
+    <h2 class="head animate-fade-up" style="animation-delay:.06s">高齡者是<em>駕駛</em>，不是行人——而且是<em>機車騎士</em></h2>
+    <p class="sub animate-fade-up" style="animation-delay:.12s">
+      全國高齡政策以「行人保護」為主軸（全國高齡行人死亡占 75.2%），但<b style="color:var(--ink)">本轄圖像完全不同</b>。
+    </p>
+    <div class="grid g-2-3" style="align-items:center;margin-top:clamp(2px,.8vh,8px)">
+      <div class="grid g2 animate-stagger">
+        <div class="card hl" style="text-align:center"><div class="m-k">以駕駛身分涉入</div>
+          <div class="m-v c-crit">93.6<small>%</small></div><div class="m-n">206 人／220 名高齡當事者</div></div>
+        <div class="card" style="text-align:center"><div class="m-k">以行人身分涉入</div>
+          <div class="m-v" style="color:var(--ink-3)">2.7<small>%</small></div><div class="m-n">僅 6 人</div></div>
+        <div class="card wn" style="text-align:center"><div class="m-k">騎乘機車</div>
+          <div class="m-v c-warn">126<small>人</small></div><div class="m-n">占高齡駕駛 61.2%</div></div>
+        <div class="card wn" style="text-align:center"><div class="m-k">機車＋慢速載具</div>
+          <div class="m-v c-warn">73.8<small>%</small></div><div class="m-n">四年前為 69.4%，持續上升</div></div>
+      </div>
+      <div class="card animate-scale">
+        <div class="m-k" style="margin-bottom:8px">高齡駕駛載具結構變化（各年 1–6 月）</div>
+        <div class="legend" style="margin-bottom:6px">
+          <span><i style="background:#eb6834"></i>機車</span>
+          <span><i style="background:#3b8fe0"></i>小客車</span>
+          <span><i style="background:#1baf7a"></i>慢速載具</span>
+        </div>
+        <svg id="s4" viewBox="0 0 520 230" role="img" aria-label="載具結構四年變化"></svg>
+      </div>
+    </div>
+    <div class="card hl animate-fade-up" style="animation-delay:.45s">
+      <ul class="pts"><li><span class="dot r"></span><span><b>對策意涵：</b>若照抄中央的行人設施導向對策，資源將錯置於僅占 2.7% 的族群。
+      <b class="c-crit">本轄主軸應是「高齡機車騎士」</b>——慢速載具（自行車、微電車）受傷率更高達 <b class="c-crit">92.0%</b>。</span></li></ul>
+    </div>
+  </div>
+</div>
+
+<!-- 5 洞察2 -->
+<div class="slide">
+  <div class="slide-content">
+    <div class="eyebrow animate-fade-up">INSIGHT 02</div>
+    <h2 class="head animate-fade-up" style="animation-delay:.06s">70 歲是分水嶺，<b>75–79 歲捲入事故就是受傷</b></h2>
+    <div class="grid g-2-3" style="align-items:center;margin-top:clamp(2px,.8vh,10px)">
+      <div class="card animate-scale">
+        <div class="m-k" style="margin-bottom:6px">各年齡層受傷率（虛線＝59 歲以下基準 65.4%）</div>
+        <svg id="s5" viewBox="0 0 520 250" role="img" aria-label="各年齡層受傷率"></svg>
+      </div>
+      <div class="animate-stagger" style="display:flex;flex-direction:column;gap:clamp(8px,1.2vh,14px)">
+        <div class="card hl" style="text-align:center">
+          <div class="m-k">75–79 歲受傷率</div>
+          <div class="hero-num red" style="font-size:clamp(46px,7.6vw,92px)">100<span style="font-size:.4em">%</span></div>
+          <div class="m-n">該齡捲入傷亡事故之 26 人　<b class="c-crit">全數受傷</b></div>
+        </div>
+        <div class="card wn"><ul class="pts">
+          <li><span class="dot w"></span><span><b>無照率同樣在 75–79 歲達頂峰</b>　26.1%（23 名駕駛中 6 人）——為青壯年 6.8% 的 3.8 倍</span></li>
+          <li><span class="dot w"></span><span>推測多為<b>駕照逾期未換</b>或認知功能測驗未過</span></li></ul></div>
+        <div class="card"><ul class="pts">
+          <li><span class="dot"></span><span><b>載具也在「降級」</b>：65–69 歲小客車 27 人，75–79 歲僅剩 2 人；85 歲以上改騎<b>腳踏車與農機</b>——防護力隨年齡遞減</span></li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 6 洞察3（最強） -->
+<div class="slide">
+  <div class="slide-content">
+    <div class="eyebrow animate-fade-up">INSIGHT 03　·　最重要的一頁</div>
+    <h2 class="head animate-fade-up" style="animation-delay:.06s">三分之一的事故，<b>高齡者不是肇事者</b>——<br>而<b>唯一的死亡案件正是這一類</b></h2>
+    <div class="grid g-2-3" style="align-items:center;margin-top:clamp(2px,.8vh,8px)">
+      <div class="animate-stagger" style="display:flex;flex-direction:column;gap:clamp(7px,1.1vh,12px)">
+        <div class="grid g3" style="gap:10px">
+          <div class="card" style="text-align:center"><div class="m-k">高齡者主責</div>
+            <div class="m-v">114<small>件</small></div><div class="m-n">57.6%　<b class="c-good">零死亡</b></div></div>
+          <div class="card hl" style="text-align:center"><div class="m-k">高齡者非主責</div>
+            <div class="m-v c-crit">65<small>件</small></div><div class="m-n">32.8%　<b class="c-crit">唯一死亡案在此</b></div></div>
+          <div class="card" style="text-align:center"><div class="m-k">同案兼有</div>
+            <div class="m-v" style="color:var(--ink-3)">19<small>件</small></div><div class="m-n">9.6%</div></div>
+        </div>
+        <div class="card hl"><div class="m-k" style="margin-bottom:6px">42 名完全無肇事責任的高齡者，是怎麼被撞的</div>
+          <ul class="pts">
+            <li><span class="dot r"></span><span><b>76.2%</b> 受撞當下在<b>直行中或停等中</b>——完全被動，沒有閃避可能</span></li>
+            <li><span class="dot r"></span><span><b>81.0%</b> 受傷（高於高齡者整體的 70.3%）</span></li>
+            <li><span class="dot r"></span><span>事故型態以<b>追撞 10 件</b>最多；車種以<b>機車 22 人</b>為大宗</span></li></ul></div>
+      </div>
+      <div class="animate-stagger" style="display:flex;flex-direction:column;gap:clamp(7px,1.1vh,12px)">
+        <div class="card"><div class="m-k" style="margin-bottom:6px">撞他們的人是誰</div>
+          <table><tbody>
+            <tr class="hi"><td><b>18–64 歲青壯年</b></td><td class="n"><b>31 人</b></td><td class="n c-crit">67.4%</td></tr>
+            <tr><td>65 歲以上</td><td class="n">12 人</td><td class="n">26.1%</td></tr>
+            <tr><td>未滿 18 歲</td><td class="n">3 人</td><td class="n">6.5%</td></tr>
+          </tbody></table></div>
+        <div class="card"><div class="m-k" style="margin-bottom:6px">對造的肇事原因</div>
+          <table><tbody>
+            <tr><td>恍神、分心駕駛</td><td class="n"><b>10</b></td></tr>
+            <tr class="hi"><td><b>未保持行車安全距離</b></td><td class="n"><b>8</b></td></tr>
+            <tr><td>其他不當駕車行為</td><td class="n">5</td></tr>
+          </tbody></table></div>
+      </div>
+    </div>
+    <div class="card hl animate-fade-up" style="animation-delay:.5s">
+      <ul class="pts"><li><span class="dot r"></span><span>
+        <b>關鍵意涵：這類事故，再多的高齡者教育或駕照管制都防不了</b>——受害者本身沒有疏失。
+        <b class="c-crit">防制對象必須是其他用路人</b>，而執法側目前<b class="c-crit">沒有「未保持安全距離」的專項</b>。</span></li></ul>
+    </div>
+  </div>
+</div>
+
+<!-- 7 風險密度 -->
+<div class="slide">
+  <div class="slide-content">
+    <div class="eyebrow animate-fade-up">INSIGHT 04　·　介接政府人口資料</div>
+    <h2 class="head animate-fade-up" style="animation-delay:.06s">最老的區，<em>不是</em>最危險的區</h2>
+    <div class="grid g-2-3" style="align-items:center;margin-top:clamp(2px,.8vh,10px)">
+      <div class="card animate-scale">
+        <div class="m-k" style="margin-bottom:6px">各區高齡事故率（每萬高齡人口）</div>
+        <div class="legend" style="margin-bottom:6px">
+          <span><i style="background:#3b8fe0"></i>115 上半年</span>
+          <span><i style="background:#63748d"></i>114 上半年</span>
+        </div>
+        <svg id="s7" viewBox="0 0 520 240" role="img" aria-label="各區高齡事故率"></svg>
+      </div>
+      <div class="animate-stagger" style="display:flex;flex-direction:column;gap:clamp(7px,1.1vh,12px)">
+        <div class="card"><table>
+          <thead><tr><th>行政區</th><th class="n">高齡占比</th><th class="n">事故率</th><th class="n">過度代表</th></tr></thead>
+          <tbody>
+            <tr class="hi"><td><b>新化區</b></td><td class="n">22.6%</td><td class="n"><b class="c-crit">181.0</b></td><td class="n"><b class="c-crit">1.70 倍</b></td></tr>
+            <tr><td>左鎮區</td><td class="n"><b class="c-warn">34.7%</b></td><td class="n">113.3</td><td class="n c-good">0.94 倍</td></tr>
+            <tr><td>山上區</td><td class="n">25.4%</td><td class="n c-good">64.2</td><td class="n c-good">0.92 倍</td></tr>
+            <tr><td style="color:var(--ink-3)">臺南市平均</td><td class="n" style="color:var(--ink-3)">20.9%</td><td class="n" style="color:var(--ink-3)">—</td><td class="n" style="color:var(--ink-3)">—</td></tr>
+          </tbody></table>
+          <p class="kicker" style="margin-top:6px">過度代表＝高齡事故占比 ÷ 高齡人口占比；&gt;1 表示超額出現</p>
+        </div>
+        <div class="card hl"><ul class="pts">
+          <li><span class="dot r"></span><span><b>新化區是唯一有「超額風險」的區</b>——高齡人口占比三區最低，卻承擔該區 38.5% 的事故</span></li>
+          <li><span class="dot g"></span><span><b>左鎮區高齡化最嚴重（34.7%，全市 1.66 倍）</b>，但事故率與過度代表都不高——多屬人口結構自然反映</span></li></ul></div>
+      </div>
+    </div>
+    <div class="card animate-fade-up" style="animation-delay:.5s"><ul class="pts">
+      <li><span class="dot"></span><span><b>資源配置原則：看「超額代表」，不看「人口結構」。</b>
+      新化區事故率末三期連續上升（157.7→177.2→181.0），三區唯一未見回落（趨勢檢定 p=0.341，尚未達顯著）。</span></li></ul></div>
+  </div>
+</div>
+
+<!-- 8 熱點 -->
+<div class="slide">
+  <div class="slide-content">
+    <div class="eyebrow animate-fade-up">HOTSPOTS　·　會勘標的</div>
+    <h2 class="head animate-fade-up" style="animation-delay:.06s">高齡者易肇事路口　<span style="font-size:.62em;color:var(--ink-3)">依傷害能量 EPDO 排序</span></h2>
+    <div class="grid g-2-3" style="align-items:start;margin-top:clamp(2px,.8vh,10px)">
+      <div class="card animate-scale">
+        <svg id="s8" viewBox="0 0 520 250" role="img" aria-label="易肇事路口 EPDO 排名"></svg>
+      </div>
+      <div class="animate-stagger" style="display:flex;flex-direction:column;gap:clamp(7px,1.1vh,12px)">
+        <div class="card"><table>
+          <thead><tr><th>序</th><th>路口</th><th class="n">件</th><th class="n">EPDO</th></tr></thead>
+          <tbody>
+            <tr class="hi"><td>1</td><td><b>中山路／中正路</b></td><td class="n">9</td><td class="n"><b>47.5</b></td></tr>
+            <tr><td>2</td><td>中正路／和平街</td><td class="n">6</td><td class="n">34.0</td></tr>
+            <tr><td>3</td><td>中山路／大智路</td><td class="n">5</td><td class="n">33.0</td></tr>
+            <tr><td>4</td><td>大智路（164 巷口）</td><td class="n">3</td><td class="n">27.5</td></tr>
+            <tr><td>5</td><td>忠孝路／民權街</td><td class="n">5</td><td class="n">26.0</td></tr>
+            <tr><td>6</td><td>省道臺20／臺39線</td><td class="n">4</td><td class="n">25.0</td></tr>
+          </tbody></table></div>
+        <div class="card wn"><ul class="pts">
+          <li><span class="dot w"></span><span><b>前十名全在新化市區</b>；第 1 名 9 件<b>全為 A2 傷亡</b></span></li>
+          <li><span class="dot w"></span><span>側撞事故中<b>左轉相關衝突占 73.3%</b>　→　建議評估<b>左轉保護時相</b></span></li>
+          <li><span class="dot w"></span><span><b>56.9% 發生於無號誌環境</b>　→　停讓管制與號誌化評估</span></li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 9 執法錯位 -->
+<div class="slide">
+  <div class="slide-content">
+    <div class="eyebrow animate-fade-up">ENFORCEMENT GAP</div>
+    <h2 class="head animate-fade-up" style="animation-delay:.06s">承擔 <em>36.7%</em> 的事故，只承受 <em>4.2%</em> 的舉發</h2>
+    <div class="grid g4 animate-stagger" style="margin-top:clamp(2px,.8vh,10px)">
+      <div class="card hl" style="text-align:center"><div class="m-k">風險–執法落差</div>
+        <div class="m-v c-crit">8.7<small>倍</small></div><div class="m-n">事故占比 ÷ 舉發占比</div></div>
+      <div class="card wn" style="text-align:center"><div class="m-k">肇事後才開單</div>
+        <div class="m-v c-warn">58.6<small>%</small></div><div class="m-n">197 件／336 件</div></div>
+      <div class="card" style="text-align:center"><div class="m-k">事前主動攔查</div>
+        <div class="m-v">123<small>件</small></div><div class="m-n">僅占 36.6%</div></div>
+      <div class="card" style="text-align:center"><div class="m-k">高齡事故尖峰</div>
+        <div class="m-v c-pri">06–11<small>時</small></div><div class="m-n">占 56.1%，夜間僅 4.0%</div></div>
+    </div>
+    <div class="grid g2" style="margin-top:clamp(4px,1vh,12px)">
+      <div class="card animate-fade-up"><div class="m-k" style="margin-bottom:6px">執法與事故之對應落差</div>
+        <table>
+          <thead><tr><th>風險行為</th><th class="n">事故</th><th class="n">舉發</th><th>研判</th></tr></thead>
+          <tbody>
+            <tr class="hi"><td><b>分心駕駛／未注意</b></td><td class="n"><b>45</b></td><td class="n">—</td><td><span class="tag t-r">無法取締</span></td></tr>
+            <tr class="hi"><td><b>對造未保持安全距離</b></td><td class="n"><b>8</b></td><td class="n">—</td><td><span class="tag t-r">未見專項</span></td></tr>
+            <tr><td>路口未讓／轉彎違規</td><td class="n">44</td><td class="n">25</td><td><span class="tag t-w">部分對應</span></td></tr>
+            <tr><td>無照駕駛</td><td class="n">24</td><td class="n">14</td><td><span class="tag t-w">待強化</span></td></tr>
+            <tr><td>闖紅燈／違反號誌</td><td class="n">13</td><td class="n">58</td><td><span class="tag t-g">執法充分</span></td></tr>
+          </tbody></table></div>
+      <div class="animate-stagger" style="display:flex;flex-direction:column;gap:clamp(7px,1.1vh,12px)">
+        <div class="card hl"><div class="m-k">明確的執法真空點位</div>
+          <ul class="pts" style="margin-top:6px">
+            <li><span class="dot r"></span><span><b>省道臺20／臺39線口</b>　高齡傷亡 4 件，高齡舉發 <b class="c-crit">0 件</b></span></li>
+            <li><span class="dot r"></span><span><b>大智路系統</b>　8 件事故，僅 4 件舉發</span></li>
+            <li><span class="dot"></span><span>反觀中山路、中正路布防與風險相符 <span class="tag t-g">正確</span></span></li></ul></div>
+        <div class="card"><ul class="pts"><li><span class="dot w"></span><span>
+          <b>但不宜以舉發量為目標。</b>最大宗肇因「分心駕駛」無外顯違規事實、無從取締——
+          應把攔查轉化為<b>「勸導＋當場衛教」</b>的接觸機會。</span></li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 10 行動 -->
+<div class="slide">
+  <div class="slide-content">
+    <div class="eyebrow animate-fade-up">ACTION　·　三個月內可啟動</div>
+    <h2 class="head animate-fade-up" style="animation-delay:.06s">三項<em>零預算、即刻可行</em>的作為</h2>
+    <div class="grid g3 animate-stagger" style="margin-top:clamp(4px,1vh,14px)">
+      <div class="card" style="border-color:rgba(59,143,224,.45)">
+        <div class="tag t-b">第一順位</div>
+        <div class="m-v" style="font-size:clamp(21.7px,2.62vw,31.9px);margin-top:8px">勤務時段重配</div>
+        <ul class="pts" style="margin-top:9px">
+          <li><span class="dot"></span><span>護老勤務移至 <b>06–11 時</b>（高齡事故占 56.1%）</span></li>
+          <li><span class="dot"></span><span>鎖定新化所（86 件）、唪口所（59 件）轄區之市場、衛生所、廟口</span></li>
+          <li><span class="dot"></span><span><b>零新增預算</b>，下月勤務表即可反映</span></li></ul></div>
+      <div class="card hl">
+        <div class="tag t-r">第一順位</div>
+        <div class="m-v" style="font-size:clamp(21.7px,2.62vw,31.9px);margin-top:8px">防追撞專項執法</div>
+        <ul class="pts" style="margin-top:9px">
+          <li><span class="dot r"></span><span>取締<b>未保持行車安全距離</b>、行近慢車未減速</span></li>
+          <li><span class="dot r"></span><span>移入<b>省道臺20／臺39線口</b>（目前舉發掛零）</span></li>
+          <li><span class="dot r"></span><span>宣導對象鎖定<b>青壯年騎士</b>——直接對應唯一死亡案型態</span></li></ul></div>
+      <div class="card ok">
+        <div class="tag t-g">第二順位</div>
+        <div class="m-v" style="font-size:clamp(21.7px,2.62vw,31.9px);margin-top:8px">路老師＋無照清查</div>
+        <ul class="pts" style="margin-top:9px">
+          <li><span class="dot g"></span><span><b>路老師社區宣講</b>——屏東實證高齡死亡降 <b>40%</b></span></li>
+          <li><span class="dot g"></span><span>協同村里長清查<b>無照與逾期未換照</b>長者，洽監理到社區換照</span></li>
+          <li><span class="dot g"></span><span>兩者互為配套：宣講場合即清查接觸點</span></li></ul></div>
+    </div>
+    <div class="card wn animate-fade-up" style="animation-delay:.45s"><ul class="pts">
+      <li><span class="dot w"></span><span><b>第三順位（需跨機關）：</b>中山路／中正路口等前五名點位<b>左轉保護時相</b>與<b>無號誌路口停讓管制</b>，
+        以本報告作附件於年度道安會報提案，爭取「永續提升人行安全計畫」（400 億元）資源。</span></li></ul></div>
+  </div>
+</div>
+
+<!-- 11 口袋速查 -->
+<div class="slide">
+  <div class="slide-content">
+    <div class="eyebrow animate-fade-up">POCKET CARD　·　被問到就翻這頁</div>
+    <h2 class="head animate-fade-up" style="animation-delay:.06s">口袋速查</h2>
+    <div class="grid g2" style="margin-top:clamp(2px,.8vh,10px);gap:clamp(8px,1.2vw,16px)">
+      <div class="card animate-fade-up"><div class="m-k" style="margin-bottom:6px">核心數字（115 年 1–6 月，A1＋A2）</div>
+        <table><tbody>
+          <tr><td>高齡傷亡事故</td><td class="n"><b>198 件</b></td><td class="n">占全般 36.7%</td></tr>
+          <tr><td>死亡／受傷</td><td class="n"><b>1 人</b>／262 人</td><td class="n c-good">死亡↓80%</td></tr>
+          <tr><td>高齡當事者</td><td class="n"><b>220 人</b></td><td class="n">駕駛 93.6%</td></tr>
+          <tr><td>高齡事故率</td><td class="n"><b>157.5</b></td><td class="n c-good">↓1.9%</td></tr>
+          <tr><td>全般事故率</td><td class="n">102.6</td><td class="n c-crit">↑16.6%</td></tr>
+          <tr><td>高齡人口（三區）</td><td class="n">12,574 人</td><td class="n">占 23.89%</td></tr>
+        </tbody></table></div>
+      <div class="card animate-fade-up" style="animation-delay:.1s"><div class="m-k" style="margin-bottom:6px">最可能被追問的四題</div>
+        <ul class="pts">
+          <li><span class="dot"></span><span><b>Q：為何比去年多？</b><br>A：件數增 4 件，但<b>事故率降 1.9%</b>；同期全般事故率升 16.6%，高齡相對表現優於整體。</span></li>
+          <li><span class="dot"></span><span><b>Q：哪一區最該加強？</b><br>A：<b>新化區</b>。事故率 181.0 最高，且過度代表 1.70 倍為唯一超額風險區。</span></li>
+          <li><span class="dot"></span><span><b>Q：為何不是加強老人教育就好？</b><br>A：<b>32.8% 的事故高齡者非肇責方</b>，唯一死亡案即屬此類，須管制其他用路人。</span></li>
+          <li><span class="dot"></span><span><b>Q：資料可靠嗎？</b><br>A：全期間 5,989 件已查核——月份無缺漏、GPS 100%、值域無異常；傷亡口徑肇因完整率 98.3–100%。</span></li></ul></div>
+    </div>
+    <div class="grid g4 animate-stagger" style="margin-top:clamp(4px,1vh,12px)">
+      <div class="card" style="text-align:center"><div class="m-k">首要會勘點</div><div class="m-v" style="font-size:clamp(16.0px,1.82vw,22.8px);margin-top:6px">中山路／中正路</div><div class="m-n">9 件全傷亡・EPDO 47.5</div></div>
+      <div class="card" style="text-align:center"><div class="m-k">首要勤務時段</div><div class="m-v c-pri" style="font-size:clamp(18.2px,2.17vw,27.4px);margin-top:6px">06–11 時</div><div class="m-n">占高齡事故 56.1%</div></div>
+      <div class="card" style="text-align:center"><div class="m-k">首要執法項目</div><div class="m-v" style="font-size:clamp(16.0px,1.82vw,22.8px);margin-top:6px">未保持安全距離</div><div class="m-n">目前無專項舉發</div></div>
+      <div class="card" style="text-align:center"><div class="m-k">首要族群</div><div class="m-v c-warn" style="font-size:clamp(16.0px,1.82vw,22.8px);margin-top:6px">70 歲以上機車</div><div class="m-n">75–79 歲受傷率 100%</div></div>
+    </div>
+    <p class="kicker animate-fade-up" style="animation-delay:.55s;text-align:center">
+      資料來源：警政署 EIS 事故調查表・分局舉發資料庫・臺南市民政局各區人口統計　|　完整報告另見 HTML 分析報告
+    </p>
+  </div>
+</div>
+
+</div><!-- /.slide-deck -->
+
+<div class="nav">
+  <button class="nav-btn" onclick="prevSlide(event)">←</button>
+  <span class="counter"><span id="cur">1</span> / <span id="tot">11</span></span>
+  <button class="nav-btn" onclick="nextSlide(event)">→</button>
+</div>
+
+<script>
+/* ---------- 導覽 ---------- */
+let current = 1;
+const slides = document.querySelectorAll('.slide');
+const total = slides.length;
+document.getElementById('tot').textContent = total;
+/* 自動縮放：內容高於版面時等比縮小，確保任何視窗比例（含 16:9 投影）都不被裁切 */
+/* ⚠ 列印時投影片為 297mm×167mm（96dpi 下 1122×631px），
+     但 JS 於 load 時取到的是「螢幕」視窗高度（headless 常為 536px），
+     以螢幕尺寸算出的縮放係數被寫成 inline style 後沿用到列印，
+     造成內容被多縮約 15%、四周留白、字變小。
+     此處於列印時改用列印頁實際尺寸，並在 beforeprint 重算一次。 */
+const PRINT_W = 297 / 25.4 * 96, PRINT_H = 167 / 25.4 * 96;
+function fitSlide(slide){
+  const sc = slide.querySelector('.slide-content');
+  if(!sc) return;
+  sc.style.transform = '';
+  const printing = window.matchMedia && window.matchMedia('print').matches;
+  const cs = getComputedStyle(slide);
+  const boxH = printing ? PRINT_H : slide.clientHeight;
+  const boxW = printing ? PRINT_W : slide.clientWidth;
+  const navGap = printing ? 0 : 34;          /* 列印時導覽列隱藏，不需保留空間 */
+  const availH = boxH - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - navGap;
+  const availW = boxW - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const h = sc.scrollHeight, w = sc.scrollWidth;
+  if(!h || !w) return;
+  /* 僅在溢出時縮小，不放大：字級已由 CSS clamp 調足，
+     若在此放大會使內容溢出 .slide 的 overflow:hidden 而被裁切（標題與底部卡片消失）。 */
+  const k = Math.min(1, (availH / h) * 0.97, availW / w);   /* 0.97 留安全邊界 */
+  if(k < 0.999){
+    sc.style.transformOrigin = 'center center';
+    sc.style.transform = 'scale(' + k.toFixed(4) + ')';
+  }
+}
+function showSlide(n){
+  current = Math.max(1, Math.min(total, n));
+  slides.forEach((s,i)=>s.classList.toggle('active', i===current-1));
+  document.getElementById('cur').textContent = current;
+  document.getElementById('pb').style.width = (current/total*100)+'%';
+  requestAnimationFrame(()=>fitSlide(slides[current-1]));
+}
+window.addEventListener('resize', ()=>{ slides.forEach(fitSlide); });
+function nextSlide(e){ if(e) e.stopPropagation(); showSlide(current+1); }
+function prevSlide(e){ if(e) e.stopPropagation(); showSlide(current-1); }
+document.addEventListener('keydown', e=>{
+  if(e.key==='ArrowRight'||e.key===' '){ e.preventDefault(); nextSlide(); }
+  if(e.key==='ArrowLeft'){ e.preventDefault(); prevSlide(); }
+  if(e.key==='Home') showSlide(1);
+  if(e.key==='End') showSlide(total);
+});
+document.addEventListener('click', e=>{ if(!e.target.closest('.nav')) nextSlide(); });
+
+/* ---------- 內嵌 SVG 圖表（不依賴外部 CDN，可離線） ---------- */
+const NS='http://www.w3.org/2000/svg';
+const C={pri:'#3b8fe0',acc:'#eb6834',teal:'#1baf7a',crit:'#f2555a',warn:'#f2b134',
+  good:'#2ec27e',gray:'#63748d',ink:'#f1f5f9',ink2:'#b6c2d4',ink3:'#7e8ea6',grid:'rgba(255,255,255,.09)'};
+const el=(t,a={})=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
+const tx=(x,y,s,o={})=>{const t=el('text',{x,y,fill:o.fill||C.ink2,'font-size':o.fs||12,
+  'text-anchor':o.ta||'start','font-weight':o.fw||500,'dominant-baseline':o.db||'auto'});
+  t.textContent=s;return t;};
+
+/* 多序列折線（自動解決標籤碰撞） */
+function tline(id,series,labels,opt={}){
+  const svg=document.getElementById(id); if(!svg)return;
+  const [,,W,H]=svg.getAttribute('viewBox').split(' ').map(Number);
+  const L=56,R=26,T=26,B=42, pw=W-L-R, ph=H-T-B;
+  const max=opt.max||Math.max(...series.flatMap(s=>s.d))*1.22;
+  const step=pw/(labels.length-1);
+  for(let i=0;i<=4;i++){
+    const v=max/4*i, y=T+ph-ph*(v/max);
+    svg.appendChild(el('line',{x1:L,x2:W-R,y1:y,y2:y,stroke:C.grid,'stroke-width':1}));
+    if(i>0) svg.appendChild(tx(L-7,y,Math.round(v),{ta:'end',db:'middle',fs:15.9,fill:C.ink3}));
+  }
+  labels.forEach((lb,i)=>svg.appendChild(tx(L+step*i,T+ph+19,lb,{ta:'middle',fs:17.4,fill:C.ink2,fw:600})));
+  const specs=[];
+  series.forEach(s=>{
+    const pts=s.d.map((v,i)=>[L+step*i, T+ph-ph*(v/max)]);
+    svg.appendChild(el('path',{d:pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' '),
+      fill:'none',stroke:s.c,'stroke-width':3,'stroke-linejoin':'round','stroke-linecap':'round'}));
+    pts.forEach((p,i)=>{
+      svg.appendChild(el('circle',{cx:p[0],cy:p[1],r:4.4,fill:'#0b1220',stroke:s.c,'stroke-width':2.6}));
+      specs.push({i,x:p[0]+(i===0?7:(i===pts.length-1?-7:0)),y:p[1]-12,
+        ta:i===0?'start':(i===pts.length-1?'end':'middle'),v:s.d[i],c:s.c});
+    });
+  });
+  const byX={}; specs.forEach(s=>{(byX[s.i]=byX[s.i]||[]).push(s);});
+  Object.values(byX).forEach(g=>{g.sort((a,b)=>a.y-b.y);
+    for(let k=1;k<g.length;k++) if(g[k].y-g[k-1].y<23) g[k].y=g[k-1].y+23;});
+  specs.forEach(s=>svg.appendChild(tx(s.x,s.y,s.v,{ta:s.ta,fs:16.7,fw:700,fill:s.c})));
+  svg.appendChild(el('line',{x1:L,x2:W-R,y1:T+ph,y2:T+ph,stroke:'rgba(255,255,255,.25)','stroke-width':1.5}));
+}
+
+/* 直條（可加基準線與副標） */
+function vbar(id,data,opt={}){
+  const svg=document.getElementById(id); if(!svg)return;
+  const [,,W,H]=svg.getAttribute('viewBox').split(' ').map(Number);
+  const L=56,R=18,T=28,B=opt.bot||56, pw=W-L-R, ph=H-T-B;
+  const max=opt.max||Math.max(...data.map(d=>d[1]))*1.2;
+  const step=pw/data.length, bw=Math.min(opt.bw||52, step*0.6);
+  for(let i=0;i<=4;i++){
+    const v=max/4*i, y=T+ph-ph*(v/max);
+    svg.appendChild(el('line',{x1:L,x2:W-R,y1:y,y2:y,stroke:C.grid,'stroke-width':1}));
+    if(i>0) svg.appendChild(tx(L-7,y,Math.round(v)+(opt.pct?'%':''),{ta:'end',db:'middle',fs:15.9,fill:C.ink3}));
+  }
+  if(opt.ref!==undefined){
+    const y=T+ph-ph*(opt.ref/max);
+    svg.appendChild(el('line',{x1:L,x2:W-R,y1:y,y2:y,stroke:C.ink3,'stroke-width':1.6,'stroke-dasharray':'6 4'}));
+  }
+  data.forEach((d,i)=>{
+    const x=L+step*i+(step-bw)/2, h=Math.max(3,ph*(d[1]/max)), y=T+ph-h;
+    svg.appendChild(el('rect',{x,y,width:bw,height:h,fill:opt.cf?opt.cf(d,i):C.pri,rx:5}));
+    svg.appendChild(tx(x+bw/2,y-7,d[1]+(opt.pct?'%':''),{ta:'middle',fs:17.4,fw:700,fill:C.ink}));
+    svg.appendChild(tx(x+bw/2,T+ph+18,d[0],{ta:'middle',fs:16.7,fw:600,fill:C.ink2}));
+    if(opt.sub) svg.appendChild(tx(x+bw/2,T+ph+34,opt.sub(d,i),{ta:'middle',fs:15.2,fill:C.ink3}));
+  });
+  svg.appendChild(el('line',{x1:L,x2:W-R,y1:T+ph,y2:T+ph,stroke:'rgba(255,255,255,.25)','stroke-width':1.5}));
+}
+
+/* 分組直條 */
+function gbar(id,data,opt={}){
+  const svg=document.getElementById(id); if(!svg)return;
+  const [,,W,H]=svg.getAttribute('viewBox').split(' ').map(Number);
+  const L=56,R=18,T=28,B=50, pw=W-L-R, ph=H-T-B;
+  const max=opt.max||Math.max(...data.flatMap(d=>[d[1],d[2]]))*1.28;
+  const step=pw/data.length, bw=Math.min(38, step*0.3), gp=5;
+  for(let i=0;i<=4;i++){
+    const v=max/4*i, y=T+ph-ph*(v/max);
+    svg.appendChild(el('line',{x1:L,x2:W-R,y1:y,y2:y,stroke:C.grid,'stroke-width':1}));
+    if(i>0) svg.appendChild(tx(L-7,y,Math.round(v),{ta:'end',db:'middle',fs:15.9,fill:C.ink3}));
+  }
+  data.forEach((d,i)=>{
+    const cx=L+step*i+step/2;
+    [[d[2],C.gray,-1],[d[1],C.pri,1]].forEach(([v,col,sd])=>{
+      const x=cx+(sd<0?-(bw+gp/2):gp/2), h=Math.max(3,ph*(v/max)), y=T+ph-h;
+      svg.appendChild(el('rect',{x,y,width:bw,height:h,fill:col,rx:5}));
+      svg.appendChild(tx(x+bw/2,y-7,v,{ta:'middle',fs:16.7,fw:700,fill:sd>0?C.ink:C.ink3}));
+    });
+    svg.appendChild(tx(cx,T+ph+19,d[0],{ta:'middle',fs:17.4,fw:600,fill:C.ink2}));
+  });
+  svg.appendChild(el('line',{x1:L,x2:W-R,y1:T+ph,y2:T+ph,stroke:'rgba(255,255,255,.25)','stroke-width':1.5}));
+}
+
+/* 橫條 */
+function hbar(id,data,opt={}){
+  const svg=document.getElementById(id); if(!svg)return;
+  const [,,W,H]=svg.getAttribute('viewBox').split(' ').map(Number);
+  const L=opt.lw||214, R=62, top=10, bot=8, gap=opt.gap||9;
+  const n=data.length, bh=(H-top-bot-(n-1)*gap)/n;
+  const max=Math.max(...data.map(d=>d[1])), pw=W-L-R;
+  data.forEach((d,i)=>{
+    const y=top+i*(bh+gap), w=Math.max(3,d[1]/max*pw);
+    svg.appendChild(tx(L-10,y+bh/2,d[0],{ta:'end',db:'middle',fs:16.7,fill:C.ink2}));
+    svg.appendChild(el('rect',{x:L,y,width:w,height:bh,fill:opt.cf?opt.cf(d,i):C.pri,rx:4}));
+    svg.appendChild(tx(L+w+8,y+bh/2,d[1].toFixed(1),{db:'middle',fs:17.4,fw:700,fill:C.ink}));
+  });
+}
+
+/* ---- 繪製 ---- */
+tline('s3',
+  [{c:C.acc,d:[96.7,86.3,88.0,102.6]},{c:C.pri,d:[154.1,130.1,160.5,157.5]}],
+  ['112上','113上','114上','115上'], {max:200});
+
+tline('s4',
+  [{c:C.acc,d:[100,92,114,126]},{c:C.pri,d:[47,39,63,53]},{c:C.teal,d:[18,16,21,26]}],
+  ['112上','113上','114上','115上'], {max:165});
+
+vbar('s5',
+  [['65-69',61.8],['70-74',67.9],['75-79',100.0],['80-84',80.0],['85+',66.7]],
+  {max:122, pct:true, ref:65.4, bw:56, bot:50,
+   sub:(d,i)=>['n=89','n=78','n=26','n=20','n=7'][i],
+   cf:d=>d[1]>=95?C.crit:(d[1]>=75?'#ef8a5c':(d[1]>=66?C.warn:C.pri))});
+
+gbar('s7', [['新化區',181.0,177.2],['左鎮區',113.3,110.1],['山上區',64.2,112.0]], {max:230});
+
+hbar('s8', [['中山路／中正路',47.5],['中正路／和平街',34.0],['中山路／大智路',33.0],
+  ['大智路（164巷口）',27.5],['忠孝路／民權街',26.0],['省道臺20／臺39線',25.0]],
+  {lw:150, cf:(d,i)=>i===0?C.crit:(i<3?'#ef8a5c':C.pri)});
+
+showSlide(1);
+/* 圖表繪製後版面高度改變，重新校正一次 */
+window.addEventListener('load', ()=>slides.forEach(fitSlide));
+/* 列印前重算：此時列印樣式已套用，量到的才是紙張尺寸 */
+addEventListener('beforeprint', ()=>slides.forEach(fitSlide));
+if(window.matchMedia){ const mq=window.matchMedia('print');
+  (mq.addEventListener||mq.addListener).call(mq, mq.addEventListener?'change':undefined,
+    ()=>slides.forEach(fitSlide)); }
+</script>
+</body>
+</html>

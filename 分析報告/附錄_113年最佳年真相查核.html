@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>附錄：113 年「四年最佳」真相查核 — 臺南市政府警察局新化分局</title>
+<style>
+:root{
+  --ink:#0b1220; --ink-2:#475569; --ink-3:#7c8798;
+  --navy:#0f172a; --navy-2:#1e293b; --accent:#0369a1;
+  --surface:#ffffff; --page:#f1f5f9; --panel:#f8fafc;
+  --line:#e2e8f0; --line-2:#cbd5e1;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --critical:#d03b3b; --warning:#fab219; --good:#0ca30c; --serious:#ec835a;
+  --grid:#e8ecf1;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0; background:var(--page); color:var(--ink);
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:15px; line-height:1.75; letter-spacing:.01em;}
+.wrap{max-width:1180px; margin:0 auto; padding:0 20px 80px}
+
+.masthead{background:linear-gradient(135deg,#0f172a 0%,#152a43 55%,#1e3a5f 100%);
+  color:#fff; padding:44px 0 38px; margin-bottom:32px; border-bottom:4px solid var(--accent);}
+.masthead .wrap{padding-bottom:0}
+.mh-org{font-size:14px; letter-spacing:.22em; color:#93c5fd; margin-bottom:14px; font-weight:500}
+.mh-title{font-size:34px; font-weight:800; letter-spacing:-.01em; line-height:1.3; margin:0 0 8px}
+.mh-badge{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+  color:#e0f2fe; font-size:13px; font-weight:600; padding:3px 12px; border-radius:99px; margin-bottom:12px}
+.mh-sub{font-size:16px; color:#cbd5e1; font-weight:400}
+.mh-meta{margin-top:26px; padding-top:18px; border-top:1px solid rgba(255,255,255,.16);
+  display:flex; flex-wrap:wrap; gap:26px 44px; font-size:13.5px; color:#cbd5e1;}
+.mh-meta b{color:#fff; font-weight:600}
+
+section{margin-bottom:38px}
+h2{font-size:21px; font-weight:700; color:var(--navy); margin:0 0 6px;
+  padding-bottom:11px; border-bottom:2px solid var(--navy); letter-spacing:.01em;}
+h2 .en{font-size:12px; color:var(--ink-3); font-weight:400; letter-spacing:.08em; margin-left:10px}
+h3{font-size:16.5px; font-weight:700; color:var(--navy-2); margin:26px 0 10px}
+h3::before{content:"▍"; color:var(--accent); margin-right:6px}
+p{margin:0 0 12px}
+.lead{color:var(--ink-2); font-size:14.5px; margin-bottom:18px}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  padding:22px 24px; margin:16px 0; box-shadow:0 1px 2px rgba(15,23,42,.04);}
+
+.tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(178px,1fr)); gap:14px; margin:20px 0 8px}
+.tile{background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  padding:18px 18px 16px; position:relative; overflow:hidden;}
+.tile::before{content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--s1)}
+.tile.warn::before{background:var(--critical)} .tile.ok::before{background:var(--good)}
+.tile.amber::before{background:var(--warning)}
+.tile .k{font-size:12.5px; color:var(--ink-2); font-weight:600; margin-bottom:8px; letter-spacing:.02em}
+.tile .v{font-size:30px; font-weight:800; line-height:1.05; color:var(--navy); letter-spacing:-.02em}
+.tile .v small{font-size:15px; font-weight:600; color:var(--ink-2); margin-left:3px}
+.tile .n{font-size:12px; color:var(--ink-3); margin-top:7px; line-height:1.5}
+
+.key{background:#fff7ed; border:1px solid #fed7aa; border-left:4px solid var(--s2);
+  border-radius:10px; padding:16px 20px; margin:16px 0;}
+.key.red{background:#fef2f2; border-color:#fecaca; border-left-color:var(--critical)}
+.key.blue{background:#eff6ff; border-color:#bfdbfe; border-left-color:var(--s1)}
+.key.green{background:#f0fdf4; border-color:#bbf7d0; border-left-color:var(--good)}
+.key .t{font-weight:700; color:var(--navy); margin-bottom:6px; font-size:15px}
+.key p{margin:0; font-size:14px; color:var(--ink-2); line-height:1.7}
+.key p+p{margin-top:8px}
+
+table{width:100%; border-collapse:collapse; font-size:13.5px; margin:12px 0}
+thead th{background:var(--navy); color:#fff; font-weight:600; text-align:left;
+  padding:10px 12px; font-size:12.5px; letter-spacing:.03em; white-space:nowrap;}
+tbody td{padding:9px 12px; border-bottom:1px solid var(--line)}
+tbody tr:nth-child(even){background:var(--panel)}
+tbody tr:hover{background:#eef4fb}
+td.num,th.num{text-align:right; font-variant-numeric:tabular-nums}
+.rank{display:inline-flex; width:22px; height:22px; align-items:center; justify-content:center;
+  background:var(--navy); color:#fff; border-radius:6px; font-size:11.5px; font-weight:700}
+.rank.g{background:#b8860b} .rank.s{background:#71797e} .rank.b{background:#8b5a2b}
+.tag{display:inline-block; padding:1px 8px; border-radius:99px; font-size:11.5px; font-weight:600; white-space:nowrap}
+.tag.red{background:#fee2e2; color:#991b1b} .tag.amber{background:#fef3c7; color:#92400e}
+.tag.blue{background:#dbeafe; color:#1e40af} .tag.gray{background:#e2e8f0; color:#475569}
+.tag.green{background:#dcfce7; color:#166534}
+.tag.note{white-space:normal; display:inline; padding:2px 8px; line-height:1.7}
+/* 建議區塊內之標籤多為長句說明，一律允許換行（表格內短標籤仍維持 nowrap） */
+.rec-b .tag{white-space:normal; display:inline; padding:2px 8px; line-height:1.7}
+
+.chart{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:20px 22px 14px; margin:16px 0}
+.chart .ct{font-size:15px; font-weight:700; color:var(--navy); margin-bottom:2px}
+.chart .cs{font-size:12.5px; color:var(--ink-3); margin-bottom:14px}
+.legend{display:flex; gap:20px; flex-wrap:wrap; margin:4px 0 12px; font-size:12.5px; color:var(--ink-2)}
+.legend i{display:inline-block; width:11px; height:11px; border-radius:3px; margin-right:6px; vertical-align:-1px}
+svg{display:block; width:100%; height:auto; overflow:visible}
+.g2{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+.g2>*{min-width:0}
+@media (max-width:860px){.g2{grid-template-columns:1fr}}
+@media (max-width:900px){
+  table{display:block; overflow-x:auto; -webkit-overflow-scrolling:touch}
+  thead th,tbody td{white-space:nowrap}
+}
+
+.rec{border:1px solid var(--line); border-radius:12px; overflow:hidden; margin:14px 0; background:var(--surface)}
+.rec-h{padding:13px 18px; background:var(--panel); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.rec-h .n{font-size:15px; font-weight:700; color:var(--navy)}
+.rec-b{padding:15px 18px; font-size:14px; color:var(--ink-2); line-height:1.75}
+.rec-b .row{display:flex; gap:10px; margin-bottom:9px}
+.rec-b .row:last-child{margin-bottom:0}
+.rec-b .lab{flex:0 0 76px; font-weight:600; color:var(--navy-2); font-size:13px}
+.rec-b .val{flex:1}
+.src{font-size:12px; color:var(--ink-3); word-break:break-all}
+
+.foot{margin-top:44px; padding-top:20px; border-top:2px solid var(--navy); font-size:12.5px; color:var(--ink-3); line-height:1.9}
+.foot b{color:var(--ink-2)}
+ul.tight{margin:6px 0 12px; padding-left:22px} ul.tight li{margin-bottom:5px; font-size:14px; color:var(--ink-2)}
+ol.tight{margin:6px 0 12px; padding-left:22px} ol.tight li{margin-bottom:7px; font-size:14px; color:var(--ink-2)}
+
+@media print{
+  body{background:#fff; font-size:10.5pt}
+  .wrap{max-width:none; padding:0}
+  /* ⚠ A4 列印寬度約 794px，會誤觸發 max-width:900px 之窄螢幕表格內捲規則，
+     導致右側欄位被裁切；此處強制還原為正常表格並允許換行 */
+  table{display:table !important; overflow:visible !important; width:100% !important;
+        table-layout:fixed; font-size:9.5pt}
+  thead th, tbody td{white-space:normal !important; word-break:break-word; padding:5px 6px}
+  .tag{white-space:normal}
+  svg{max-width:100%}
+  .masthead{padding:20px 0 16px; margin-bottom:18px; background:var(--navy) !important}
+  .mh-title{font-size:22pt}
+  section{page-break-inside:auto; margin-bottom:20px}
+  h2,h3{page-break-after:avoid}
+  .card,.chart,.rec,.key,.tile{page-break-inside:avoid; box-shadow:none}
+  table{page-break-inside:auto} tr{page-break-inside:avoid}
+  thead{display:table-header-group}
+  .page-break{page-break-before:always}
+  *{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+}
+@page{size:A4; margin:14mm 12mm}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="mh-org">臺南市政府警察局新化分局　交通組</div>
+    <div class="mh-badge">高齡者交通事故分析報告　專題附錄</div>
+    <h1 class="mh-title">113 年「四年最佳」真相查核</h1>
+    <div class="mh-sub">該年是否存在可複製之有效作為？—— 控制組對照、統計檢定與改善來源拆解</div>
+    <div class="mh-meta">
+      <div><b>查核標的</b>　主報告「113 年為四年最佳，須探究當年有效作為」之推論</div>
+      <div><b>統計口徑</b>　A1（死亡）＋A2（受傷）傷亡事故</div>
+      <div><b>檢定方法</b>　卜瓦松率比條件二項檢定 · 2×2 卡方（Yates 校正）· 加權卜瓦松趨勢檢定 · 差異中的差異(DiD) · 管制界限法</div>
+      <div><b>顯著水準</b>　α = 0.05（分區檢定另作 Bonferroni 校正）</div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<section>
+  <h2>查核結論<span class="en">CONCLUSION</span></h2>
+  <div class="key red">
+    <div class="t">結論一：「113 年有有效作為」之前提不成立，不建議回頭複製該年措施</div>
+    <p>113 年上半年高齡事故率 130.1 確為四年最低，惟該降幅<b>在統計上不顯著</b>（率比 0.845，p = 0.136）。
+    同期<b>非高齡事故亦同步下降</b>（率比 0.909），兩者差異僅 1.08 倍，代表當年<b>不存在任何針對高齡族群的差別效果</b>。
+    高齡事故占比自 33.6% 微降至 33.0%，檢定 p = 0.910——結構完全未變。</p>
+    <p>若據此回溯複製 113 年作為，將複製到一個<b>統計上不存在的成效</b>，並排擠真正有效的資源配置。</p>
+  </div>
+  <div class="key">
+    <div class="t">結論二：真正的訊號在 114 年——四年間唯一具統計顯著性的結構性惡化</div>
+    <p>113→114 年，非高齡事故率仍在下降（0.899）之背景下，高齡事故率獨升 23.4%，
+    高齡占比自 33.0% 跳升至 41.6%（<b>χ² = 6.95，p = 0.008</b>），為四年唯一達顯著水準之結構變化。
+    <b>應追查的年份是 114 年的惡化成因，而非 113 年的虛假改善。</b>該成因已於第八節查明：<b>惡化之 80% 集中於三岔路（T 字路口）</b>，且經控制組驗證為高齡族群特有（p = 0.0023），與號誌設置與否無關。</p>
+  </div>
+  <div class="key blue">
+    <div class="t">結論三：現行「事故率」單一指標無法分辨真改善與隨機波動，建議改採三項複合指標</div>
+    <p>本附錄第六節提出「過度代表倍數」「控制組差分比」「月別管制界限」三項指標與判讀規則，
+    可在不增加任何資料蒐集成本下，即時分辨訊號與雜訊。以該組指標回溯，113 年不會被誤判為成效年，
+    114 年之惡化則可提前於當年上半年結束時即被偵測。</p>
+  </div>
+</section>
+
+<section>
+  <h2>一、控制組對照：高齡與非高齡同步下降<span class="en">CONTROL GROUP</span></h2>
+  <p class="lead">判斷某措施是否對高齡有效，必須設置控制組。若高齡與非高齡同步變動，
+  代表變動來自對兩者一體適用之共同因素（車流、天候、報案行為、隨機性），而非針對高齡之作為。</p>
+  <div class="chart">
+    <div class="ct">高齡 vs 非高齡　事故率四期對照</div>
+    <div class="cs">單位：件／萬人口（各以該族群人口為分母，已消除人口結構變動影響）</div>
+    <svg viewBox="0 0 700 300" xmlns="http://www.w3.org/2000/svg"><line x1="52" y1="260.0" x2="582" y2="260.0" stroke="#e8ecf1" stroke-width="1"/><text x="44" y="264.0" text-anchor="end" font-size="11" fill="#7c8798">0</text><line x1="52" y1="199.5" x2="582" y2="199.5" stroke="#e8ecf1" stroke-width="1"/><text x="44" y="203.5" text-anchor="end" font-size="11" fill="#7c8798">45</text><line x1="52" y1="139.0" x2="582" y2="139.0" stroke="#e8ecf1" stroke-width="1"/><text x="44" y="143.0" text-anchor="end" font-size="11" fill="#7c8798">90</text><line x1="52" y1="78.5" x2="582" y2="78.5" stroke="#e8ecf1" stroke-width="1"/><text x="44" y="82.5" text-anchor="end" font-size="11" fill="#7c8798">135</text><line x1="52" y1="18.0" x2="582" y2="18.0" stroke="#e8ecf1" stroke-width="1"/><text x="44" y="22.0" text-anchor="end" font-size="11" fill="#7c8798">180</text><text x="52.0" y="280" text-anchor="middle" font-size="12" fill="#475569">112H1</text><text x="228.7" y="280" text-anchor="middle" font-size="12" fill="#475569">113H1</text><text x="405.3" y="280" text-anchor="middle" font-size="12" fill="#475569">114H1</text><text x="582.0" y="280" text-anchor="middle" font-size="12" fill="#475569">115H1</text><line x1="52" y1="260" x2="582" y2="260" stroke="#cbd5e1" stroke-width="1.5"/><polyline points="52.0,52.8 228.7,85.1 405.3,44.2 582.0,48.2" fill="none" stroke="#2a78d6" stroke-width="2.6"/><circle cx="52.0" cy="52.8" r="4.2" fill="#fff" stroke="#2a78d6" stroke-width="2.4"/><text x="52.0" y="40.8" text-anchor="middle" font-size="11.5" font-weight="700" fill="#2a78d6">154.1</text><circle cx="228.7" cy="85.1" r="4.2" fill="#fff" stroke="#2a78d6" stroke-width="2.4"/><text x="228.7" y="73.1" text-anchor="middle" font-size="11.5" font-weight="700" fill="#2a78d6">130.1</text><circle cx="405.3" cy="44.2" r="4.2" fill="#fff" stroke="#2a78d6" stroke-width="2.4"/><text x="405.3" y="32.2" text-anchor="middle" font-size="11.5" font-weight="700" fill="#2a78d6">160.5</text><circle cx="582.0" cy="48.2" r="4.2" fill="#fff" stroke="#2a78d6" stroke-width="2.4"/><text x="582.0" y="36.2" text-anchor="middle" font-size="11.5" font-weight="700" fill="#2a78d6">157.5</text><text x="592.0" y="52.2" font-size="12" font-weight="700" fill="#2a78d6">高齡（65歲以上）</text><polyline points="52.0,150.7 228.7,160.5 405.3,170.6 582.0,145.2" fill="none" stroke="#eb6834" stroke-width="2.6"/><circle cx="52.0" cy="150.7" r="4.2" fill="#fff" stroke="#eb6834" stroke-width="2.4"/><text x="52.0" y="170.7" text-anchor="middle" font-size="11.5" font-weight="700" fill="#eb6834">81.3</text><circle cx="228.7" cy="160.5" r="4.2" fill="#fff" stroke="#eb6834" stroke-width="2.4"/><text x="228.7" y="180.5" text-anchor="middle" font-size="11.5" font-weight="700" fill="#eb6834">74.0</text><circle cx="405.3" cy="170.6" r="4.2" fill="#fff" stroke="#eb6834" stroke-width="2.4"/><text x="405.3" y="190.6" text-anchor="middle" font-size="11.5" font-weight="700" fill="#eb6834">66.5</text><circle cx="582.0" cy="145.2" r="4.2" fill="#fff" stroke="#eb6834" stroke-width="2.4"/><text x="582.0" y="165.2" text-anchor="middle" font-size="11.5" font-weight="700" fill="#eb6834">85.4</text><text x="592.0" y="149.2" font-size="12" font-weight="700" fill="#eb6834">非高齡（64歲以下）</text><rect x="202.7" y="18" width="52" height="242" fill="#0ca30c" opacity="0.06"/><text x="228.7" y="30" text-anchor="middle" font-size="11" font-weight="700" fill="#0ca30c">113 年</text></svg>
+  </div>
+  <table>
+    <thead><tr><th>期間</th><th class="num">全般件</th><th class="num">高齡件</th><th class="num">非高齡件</th>
+    <th class="num">高齡事故率</th><th class="num">非高齡事故率</th><th class="num">高齡占比</th></tr></thead>
+    <tbody>
+      <tr><td>112H1</td><td class="num">521</td><td class="num">175</td><td class="num">346</td>
+        <td class="num">154.1</td><td class="num">81.3</td><td class="num">33.6%</td></tr>
+      <tr><td><b>113H1</b></td><td class="num">463</td><td class="num"><b>153</b></td><td class="num">310</td>
+        <td class="num"><b>130.1</b></td><td class="num"><b>74.0</b></td><td class="num">33.0%</td></tr>
+      <tr><td>114H1</td><td class="num">466</td><td class="num">194</td><td class="num">272</td>
+        <td class="num">160.5</td><td class="num">66.5</td><td class="num">41.6%</td></tr>
+      <tr><td>115H1</td><td class="num">540</td><td class="num">198</td><td class="num">342</td>
+        <td class="num">157.5</td><td class="num">85.4</td><td class="num">36.7%</td></tr>
+    </tbody>
+  </table>
+  <div class="key green">
+    <div class="t">判讀</div>
+    <p>113 年高齡事故率降 15.6%，同期非高齡亦降 9.0%。<b>兩者比值 0.845 ÷ 0.909 = 0.93</b>，
+    即高齡僅較非高齡多降 7%，遠低於可視為政策效果之門檻。相對地，113→114 年該比值為 <b>1.373</b>，
+    高齡較非高齡多惡化 37%，才是真正的異常。</p>
+  </div>
+</section>
+
+<section>
+  <h2>二、統計顯著性檢定<span class="en">SIGNIFICANCE TESTS</span></h2>
+  <p class="lead">以卜瓦松率比條件二項精確檢定比較各期事故率，並以 2×2 卡方檢定高齡占比是否發生結構變化。
+  高齡件數規模僅約 150–200 件／半年，卜瓦松標準差達 ±12–14 件，
+  意即<b>±25 件以內之增減本即屬隨機範圍</b>。</p>
+  <table>
+    <thead><tr><th>期間轉折</th><th class="num">高齡率比</th><th class="num">p 值</th>
+      <th class="num">非高齡率比</th><th class="num">p 值</th><th class="num">占比變化 p</th>
+      <th>顯著</th><th>判讀</th></tr></thead>
+    <tbody>
+      <tr><td><b>112H1 → 113H1</b></td><td class="num">0.845</td><td class="num">0.136</td>
+      <td class="num">0.909</td><td class="num">0.226</td><td class="num">0.910</td>
+      <td><span class="tag gray">否</span></td><td style="font-size:12.5px">高齡與非高齡同步下降，皆不顯著；高齡占比幾無變化</td></tr><tr><td><b>113H1 → 114H1</b></td><td class="num">1.234</td><td class="num">0.053</td>
+      <td class="num">0.899</td><td class="num">0.214</td><td class="num"><b>0.008</b></td>
+      <td><span class="tag red">是</span></td><td style="font-size:12.5px">非高齡仍在降、高齡獨升，四年唯一結構性顯著變化</td></tr><tr><td><b>114H1 → 115H1</b></td><td class="num">0.981</td><td class="num">0.880</td>
+      <td class="num"><b>1.283</b></td><td class="num"><b>0.002</b></td><td class="num">0.122</td>
+      <td><span class="tag blue">否</span></td><td style="font-size:12.5px">反向：非高齡顯著暴增，高齡持平</td></tr><tr><td><b>113H1 → 115H1</b></td><td class="num">1.210</td><td class="num">0.078</td>
+      <td class="num">1.154</td><td class="num">0.072</td><td class="num">0.258</td>
+      <td><span class="tag gray">否</span></td><td style="font-size:12.5px">兩年後兩族群同幅回升，結構未變</td></tr>
+    </tbody>
+  </table>
+  <div class="key">
+    <div class="t">附帶發現：115 年上半年之壓力來源是非高齡族群</div>
+    <p>114→115 年非高齡事故率自 66.5 暴增至 85.4（率比 1.283，<b>p = 0.002 顯著</b>），
+    高齡則持平（0.981）。主報告所載「高齡過度代表倍數自 1.83 回落至 1.53」之改善，
+    <b>其中相當部分係全般事故（分母）擴大所致，而非高齡風險真正下降</b>——
+    高齡絕對件數仍自 194 增至 198。此點於對外說明時應併同陳述，避免高估成效。</p>
+  </div>
+</section>
+
+<section>
+  <h2>三、改善來源拆解：主力轄區根本沒有改善<span class="en">DECOMPOSITION</span></h2>
+  <p class="lead">若 113 年之下降係分局作為所致，效果應反映於占九成量體的新化區。實際拆解結果相反。</p>
+  <div class="chart">
+    <div class="ct">三行政區高齡傷亡事故件數　四期走勢</div>
+    <div class="cs">各區採獨立刻度以凸顯形狀差異；括號內為該區占分局高齡事故之比重</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px"><div><svg viewBox="0 0 232 190" xmlns="http://www.w3.org/2000/svg"><line x1="34" y1="156.0" x2="220" y2="156.0" stroke="#e8ecf1" stroke-width="1"/><text x="26" y="160.0" text-anchor="end" font-size="11" fill="#7c8798">0</text><line x1="34" y1="90.7" x2="220" y2="90.7" stroke="#e8ecf1" stroke-width="1"/><text x="26" y="94.7" text-anchor="end" font-size="11" fill="#7c8798">110</text><line x1="34" y1="25.3" x2="220" y2="25.3" stroke="#e8ecf1" stroke-width="1"/><text x="26" y="29.3" text-anchor="end" font-size="11" fill="#7c8798">220</text><text x="34.0" y="176" text-anchor="middle" font-size="12" fill="#475569">112</text><text x="96.0" y="176" text-anchor="middle" font-size="12" fill="#475569">113</text><text x="158.0" y="176" text-anchor="middle" font-size="12" fill="#475569">114</text><text x="220.0" y="176" text-anchor="middle" font-size="12" fill="#475569">115</text><line x1="34" y1="156" x2="220" y2="156" stroke="#cbd5e1" stroke-width="1.5"/><polyline points="34.0,72.3 96.0,74.0 158.0,61.0 220.0,54.4" fill="none" stroke="#2a78d6" stroke-width="2.4"/><circle cx="34.0" cy="72.3" r="3.8" fill="#2a78d6"/><text x="34.0" y="63.3" text-anchor="middle" font-size="11" font-weight="700" fill="#2a78d6">141</text><circle cx="96.0" cy="74.0" r="3.8" fill="#2a78d6"/><text x="96.0" y="65.0" text-anchor="middle" font-size="11" font-weight="700" fill="#2a78d6">138</text><circle cx="158.0" cy="61.0" r="3.8" fill="#2a78d6"/><text x="158.0" y="52.0" text-anchor="middle" font-size="11" font-weight="700" fill="#2a78d6">160</text><circle cx="220.0" cy="54.4" r="3.8" fill="#2a78d6"/><text x="220.0" y="45.4" text-anchor="middle" font-size="11" font-weight="700" fill="#2a78d6">171</text><text x="116" y="14" text-anchor="middle" font-size="12.5" font-weight="700" fill="#0f172a">新化區</text></svg></div><div><svg viewBox="0 0 232 190" xmlns="http://www.w3.org/2000/svg"><line x1="34" y1="156.0" x2="220" y2="156.0" stroke="#e8ecf1" stroke-width="1"/><text x="26" y="160.0" text-anchor="end" font-size="11" fill="#7c8798">0</text><line x1="34" y1="83.5" x2="220" y2="83.5" stroke="#e8ecf1" stroke-width="1"/><text x="26" y="87.5" text-anchor="end" font-size="11" fill="#7c8798">15</text><line x1="34" y1="35.1" x2="220" y2="35.1" stroke="#e8ecf1" stroke-width="1"/><text x="26" y="39.1" text-anchor="end" font-size="11" fill="#7c8798">25</text><text x="34.0" y="176" text-anchor="middle" font-size="12" fill="#475569">112</text><text x="96.0" y="176" text-anchor="middle" font-size="12" fill="#475569">113</text><text x="158.0" y="176" text-anchor="middle" font-size="12" fill="#475569">114</text><text x="220.0" y="176" text-anchor="middle" font-size="12" fill="#475569">115</text><line x1="34" y1="156" x2="220" y2="156" stroke="#cbd5e1" stroke-width="1.5"/><polyline points="34.0,54.4 96.0,102.8 158.0,64.1 220.0,102.8" fill="none" stroke="#eb6834" stroke-width="2.4"/><circle cx="34.0" cy="54.4" r="3.8" fill="#eb6834"/><text x="34.0" y="45.4" text-anchor="middle" font-size="11" font-weight="700" fill="#eb6834">21</text><circle cx="96.0" cy="102.8" r="3.8" fill="#eb6834"/><text x="96.0" y="93.8" text-anchor="middle" font-size="11" font-weight="700" fill="#eb6834">11</text><circle cx="158.0" cy="64.1" r="3.8" fill="#eb6834"/><text x="158.0" y="55.1" text-anchor="middle" font-size="11" font-weight="700" fill="#eb6834">19</text><circle cx="220.0" cy="102.8" r="3.8" fill="#eb6834"/><text x="220.0" y="93.8" text-anchor="middle" font-size="11" font-weight="700" fill="#eb6834">11</text><text x="116" y="14" text-anchor="middle" font-size="12.5" font-weight="700" fill="#0f172a">山上區</text></svg></div><div><svg viewBox="0 0 232 190" xmlns="http://www.w3.org/2000/svg"><line x1="34" y1="156.0" x2="220" y2="156.0" stroke="#e8ecf1" stroke-width="1"/><text x="26" y="160.0" text-anchor="end" font-size="11" fill="#7c8798">0</text><line x1="34" y1="92.5" x2="220" y2="92.5" stroke="#e8ecf1" stroke-width="1"/><text x="26" y="96.5" text-anchor="end" font-size="11" fill="#7c8798">10</text><line x1="34" y1="29.0" x2="220" y2="29.0" stroke="#e8ecf1" stroke-width="1"/><text x="26" y="33.0" text-anchor="end" font-size="11" fill="#7c8798">20</text><text x="34.0" y="176" text-anchor="middle" font-size="12" fill="#475569">112</text><text x="96.0" y="176" text-anchor="middle" font-size="12" fill="#475569">113</text><text x="158.0" y="176" text-anchor="middle" font-size="12" fill="#475569">114</text><text x="220.0" y="176" text-anchor="middle" font-size="12" fill="#475569">115</text><line x1="34" y1="156" x2="220" y2="156" stroke="#cbd5e1" stroke-width="1.5"/><polyline points="34.0,73.5 96.0,130.6 158.0,60.8 220.0,54.4" fill="none" stroke="#d03b3b" stroke-width="2.4"/><circle cx="34.0" cy="73.5" r="3.8" fill="#d03b3b"/><text x="34.0" y="64.5" text-anchor="middle" font-size="11" font-weight="700" fill="#d03b3b">13</text><circle cx="96.0" cy="130.6" r="3.8" fill="#d03b3b"/><text x="96.0" y="121.6" text-anchor="middle" font-size="11" font-weight="700" fill="#d03b3b">4</text><circle cx="158.0" cy="60.8" r="3.8" fill="#d03b3b"/><text x="158.0" y="51.8" text-anchor="middle" font-size="11" font-weight="700" fill="#d03b3b">15</text><circle cx="220.0" cy="54.4" r="3.8" fill="#d03b3b"/><text x="220.0" y="45.4" text-anchor="middle" font-size="11" font-weight="700" fill="#d03b3b">16</text><text x="116" y="14" text-anchor="middle" font-size="12.5" font-weight="700" fill="#0f172a">左鎮區</text></svg></div></div>
+  </div>
+  <table>
+    <thead><tr><th>行政區</th><th class="num">112H1</th><th class="num">113H1</th><th class="num">114H1</th>
+      <th class="num">115H1</th><th class="num">112→113 增減</th><th class="num">占量體</th><th>形態研判</th></tr></thead>
+    <tbody>
+      <tr><td><b>新化區</b></td><td class="num">141</td><td class="num">138</td><td class="num">160</td><td class="num">171</td>
+        <td class="num"><b>−3（−2.1%）</b></td><td class="num">90.2%</td>
+        <td><span class="tag gray">四期單調上升，113 年未見改善</span></td></tr>
+      <tr><td>山上區</td><td class="num">21</td><td class="num">11</td><td class="num">19</td><td class="num">11</td>
+        <td class="num">−10（−47.6%）</td><td class="num">7.2%</td>
+        <td><span class="tag amber">高低振盪，114 年全數反彈</span></td></tr>
+      <tr><td>左鎮區</td><td class="num">13</td><td class="num">4</td><td class="num">15</td><td class="num">16</td>
+        <td class="num">−9（−69.2%）</td><td class="num">2.6%</td>
+        <td><span class="tag red">113 年為四年唯一低點，隨即回升並創新高</span></td></tr>
+      <tr style="background:#fef2f2"><td><b>合計</b></td><td class="num">175</td><td class="num">153</td>
+        <td class="num">194</td><td class="num">198</td><td class="num"><b>−22</b></td><td class="num">100%</td>
+        <td><b>減少量之 86% 來自僅占 9.8% 量體之兩小區</b></td></tr>
+    </tbody>
+  </table>
+  <div class="key red">
+    <div class="t">回歸均值之教科書案例</div>
+    <p>112→113 年總減少 22 件，其中山上區 −10 件、左鎮區 −9 件，合計 −19 件（<b>占 86%</b>），
+    但此二區僅占高齡事故量體 9.8%。占 90.2% 之新化區僅減 3 件（−2.1%）。
+    且該二區於 114 年<b>全數反彈</b>（山上 11→19、左鎮 4→16），符合小樣本隨機低點後回歸均值之典型型態。</p>
+  </div>
+
+  <h3>方法學警示：基準選擇偏誤——本查核自身亦曾誤入</h3>
+  <p class="lead">左鎮區 113 年之 4 件為四年唯一低點（112 年 13、114 年 15、115 年 16 件）。
+  若<b>以該低點為比較基準</b>，將得出「顯著惡化」之結論；改以不依賴單一基準之方法檢定，
+  該結論即不成立。此為與主報告「113 年最佳」完全相同之陷阱，謹此併列以為警惕。</p>
+  <table>
+    <thead><tr><th>比較基準之選擇</th><th class="num">件數</th><th class="num">率比</th>
+      <th class="num">p 值</th><th>結論</th></tr></thead>
+    <tbody>
+      <tr style="background:#fef2f2"><td>113→114（<b>以四年最低點為基準</b>）</td><td class="num">4 → 15</td>
+        <td class="num">3.76</td><td class="num">0.012</td>
+        <td><span class="tag red">看似顯著——實為偏誤</span></td></tr>
+      <tr><td>112→114（以首期為基準）</td><td class="num">13 → 15</td><td class="num">1.15</td>
+        <td class="num">0.851</td><td><span class="tag gray">不顯著</span></td></tr>
+      <tr><td>112→115（端點比較）</td><td class="num">13 → 16</td><td class="num">1.18</td>
+        <td class="num">0.713</td><td><span class="tag gray">不顯著</span></td></tr>
+      <tr style="background:#f0fdf4"><td><b>四期趨勢檢定（不依賴單一基準）</b></td><td class="num">四期全用</td>
+        <td class="num">+11.5%／期</td><td class="num"><b>0.371</b></td>
+        <td><span class="tag green">正確方法：不顯著</span></td></tr>
+    </tbody>
+  </table>
+  <div class="key red">
+    <div class="t">修正後結論：三個行政區均無統計上可確認之趨勢</div>
+    <p>以四期加權卜瓦松趨勢檢定（對數事故率對期序迴歸）重驗三區，
+    <b>無任一區達顯著水準</b>：新化區 +3.5%／期（p = 0.341）、山上區 −14.9%／期（p = 0.155）、
+    左鎮區 +11.5%／期（p = 0.371）。分區層級之高齡事故件數僅個位數至十餘件，
+    卜瓦松雜訊即可產生 3 倍以上之率比，<b>不足以支撐任何分區別之資源調配決策</b>。</p>
+    <p><b>操作原則</b>：凡比較兩期數據，基準期必須<u>事前指定</u>（如固定用首期或去年同期），
+    不得於觀察數據後挑選；若基準期恰為序列極值，須改用趨勢檢定或端點比較複核。</p>
+  </div>
+</section>
+
+<section>
+  <h2>四、月別型態：V 型回彈而非階梯式下降<span class="en">MONTHLY PATTERN</span></h2>
+  <p class="lead">政策效果之特徵為「自實施月起持續維持低檔」的階梯式變化；
+  隨機波動之特徵則為「驟降後自行回彈」。以卜瓦松管制界限檢定 113 年各月是否真正低於基準。</p>
+  <div class="chart">
+    <div class="ct">113 年上半年月別高齡事故件數　vs　管制界限</div>
+    <div class="cs">基準線＝112 年與 114 年同月平均；管制帶＝基準 ±1.96√基準（95% 卜瓦松界限）</div>
+    <svg viewBox="0 0 700 300" xmlns="http://www.w3.org/2000/svg"><line x1="46" y1="260.0" x2="570" y2="260.0" stroke="#e8ecf1" stroke-width="1"/><text x="38" y="264.0" text-anchor="end" font-size="11" fill="#7c8798">0</text><line x1="46" y1="194.5" x2="570" y2="194.5" stroke="#e8ecf1" stroke-width="1"/><text x="38" y="198.5" text-anchor="end" font-size="11" fill="#7c8798">15</text><line x1="46" y1="129.1" x2="570" y2="129.1" stroke="#e8ecf1" stroke-width="1"/><text x="38" y="133.1" text-anchor="end" font-size="11" fill="#7c8798">30</text><line x1="46" y1="63.6" x2="570" y2="63.6" stroke="#e8ecf1" stroke-width="1"/><text x="38" y="67.6" text-anchor="end" font-size="11" fill="#7c8798">45</text><text x="46.0" y="280" text-anchor="middle" font-size="12" fill="#475569">1月</text><text x="150.8" y="280" text-anchor="middle" font-size="12" fill="#475569">2月</text><text x="255.6" y="280" text-anchor="middle" font-size="12" fill="#475569">3月</text><text x="360.4" y="280" text-anchor="middle" font-size="12" fill="#475569">4月</text><text x="465.2" y="280" text-anchor="middle" font-size="12" fill="#475569">5月</text><text x="570.0" y="280" text-anchor="middle" font-size="12" fill="#475569">6月</text><line x1="46" y1="260" x2="570" y2="260" stroke="#cbd5e1" stroke-width="1.5"/><polygon points="46.0,49.2 150.8,79.8 255.6,56.7 360.4,110.8 465.2,82.4 570.0,92.4 570.0,183.2 465.2,175.8 360.4,195.4 255.6,157.9 150.8,174.0 46.0,152.2" fill="#2a78d6" opacity="0.10"/><polyline points="46.0,49.2 150.8,79.8 255.6,56.7 360.4,110.8 465.2,82.4 570.0,92.4" fill="none" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="4 3"/><polyline points="46.0,152.2 150.8,174.0 255.6,157.9 360.4,195.4 465.2,175.8 570.0,183.2" fill="none" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="4 3"/><polyline points="46.0,100.7 150.8,126.9 255.6,107.3 360.4,153.1 465.2,129.1 570.0,137.8" fill="none" stroke="#64748b" stroke-width="1.4" stroke-dasharray="6 4"/><polyline points="46.0,107.3 150.8,172.7 255.6,168.4 360.4,168.4 465.2,116.0 570.0,159.6" fill="none" stroke="#d03b3b" stroke-width="2.8"/><circle cx="46.0" cy="107.3" r="4.2" fill="#fff" stroke="#d03b3b" stroke-width="2.4"/><text x="46.0" y="95.3" text-anchor="middle" font-size="11.5" font-weight="700" fill="#d03b3b">35</text><circle cx="150.8" cy="172.7" r="4.2" fill="#fff" stroke="#d03b3b" stroke-width="2.4"/><text x="150.8" y="160.7" text-anchor="middle" font-size="11.5" font-weight="700" fill="#d03b3b">20</text><circle cx="255.6" cy="168.4" r="5.4" fill="#d03b3b" stroke="#d03b3b" stroke-width="2.4"/><text x="255.6" y="156.4" text-anchor="middle" font-size="11.5" font-weight="700" fill="#d03b3b">21</text><circle cx="360.4" cy="168.4" r="4.2" fill="#fff" stroke="#d03b3b" stroke-width="2.4"/><text x="360.4" y="156.4" text-anchor="middle" font-size="11.5" font-weight="700" fill="#d03b3b">21</text><circle cx="465.2" cy="116.0" r="4.2" fill="#fff" stroke="#d03b3b" stroke-width="2.4"/><text x="465.2" y="104.0" text-anchor="middle" font-size="11.5" font-weight="700" fill="#d03b3b">33</text><circle cx="570.0" cy="159.6" r="4.2" fill="#fff" stroke="#d03b3b" stroke-width="2.4"/><text x="570.0" y="147.6" text-anchor="middle" font-size="11.5" font-weight="700" fill="#d03b3b">23</text><text x="255.6" y="190.4" text-anchor="middle" font-size="11" font-weight="700" fill="#d03b3b">唯一破線</text><text x="578" y="96.4" font-size="11.5" font-weight="600" fill="#94a3b8">上管制界限 UCL</text><text x="578" y="141.8" font-size="11.5" font-weight="600" fill="#64748b">基準（112·114 同月均）</text><text x="578" y="187.2" font-size="11.5" font-weight="600" fill="#94a3b8">下管制界限 LCL</text><text x="578" y="163.6" font-size="11.5" font-weight="600" fill="#d03b3b">113 年實績</text></svg>
+  </div>
+  <table>
+    <thead><tr><th>月份</th><th class="num">基準（112·114 同月均）</th><th class="num">下管制界限 LCL</th>
+      <th class="num">113 年實績</th><th>檢定結果</th></tr></thead>
+    <tbody>
+      <tr><td>1 月</td><td class="num">36.5</td>
+      <td class="num">24.7</td><td class="num"><b>35</b></td>
+      <td><span class="tag gray">× 在隨機波動範圍內</span></td></tr><tr><td>2 月</td><td class="num">30.5</td>
+      <td class="num">19.7</td><td class="num"><b>20</b></td>
+      <td><span class="tag gray">× 在隨機波動範圍內</span></td></tr><tr style="background:#fef2f2"><td>3 月</td><td class="num">35.0</td>
+      <td class="num">23.4</td><td class="num"><b>21</b></td>
+      <td><span class="tag red">✓ 顯著低於基準</span></td></tr><tr><td>4 月</td><td class="num">24.5</td>
+      <td class="num">14.8</td><td class="num"><b>21</b></td>
+      <td><span class="tag gray">× 在隨機波動範圍內</span></td></tr><tr><td>5 月</td><td class="num">30.0</td>
+      <td class="num">19.3</td><td class="num"><b>33</b></td>
+      <td><span class="tag gray">× 在隨機波動範圍內</span></td></tr><tr><td>6 月</td><td class="num">28.0</td>
+      <td class="num">17.6</td><td class="num"><b>23</b></td>
+      <td><span class="tag gray">× 在隨機波動範圍內</span></td></tr>
+    </tbody>
+  </table>
+  <div class="key">
+    <div class="t">判讀：六個月中僅 3 月一個月真正低於管制下界</div>
+    <p>113 年月別序列為 <b>35 → 20 → 21 → 21 → 33 → 23</b>：1 月甚至高於 112 年同月（31），
+    2–4 月驟低，5 月旋即回彈至 33。<b>若為政策效果，5 月不會回到 33。</b></p>
+    <p>四年月別變異係數分別為 0.14 / 0.24 / 0.18 / 0.18，而純卜瓦松雜訊之理論值約為 1/√29 ≒ 0.19，
+    <b>四年皆落於純隨機預期範圍</b>，無任何一年顯示出超越隨機性之月別結構。</p>
+  </div>
+</section>
+
+<section>
+  <h2>五、環境因素與執法量能之排除<span class="en">ALTERNATIVE EXPLANATIONS</span></h2>
+  <h3>執法量能：方向與假說相反</h3>
+  <table>
+    <thead><tr><th>項目</th><th class="num">113H1</th><th class="num">114H1</th><th class="num">115H1</th>
+      <th class="num">113→114</th><th>說明</th></tr></thead>
+    <tbody>
+      <tr><td><b>舉發總量</b></td><td class="num">6,609</td><td class="num">8,887</td><td class="num">7,933</td>
+        <td class="num"><b>＋34.5%</b></td><td>事故最少的 113 年，執法量最低</td></tr>
+      <tr><td>高齡受舉發</td><td class="num">187</td><td class="num">363</td><td class="num">336</td>
+        <td class="num">＋94.1%</td><td>高齡舉發占比 2.8% → 4.1%</td></tr>
+      <tr><td>闖紅燈類</td><td class="num">586</td><td class="num">1,160</td><td class="num">874</td>
+        <td class="num">＋98.0%</td><td>114 年重點轉向路口違規</td></tr>
+      <tr><td>危險駕駛類</td><td class="num">3,995</td><td class="num">3,417</td><td class="num">3,327</td>
+        <td class="num">−14.5%</td><td>速度執法同期大幅收縮</td></tr>
+    </tbody>
+  </table>
+  <div class="key">
+    <div class="t">判讀</div>
+    <p>113 年係<b>執法量最低而事故最少</b>、114 年係<b>執法量最高而事故最多</b>，
+    與「執法強度壓制事故」之假說<b>方向相反</b>。此並非證明執法無效，
+    而是顯示本轄執法量為<b>對事故的反應</b>（事故增則加強），非事故之領先因素——
+    以舉發總量作為高齡事故防制成效指標並不成立。</p>
+    <p>另檢視執法時段結構：舉發於 06–11 時占 46–50%、12–17 時占 40–45%，四年結構穩定；
+    而 115 年舉發向上午集中（06–11 升至 50%）之同時，該時段高齡事故反自 92 件增至 111 件，
+    <b>同時段加強舉發未見對應之事故抑制</b>。</p>
+  </div>
+  <h3>環境因素：天候已排除</h3>
+  <table>
+    <thead><tr><th>天候</th><th class="num">112H1</th><th class="num">113H1</th><th class="num">114H1</th>
+      <th class="num">115H1</th><th>判讀</th></tr></thead>
+    <tbody>
+      <tr><td>晴</td><td class="num">152（87%）</td><td class="num">135（88%）</td><td class="num">171（88%）</td>
+        <td class="num">179（90%）</td><td>四年結構一致，無差異</td></tr>
+      <tr><td>陰</td><td class="num">10（6%）</td><td class="num">14（9%）</td><td class="num">11（6%）</td>
+        <td class="num">10（5%）</td><td>—</td></tr>
+      <tr><td>雨</td><td class="num">11（6%）</td><td class="num">4（3%）</td><td class="num">11（6%）</td>
+        <td class="num">8（4%）</td><td><span class="tag amber">113 年雨天事故少 7 件，惟樣本過小</span></td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:13.5px;color:#475569">113 年雨天事故 4 件較 112 年之 11 件少 7 件，佔總減少量 22 件之 32%，
+  為唯一具方向性之環境線索；惟該項本身樣本僅個位數，卜瓦松雜訊即可完全解釋，
+  且雨天事故僅占全體 3–6%，不足以構成主因。</p>
+</section>
+
+<section>
+  <h2>六、建議採用之監測指標<span class="en">MONITORING INDICATORS</span></h2>
+  <p class="lead">本節為本次查核之主要交付。三項指標皆可由現有資料直接計算，無須額外蒐集成本。</p>
+
+  <div class="rec">
+    <div class="rec-h"><span class="rank g">1</span><span class="n">過度代表倍數</span>
+      <span class="tag blue">核心指標</span></div>
+    <div class="rec-b">
+      <div class="row"><div class="lab">定義</div><div class="val">高齡事故占比 ÷ 高齡人口占比</div></div>
+      <div class="row"><div class="lab">優點</div><div class="val">分子分母同時受車流量、報案率、天候影響而互相抵銷，
+        <b>免疫於全般事故量變動</b>，是判斷「高齡是否被單獨惡化」最穩健之指標</div></div>
+      <div class="row"><div class="lab">基準區間</div><div class="val">1.50–1.60（112、113、115 年均落於此區間）</div></div>
+      <div class="row"><div class="lab">警戒門檻</div><div class="val"><b>≥ 1.80 即為警訊</b>——114 年之 1.83 為四年唯一破線者</div></div>
+      <div class="row"><div class="lab">回溯驗證</div><div class="val">以此指標檢視，113 年（1.51）不會被誤判為成效年；
+        114 年（1.83）之惡化可於當年上半年結束時即被偵測</div></div>
+    </div>
+  </div>
+
+  <div class="rec">
+    <div class="rec-h"><span class="rank s">2</span><span class="n">控制組差分比</span>
+      <span class="tag blue">因果判讀</span></div>
+    <div class="rec-b">
+      <div class="row"><div class="lab">定義</div><div class="val">高齡事故率比 ÷ 非高齡事故率比（同期）</div></div>
+      <div class="row"><div class="lab">用途</div><div class="val">分辨「針對高齡之作為奏效」與「全般環境一體變動」。
+        任何宣稱之高齡防制成效，皆須通過此項檢驗</div></div>
+      <div class="row"><div class="lab">判讀規則</div><div class="val">
+        <span class="tag green">≤ 0.85</span> 高齡確有額外改善
+        <span class="tag gray">0.85–1.20</span> 與全般同步，不可歸功於作為
+        <span class="tag red">≥ 1.30</span> 高齡被單獨惡化，應立即檢討</div></div>
+      <div class="row"><div class="lab">實測值</div><div class="val">112→113 為 <b>0.93</b>（同步，不可歸功）；
+        113→114 為 <b>1.37</b>（單獨惡化）；114→115 為 <b>0.77</b>（高齡確較全般為佳）</div></div>
+    </div>
+  </div>
+
+  <div class="rec">
+    <div class="rec-h"><span class="rank b">3</span><span class="n">月別卜瓦松管制界限</span>
+      <span class="tag blue">雜訊過濾</span></div>
+    <div class="rec-b">
+      <div class="row"><div class="lab">定義</div><div class="val">中心線＝前三年同月平均；
+        管制界限＝中心線 ±1.96×√中心線</div></div>
+      <div class="row"><div class="lab">判讀規則</div><div class="val">
+        <b>單月低於下界不算改善</b>；須<b>連續 3 個月低於下界</b>，或<b>連續 6 個月位於中心線下方</b>，
+        方可認定為真實下降趨勢</div></div>
+      <div class="row"><div class="lab">回溯驗證</div><div class="val">113 年六個月中僅 3 月一個月破下界，
+        不符合判定門檻——依此規則當年即不會被誤報為成效</div></div>
+      <div class="row"><div class="lab">115 年現況</div><div class="val">六個月全數位於管制帶內
+        （1月43／2月31／3月36／4月30／5月24／6月34），<b>尚無趨勢性變化</b></div></div>
+    </div>
+  </div>
+
+  <div class="key blue">
+    <div class="t">使用建議</div>
+    <p>三項指標建議納入每半年之高齡事故檢討，並依序判讀：
+    先以<b>指標①</b>確認高齡是否被單獨惡化 → 再以<b>指標②</b>確認變動是否可歸因於作為 →
+    最後以<b>指標③</b>確認是否已達趨勢認定門檻。三者皆通過方可對外宣稱防制成效。</p>
+  </div>
+</section>
+
+<section>
+  <h2>七、資料品質附註<span class="en">DATA QUALITY NOTE</span></h2>
+  <div class="key amber" style="background:#fffbeb;border-color:#fde68a;border-left-color:#f59e0b">
+    <div class="t">肇因分類於 112／113 年間改版，跨該界線之肇因比較無效</div>
+    <p>查核過程發現：112 年上半年之「未注意車前狀態」37 人次於 113 年起歸零，
+    同期新增「恍神、緊張、心不在焉分心駕駛」27 人次、「起步時未注意安全」10 人次等細分項目，
+    係事故調查表肇因代碼改版所致。</p>
+    <p><b>影響範圍</b>：跨 112／113 界線之<b>肇因欄位</b>比較無效（如「分心駕駛是否增加」不可回溯至 112 年）。
+    <b>不受影響</b>：件數、人數、傷亡數、事故類別（A1/A2/A3）、行政區、時段、車種、年齡等欄位定義未變，
+    本附錄各項檢定均建立於不受影響之欄位。</p>
+    <p>主報告肇因分析之期間為 115 年上半年，未跨越該界線，結論不受影響。</p>
+  </div>
+</section>
+
+<section>
+  <h2>八、114 年惡化之路口型態查證<span class="en">JUNCTION HYPOTHESIS</span></h2>
+  <p class="lead">承辦人提出實務假說：「唯一可能的因素是小路口無號誌」。本節據以檢定。
+  結論為<b>路口型態成立、號誌因素不成立</b>。</p>
+
+  <h3>檢定一：114 年增量之 80% 集中於三岔路</h3>
+  <table>
+    <thead><tr><th>道路型態</th><th class="num">112H1</th><th class="num">113H1</th>
+      <th class="num">114H1</th><th class="num">115H1</th><th class="num">113→114</th><th>研判</th></tr></thead>
+    <tbody>
+      <tr style="background:#fef2f2"><td><b>三岔路</b></td><td class="num">41</td><td class="num">30</td>
+        <td class="num"><b>63</b></td><td class="num">40</td><td class="num"><b>＋33</b></td>
+        <td><span class="tag red">占總增量 41 件之 80%</span></td></tr>
+      <tr><td>四岔路</td><td class="num">51</td><td class="num">49</td><td class="num">50</td>
+        <td class="num">61</td><td class="num">＋1</td><td><span class="tag gray">無變化</span></td></tr>
+      <tr><td>直路</td><td class="num">67</td><td class="num">59</td><td class="num">66</td>
+        <td class="num">72</td><td class="num">＋7</td><td><span class="tag gray">與整體同步</span></td></tr>
+      <tr><td>多岔路</td><td class="num">10</td><td class="num">10</td><td class="num">7</td>
+        <td class="num">11</td><td class="num">−3</td><td><span class="tag gray">無變化</span></td></tr>
+      <tr><td>彎曲路及附近</td><td class="num">6</td><td class="num">2</td><td class="num">6</td>
+        <td class="num">6</td><td class="num">＋4</td><td><span class="tag gray">樣本過小</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>檢定二：控制組驗證——確為高齡特有</h3>
+  <table>
+    <thead><tr><th>三岔路占比</th><th class="num">112H1</th><th class="num">113H1</th>
+      <th class="num">114H1</th><th class="num">115H1</th><th>114 vs 其餘三期合併</th></tr></thead>
+    <tbody>
+      <tr style="background:#fef2f2"><td><b>高齡</b></td><td class="num">23.4%</td><td class="num">19.6%</td>
+        <td class="num"><b>32.5%</b></td><td class="num">20.3%</td>
+        <td>32.5% vs 21.1%　χ² = 9.31，<b>p = 0.0023</b>
+          <span class="tag red">通過 Bonferroni 校正</span></td></tr>
+      <tr><td>非高齡（控制組）</td><td class="num">19.4%</td><td class="num">21.3%</td>
+        <td class="num">20.2%</td><td class="num">25.6%</td>
+        <td>20.2% vs 22.1%　χ² = 0.34，p = 0.562
+          <span class="tag green">平穩，無異常</span></td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:13.5px;color:#475569">差異中的差異（DiD）檢定：高齡 +12.9 個百分點、非高齡 −1.1 個百分點，
+  DiD = +13.9 個百分點（SE 5.7，z = 2.43，<b>p = 0.015</b>），確認 114 年三岔路之集中為高齡族群特有現象。
+  惟以首期 112 年為基準之直接比較未達顯著（p = 0.070），故應認定為<b>單期突出</b>而非持續趨勢。</p>
+
+  <h3>檢定三：號誌因素不成立</h3>
+  <table>
+    <thead><tr><th>項目</th><th class="num">112H1</th><th class="num">113H1</th><th class="num">114H1</th>
+      <th class="num">115H1</th><th>研判</th></tr></thead>
+    <tbody>
+      <tr><td>高齡事故無號誌占比</td><td class="num">58.3%</td><td class="num">60.8%</td>
+        <td class="num">56.2%</td><td class="num">56.9%</td>
+        <td><span class="tag gray">114 年反而下降，逐期檢定均不顯著</span></td></tr>
+      <tr><td>非高齡無號誌占比</td><td class="num">58.4%</td><td class="num">52.6%</td>
+        <td class="num">53.3%</td><td class="num">57.1%</td>
+        <td><span class="tag gray">與高齡無顯著差異（四期 p = 0.12–1.00）</span></td></tr>
+      <tr><td>三岔路中 <b>無</b>號誌者</td><td class="num">19</td><td class="num">19</td>
+        <td class="num">29</td><td class="num">22</td><td>112→114 增 <b>＋53%</b></td></tr>
+      <tr><td>三岔路中 <b>有</b>行車管制號誌者</td><td class="num">17</td><td class="num">9</td>
+        <td class="num">26</td><td class="num">16</td><td>112→114 增 <b>＋53%</b>（增幅相同）</td></tr>
+    </tbody>
+  </table>
+  <div class="key">
+    <div class="t">判讀：關鍵在「三岔路」本身，不在有無號誌</div>
+    <p>無號誌事故占高齡事故 56–61%，四年穩定且<b>與非高齡無顯著差異</b>，
+    並非高齡特有之暴險因子。三岔路增量中，有號誌者（＋17）甚至多於無號誌者（＋10）；
+    改以事前指定之 112 年為基準複核，<b>二者增幅同為 ＋53%</b>。
+    故惡化與號誌設置與否無關，而與<b>三岔路（T 字路口）之衝突型態</b>相關——
+    114 年 63 件三岔路事故中，<b>側撞達 34 件（54%）</b>，
+    印證主報告所載「左轉與直行衝突」為高齡事故核心型態。</p>
+  </div>
+
+  <h3>檢定四：非單一地點之工程缺失</h3>
+  <table>
+    <thead><tr><th>期間</th><th class="num">可辨識路口件數</th><th class="num">相異路口數</th>
+      <th class="num">最大單點件數</th><th class="num">≥2 件路口占比</th><th>研判</th></tr></thead>
+    <tbody>
+      <tr><td>112H1</td><td class="num">19</td><td class="num">13</td><td class="num">—</td>
+        <td class="num">53%</td><td><span class="tag gray">基準水準</span></td></tr>
+      <tr><td>113H1</td><td class="num">16</td><td class="num">15</td><td class="num">2</td>
+        <td class="num">12%</td><td><span class="tag gray">最分散（樣本小）</span></td></tr>
+      <tr style="background:#fef2f2"><td><b>114H1</b></td><td class="num">34</td><td class="num"><b>23</b></td>
+        <td class="num">4</td><td class="num">56%</td>
+        <td><span class="tag amber">集中度與 112 年相當，未見異常聚集</span></td></tr>
+      <tr><td>115H1</td><td class="num">16</td><td class="num">13</td><td class="num">2</td>
+        <td class="num">38%</td><td><span class="tag gray">回復</span></td></tr>
+    </tbody>
+  </table>
+  <div class="key blue">
+    <div class="t">結論：屬普遍性型態，非單點工程缺失</div>
+    <p>114 年 63 件三岔路事故散布於 <b>23 個相異路口</b>，最大單點僅 4 件，
+    ≥2 件路口占比 56% 與 112 年之 53% 相當，<b>未見異常空間聚集</b>。
+    重複發生點集中於中山路、中正路、忠孝路等主要幹道與側巷所形成之 T 字路口；
+    其中<b>中山路／護安街</b>於 114、115 兩期各發生 2 件，為少數跨期重複點，建議優先現勘。</p>
+    <p><b>資料限制</b>：地址欄位僅約 54% 填有可辨識之交叉路街名（114 年 63 件中 34 件），
+    空間分析基礎較弱，上述聚集度判讀應視為概略參考。建議強化事故地點登載完整性，
+    以提升熱點分析效度。</p>
+  </div>
+</section>
+
+<section>
+  <h2>九、後續建議查察方向<span class="en">NEXT STEPS</span></h2>
+  <ol class="tight">
+    <li><b>改以 114 年為追查標的。</b>該年惡化輪廓已可描繪：65–69 歲增 64%（61→100 人）、
+      小客車駕駛增 62%（39→63 人）、12–17 時段增 77%（43→76 件）、側撞增 39%（46→64 件）、
+      無肇事責任之高齡者增 108%（25→52 人）。呈現「較年輕高齡者、自小客車、午後、路口衝突」之型態，
+      與傳統「高齡行人／機車」印象不同，建議據此調整宣導與稽查對象。空間型態則為三岔路側撞（第八節），惟已於 115 年回落，屬單期突出而非進行中之問題，不需啟動專案改善。</li>
+    <li><b>分區別分析一律以分局層級為準，不再據以調配資源。</b>三區高齡事故件數規模為 4–171 件，
+      其中山上、左鎮二區僅個位數至十餘件，經四期趨勢檢定<b>均未達顯著</b>
+      （新化 p = 0.341、山上 p = 0.155、左鎮 p = 0.371）。分區數字適合作為現場經驗之佐證，
+      不足以單獨支撐勤務調配決策；若須分區判讀，建議改採「累計三年合併計算」以提高樣本量。</li>
+    <li><b>不再以舉發總量作為高齡事故防制之成效指標。</b>四年資料顯示舉發量係對事故之反應而非領先因素；
+      建議改以「高齡相關違規項目之舉發占比」與「熱點路口之見警時數」等過程指標替代。</li>
+    <li><b>115 年下半年資料到齊後重跑本附錄檢定。</b>屆時可完成 115 年全年之三項指標計算，
+      確認 114 年之惡化係一次性事件或趨勢起點。</li>
+  </ol>
+</section>
+
+<div class="foot">
+  <p><b>統計方法</b>　事故率比採卜瓦松分布條件二項精確檢定（conditional binomial exact test），
+  以各期族群人口為曝險量；占比結構變化採 2×2 卡方檢定並施以 Yates 連續性校正；
+  管制界限採 95%（±1.96σ）卜瓦松界限；分區趨勢採對數事故率對期序之計數加權最小平方迴歸，以 z 檢定斜率是否異於零。分區另涉三重比較，經 Bonferroni 校正顯著水準至 α = 0.0167，惟三區趨勢檢定於未校正之 α = 0.05 下即已全數不顯著。</p>
+  <p><b>資料來源</b>　警政署 EIS 事故調查表（新化分局轄區，112 年 1 月至 115 年 7 月）；
+  分局舉發案件資料庫（113 年 1 月起）；臺南市政府民政局各區人口三階段年齡統計。
+  舉發資料因系統建置時程，僅自 113 年起可用，故執法面對照未含 112 年。</p>
+  <p><b>統計口徑</b>　A1（死亡）＋A2（受傷）傷亡事故，已排除 A3 純財損事故。
+  高齡者定義為事故發生時年齡滿 65 歲之當事者；「高齡事故件數」係指至少 1 名高齡當事者之事故件數，
+  同一事故內有多名高齡者仍計為 1 件。</p>
+  <p><b>編製</b>　臺南市政府警察局新化分局交通組　·　本附錄為《高齡者交通事故分析報告（115 年上半年）》之專題附錄，
+  應併同主報告閱讀。</p>
+</div>
+
+</div>
+</body>
+</html>

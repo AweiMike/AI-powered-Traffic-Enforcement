@@ -17,7 +17,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.core import Crash, Ticket, Topic
+from app.models.core import Crash, CrashParty, Ticket, Topic
 from app.utils.data_health import run_batch_health_checks
 from app.utils.units import normalize_unit_name
 
@@ -214,6 +214,206 @@ def classify_age(age) -> Tuple[str, bool, bool]:
         return ("45-64", False, False)
     else:
         return ("65+", True, False)
+
+
+# ================================================================
+# 事故當事者層（core_crash_party）
+# ================================================================
+# ⚠️ 設計說明：core_crash 為案件層 rollup，年齡等欄位取自「代表當事者」。
+#    高齡者被撞時代表當事者是對造駕駛，高齡者即從統計消失（實測低估 54%）。
+#    本組 helper 將 EIS 的 per-當事者 row 完整落地，使族群判定改為 EXISTS。
+#    ⚠️ 個資紅線：姓名／身分證／電話／住址／車牌一律不落地。
+
+_ELDERLY_BAND_EDGES = ((70, "65-69"), (75, "70-74"), (80, "75-79"), (85, "80-84"))
+
+_VEHICLE_GROUP_RULES = (
+    ("機車", ("普通重型", "普通輕型", "大型重型")),
+    ("慢速載具", ("腳踏自行車", "微型電動二輪", "電動輔助自行車", "農耕", "個人行動運具")),
+)
+
+
+def _party_age_band(age: Optional[int]) -> Optional[str]:
+    """年齡分組：65 歲以上採 5 歲組（高齡分析需要），未滿 65 沿用粗分組"""
+    if age is None or age < 0:
+        return None
+    if age < 18:
+        return "<18"
+    if age < 65:
+        return "18-64"
+    for edge, label in _ELDERLY_BAND_EDGES:
+        if age < edge:
+            return label
+    return "85+"
+
+
+def _party_role(subtype: str, big_type: str) -> str:
+    """駕駛／乘客／行人。⚠️ 行人必須用子類別判定，大類別「人」含乘客（Wave 31 教訓）"""
+    if "行人" in subtype or "輔助代步器材" in subtype:
+        return "行人"
+    if "乘客" in subtype or "乘客" in big_type:
+        return "乘客"
+    return "駕駛"
+
+
+def _party_vehicle_group(subtype: str) -> str:
+    """車種歸群（與分析報告口徑一致）"""
+    sub = subtype or ""
+    for group, keys in _VEHICLE_GROUP_RULES:
+        if any(k in sub for k in keys):
+            return group
+    if "貨" in sub:
+        return "貨車"
+    if "自用" in sub:
+        return "小客車"
+    return "其他"
+
+
+def collect_crash_parties(df) -> Dict[str, list]:
+    """
+    從 EIS DataFrame 收集當事者層資料。
+
+    回傳 {case_id: [party_dict, ...]}；同一 (case_id, 順位) 只保留第一次出現
+    （跨半年檔重疊時由呼叫端以 case 為單位覆寫，仍保持冪等）。
+    """
+    parties: Dict[str, list] = {}
+    if df is None or len(df) == 0:
+        return parties
+
+    for _, row in df.iterrows():
+        case_id = None
+        for col_name in ["總編號(案件編號)", "總編號（案件編號）", "案件編號", "總編號"]:
+            if col_name in row.index and pd.notna(row.get(col_name)):
+                val = str(row.get(col_name)).strip()
+                if val:
+                    case_id = val
+                    break
+        if not case_id:
+            continue
+
+        order_raw = _safe_eis_str(row, "當事者順位").strip()
+        order_norm = order_raw.lstrip("0") or order_raw
+        try:
+            party_order = int(float(order_norm))
+        except (ValueError, TypeError):
+            party_order = None
+
+        bucket = parties.setdefault(case_id, [])
+        if any(p["party_order"] == party_order for p in bucket if party_order is not None):
+            continue  # 同案同順位重複列（跨檔重疊）
+
+        age_raw = _safe_eis_str(row, "當事者事故發生時年齡")
+        try:
+            age = int(float(age_raw))
+        except (ValueError, TypeError):
+            age = None
+        if age is not None and age < 0:      # EIS 以 -1 表示年齡未知
+            age = None
+        _, is_elderly, is_youth = classify_age(age)
+
+        subtype = _safe_eis_str(row, "26.當事者區分(類別)")
+        big_type = _safe_eis_str(row, "26.當事者區分(大類別)")
+        injury = _safe_eis_str(row, "22.受傷程度")
+        cause = _safe_eis_str(row, "34.初步分析研判子類別-個別")
+
+        bucket.append({
+            "case_id": case_id[:50],
+            "party_order": party_order,
+            "age": age,
+            "age_band": _party_age_band(age),
+            "gender": (_safe_eis_str(row, "17.當事者屬(性)別") or None),
+            "is_elderly": bool(is_elderly),
+            "is_youth": bool(is_youth),
+            "party_subtype": (subtype[:60] or None),
+            "role": _party_role(subtype, big_type),
+            "vehicle_group": _party_vehicle_group(subtype),
+            "license_status": (_safe_eis_str(row, "30.駕照狀態") or None),
+            "protective_gear": (_safe_eis_str(row, "24.保護裝備") or None),
+            "injury": (injury[:20] or None),
+            "is_death_24h": injury == "24小時內死亡",
+            "is_death_late": injury == "2-30日內死亡",
+            "is_injured": injury == "受傷",
+            "cause": (cause[:120] or None),
+            "is_primary": party_order == 1,
+            "no_fault": cause == "尚未發現肇事因素",
+        })
+
+    return parties
+
+
+def persist_crash_parties(db, parties_by_case: Dict[str, list]) -> int:
+    """以 case_id 為單位 delete-then-insert（冪等；重跑不會累加）"""
+    if not parties_by_case:
+        return 0
+    written = 0
+    case_ids = list(parties_by_case.keys())
+    for i in range(0, len(case_ids), 500):        # 分批避免 SQLite 參數上限
+        chunk = case_ids[i:i + 500]
+        db.query(CrashParty).filter(CrashParty.case_id.in_(chunk)).delete(
+            synchronize_session=False
+        )
+        for cid in chunk:
+            for p in parties_by_case[cid]:
+                db.add(CrashParty(**p))
+                written += 1
+        db.flush()
+    return written
+
+
+def recompute_party_rollups(db, case_ids: Optional[list] = None) -> Dict[str, int]:
+    """
+    以 core_crash_party 為唯一真實來源，重算 core_crash 的族群旗標與人數欄位。
+
+    ⚠️ 兩族群的口徑刻意不同，因為防制標的不同：
+
+    - **is_elderly＝任一當事者 ≥65 歲**（道安會報口徑）。高齡者被撞亦為防制標的
+      （實測 32.8% 為非主責、唯一死亡案即屬此類），故不限角色。
+      舊的代表當事者判定漏掉被撞的高齡者，低估 54%。
+    - **is_youth＝任一「青少年駕駛」**（不含乘客/行人）。青少年專區之目的為
+      騎乘者的執法與宣導；若比照高齡採「任一當事者」，會灌入 127 件僅有
+      兒童乘客（含 107 名 0-11 歲）的案件而扭曲該專區。限定駕駛後為 273 件
+      （舊 256 件，真實低估僅 +17）。
+      需要「青少年以任何身分涉入」時，直接查 core_crash_party。
+    """
+    where = ""
+    params: Dict[str, object] = {}
+    if case_ids:
+        marks = ",".join(f":c{i}" for i in range(len(case_ids)))
+        where = f" WHERE case_id IN ({marks})"
+        params = {f"c{i}": c for i, c in enumerate(case_ids)}
+
+    sql = f"""
+    UPDATE core_crash SET
+      is_elderly = COALESCE((SELECT MAX(p.is_elderly) FROM core_crash_party p
+                             WHERE p.case_id = core_crash.case_id), 0),
+      is_youth   = COALESCE((SELECT MAX(p.is_youth)   FROM core_crash_party p
+                             WHERE p.case_id = core_crash.case_id
+                               AND p.role = '駕駛'), 0),
+      elderly_party_count = COALESCE((SELECT COUNT(*) FROM core_crash_party p
+                             WHERE p.case_id = core_crash.case_id AND p.is_elderly = 1), 0),
+      elderly_death_count = COALESCE((SELECT COUNT(*) FROM core_crash_party p
+                             WHERE p.case_id = core_crash.case_id AND p.is_elderly = 1
+                               AND p.is_death_24h = 1), 0),
+      elderly_late_death_count = COALESCE((SELECT COUNT(*) FROM core_crash_party p
+                             WHERE p.case_id = core_crash.case_id AND p.is_elderly = 1
+                               AND p.is_death_late = 1), 0),
+      elderly_injury_count = COALESCE((SELECT COUNT(*) FROM core_crash_party p
+                             WHERE p.case_id = core_crash.case_id AND p.is_elderly = 1
+                               AND p.is_injured = 1), 0),
+      elderly_primary_count = COALESCE((SELECT COUNT(*) FROM core_crash_party p
+                             WHERE p.case_id = core_crash.case_id AND p.is_elderly = 1
+                               AND p.is_primary = 1), 0),
+      elderly_no_fault_count = COALESCE((SELECT COUNT(*) FROM core_crash_party p
+                             WHERE p.case_id = core_crash.case_id AND p.is_elderly = 1
+                               AND p.no_fault = 1), 0)
+    {where}
+    """
+    from sqlalchemy import text as _sql_text
+    db.execute(_sql_text(sql), params)
+    db.commit()
+
+    total = db.query(func.count(CrashParty.id)).scalar() or 0
+    eld = db.query(func.count(Crash.id)).filter(Crash.is_elderly.is_(True)).scalar() or 0
+    return {"party_rows": total, "elderly_cases": eld}
 
 
 def classify_evehicle(vehicle_type: str) -> Tuple[Optional[str], bool]:
@@ -1380,6 +1580,15 @@ async def import_crash_file(
 
         db.commit()
 
+        # 事故當事者層落地（Wave 32）：以 case 為單位 delete-then-insert，
+        # 再由當事者層重算 is_elderly / is_youth 與高齡人數欄位。
+        if data_format == "EIS":
+            _parties = collect_crash_parties(df)
+            if _parties:
+                persist_crash_parties(db, _parties)
+                db.commit()
+                recompute_party_rollups(db, list(_parties.keys()))
+
         # 取得統計
         total_crashes = db.query(Crash).count()
         severity_stats = {
@@ -1533,9 +1742,15 @@ def _do_batch_import(txt_files: list, db):
         db.query(func.count(Crash.id)).scalar() > 0
         and db.query(func.count(Crash.id)).filter(Crash.involves_pedestrian == True).scalar() == 0
     )
+    # 事故當事者層（Wave 32）回補哨兵：core_crash_party 全空但已有事故資料，
+    # 代表尚未落地當事者層，允許已匯入檔案重新進入流程補值；回補後非零，冪等不再重跑。
+    party_backfill_needed = (
+        db.query(func.count(Crash.id)).scalar() > 0
+        and db.query(func.count(CrashParty.id)).scalar() == 0
+    )
     needs_backfill = (
         needs_backfill_subunit or conflict_backfill_needed or clearance_backfill_needed
-        or pedestrian_backfill_needed
+        or pedestrian_backfill_needed or party_backfill_needed
     )
 
     for txt_path in txt_files:
@@ -1927,6 +2142,16 @@ def _do_batch_import(txt_files: list, db):
                         all_errors.append(f"[{fname}] 第 {idx + 2} 列: {str(e)}")
 
             db.commit()
+
+            # 事故當事者層落地（Wave 32）：以 case 為單位 delete-then-insert，
+            # 再由當事者層重算 is_elderly / is_youth 與高齡人數欄位。
+            if data_format == "EIS":
+                _parties = collect_crash_parties(df)
+                if _parties:
+                    persist_crash_parties(db, _parties)
+                    db.commit()
+                    recompute_party_rollups(db, list(_parties.keys()))
+
             total_stats["files"] += 1
             total_stats["total"] += stats["total"]
             total_stats["new"] += stats["new"]
@@ -2247,9 +2472,15 @@ async def import_crash_upload_batch(
         db.query(func.count(Crash.id)).scalar() > 0
         and db.query(func.count(Crash.id)).filter(Crash.involves_pedestrian == True).scalar() == 0
     )
+    # 事故當事者層（Wave 32）回補哨兵：core_crash_party 全空但已有事故資料，
+    # 代表尚未落地當事者層，允許已匯入檔案重新進入流程補值；回補後非零，冪等不再重跑。
+    party_backfill_needed = (
+        db.query(func.count(Crash.id)).scalar() > 0
+        and db.query(func.count(CrashParty.id)).scalar() == 0
+    )
     needs_backfill = (
         needs_backfill_subunit or conflict_backfill_needed or clearance_backfill_needed
-        or pedestrian_backfill_needed
+        or pedestrian_backfill_needed or party_backfill_needed
     )
 
     for file in files:
@@ -2720,6 +2951,16 @@ async def import_crash_upload_batch(
                         all_errors.append(f"[{file.filename}] 第 {idx + 2} 列: {str(e)}")
 
             db.commit()
+
+            # 事故當事者層落地（Wave 32）：以 case 為單位 delete-then-insert，
+            # 再由當事者層重算 is_elderly / is_youth 與高齡人數欄位。
+            if data_format == "EIS":
+                _parties = collect_crash_parties(df)
+                if _parties:
+                    persist_crash_parties(db, _parties)
+                    db.commit()
+                    recompute_party_rollups(db, list(_parties.keys()))
+
             total_stats["files"] += 1
             total_stats["total"] += stats["total"]
             total_stats["new"] += stats["new"]

@@ -2,6 +2,7 @@
 統計分析 API
 """
 
+import math
 import statistics
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -11,6 +12,7 @@ from datetime import datetime, timedelta
 
 from app.database import get_db
 from app.models.core import Ticket, Crash
+from app.models.dimension import Population
 from app.utils.epdo import epdo_sql_sum
 
 router = APIRouter()
@@ -990,4 +992,343 @@ async def get_clearance_efficiency(
         "by_route": by_route,
         "slow_cases": slow_cases,
         "note": "道路恢復效率統計（不提供各單位反應時間排名）",
+    }
+
+
+# ================================================================
+# 訊號／雜訊判讀（三項監測指標）
+# ================================================================
+# 動機：系統原本只顯示「較去年 ±N%」，不說那是真變化還是隨機波動。
+# 113 年高齡事故率 130.1 曾被寫成「四年最佳」並據以追問「當年做對什麼」，
+# 事後查核為統計假象：降幅 p=0.136 不顯著、非高齡同步下降、減少量 86% 來自
+# 兩個僅占 9.8% 量體的小區且隔年全數反彈。本組指標即為擋掉此類誤判而設。
+#
+# 判讀順序：
+#   1 過度代表倍數  該族群是否被「單獨」惡化（免疫於全般事故量變動）
+#   2 控制組差分比  變化可否歸因於針對性作為（2x2 卡方，不需人口分母）
+#   3 月別管制界限  是否已達趨勢認定門檻（單月破界不算）
+# 三者皆通過，才可對外宣稱防制成效。
+
+def _chi2_yates(a: int, b: int, c: int, d: int):
+    """2x2 卡方（Yates 連續性校正）→ (chi2, p)。任一邊際為 0 時回 (0.0, 1.0)"""
+    n = a + b + c + d
+    if min(a + b, c + d, a + c, b + d) == 0 or n == 0:
+        return 0.0, 1.0
+    num = max(abs(a * d - b * c) - n / 2, 0)
+    chi = n * num ** 2 / ((a + b) * (c + d) * (a + c) * (b + d))
+    return round(chi, 3), round(math.erfc(math.sqrt(chi / 2)), 4)
+
+
+def _poisson_limits(center: float):
+    """95% 卜瓦松管制界限（中心線 ±1.96√中心線）"""
+    if center <= 0:
+        return 0.0, 0.0
+    half = 1.96 * math.sqrt(center)
+    return round(max(0.0, center - half), 1), round(center + half, 1)
+
+
+def _population_for(db, ym: str):
+    """取某民國年月三區合計人口 → (總人口, 65歲以上)；查無回 (None, None)"""
+    row = db.query(
+        func.sum(Population.total_pop), func.sum(Population.elderly_pop)
+    ).filter(Population.year_month == ym).one()
+    return (row[0], row[1]) if row and row[0] else (None, None)
+
+
+def _roc_ym(d) -> str:
+    """西元日期 → 民國年月字串（115-06）"""
+    return "%03d-%02d" % (d.year - 1911, d.month)
+
+
+@router.get("/signal-check")
+async def signal_check(
+    topic: str = Query("elderly", description="主題：elderly/pedestrian/evehicle/dui/heavy"),
+    start_date: str = Query(..., description="本期起 YYYY-MM-DD"),
+    end_date: str = Query(..., description="本期迄 YYYY-MM-DD"),
+    baseline_start: Optional[str] = Query(None, description="基準期起；預設去年同期"),
+    baseline_end: Optional[str] = Query(None, description="基準期迄；預設去年同期"),
+    casualty_only: bool = Query(True, description="僅計 A1+A2 傷亡事故（長官指示口徑）"),
+    db: Session = Depends(get_db),
+):
+    """訊號／雜訊判讀：回答「這個增減是真的，還是隨機波動？」
+
+    基準期預設為「去年同期」且事前固定。請勿於看過數據後才挑基準期——
+    以序列極值當基準會系統性膨脹率比與顯著性（實測：以四年最低點為基準時
+    某區率比 3.76、p=0.012「顯著」，改用首期或四期趨勢檢定後 p=0.851／0.371 全不顯著）。
+    """
+    from app.api.recommendations import crash_topic_filter
+
+    try:
+        sd = datetime.strptime(start_date, "%Y-%m-%d").date()
+        ed = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="日期格式錯誤，需 YYYY-MM-DD")
+
+    if baseline_start and baseline_end:
+        try:
+            bs = datetime.strptime(baseline_start, "%Y-%m-%d").date()
+            be = datetime.strptime(baseline_end, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="基準期日期格式錯誤")
+        baseline_note = "使用者指定"
+    else:
+        bs, be = sd.replace(year=sd.year - 1), ed.replace(year=ed.year - 1)
+        baseline_note = "去年同期（預設，事前固定）"
+
+    cond = crash_topic_filter(topic)
+    if cond is None:
+        raise HTTPException(status_code=400, detail="未知主題：%s" % topic)
+
+    def _count(s, e, topic_side: bool):
+        q = db.query(func.count(Crash.id)).filter(
+            Crash.occurred_date >= s, Crash.occurred_date <= e
+        )
+        if casualty_only:
+            q = q.filter(Crash.severity.in_(("A1", "A2")))
+        return q.filter(cond if topic_side else ~cond).scalar() or 0
+
+    t_now, t_base = _count(sd, ed, True), _count(bs, be, True)
+    o_now, o_base = _count(sd, ed, False), _count(bs, be, False)
+
+    # ---- 指標2：控制組差分比（2x2 卡方，不需人口分母）----
+    chi2, p_share = _chi2_yates(t_base, o_base, t_now, o_now)
+    share_base = t_base / (t_base + o_base) if (t_base + o_base) else 0
+    share_now = t_now / (t_now + o_now) if (t_now + o_now) else 0
+    t_ratio = (t_now / t_base) if t_base else None
+    o_ratio = (o_now / o_base) if o_base else None
+    diff_ratio = round(t_ratio / o_ratio, 3) if (t_ratio and o_ratio) else None
+    if diff_ratio is None:
+        verdict2 = "資料不足"
+    elif diff_ratio <= 0.85:
+        verdict2 = "該族群確有額外改善"
+    elif diff_ratio >= 1.30:
+        verdict2 = "該族群被單獨惡化，應立即檢討"
+    else:
+        verdict2 = "與全般同步，不可歸功於針對性作為"
+
+    # ---- 指標1：過度代表倍數（需人口分母；目前僅高齡有分母）----
+    pop_now = _population_for(db, _roc_ym(ed))
+    pop_base = _population_for(db, _roc_ym(be))
+    data_through = db.query(func.max(Population.year_month)).scalar()
+
+    def _over_rep(cnt_topic, cnt_other, pop):
+        total_pop, eld_pop = pop
+        if topic != "elderly" or not total_pop or not eld_pop:
+            return None
+        cases = cnt_topic + cnt_other
+        if not cases:
+            return None
+        return round((cnt_topic / cases) / (eld_pop / total_pop), 2)
+
+    over_now = _over_rep(t_now, o_now, pop_now)
+    over_base = _over_rep(t_base, o_base, pop_base)
+    ind1 = {
+        "supported": over_now is not None,
+        "now": over_now,
+        "baseline": over_base,
+        "alert_threshold": 1.80,
+        "normal_band": [1.50, 1.60],
+        "status": (("alert" if over_now >= 1.80 else "normal") if over_now else None),
+        "population_data_through": data_through,
+        "note": (None if over_now is not None
+                 else "僅 elderly 主題支援（公開人口資料僅有 65 歲以上單一級距）"),
+    }
+
+    # ---- 指標3：月別卜瓦松管制界限（前三年同月平均為中心線）----
+    def _month_count(year: int, month: int) -> int:
+        q = db.query(func.count(Crash.id)).filter(
+            cond,
+            extract("year", Crash.occurred_date) == year,
+            extract("month", Crash.occurred_date) == month,
+        )
+        if casualty_only:
+            q = q.filter(Crash.severity.in_(("A1", "A2")))
+        return q.scalar() or 0
+
+    def _has_coverage(year: int, month: int) -> bool:
+        """該年月是否有任何事故資料（不分主題）。
+
+        ⚠️ 必須排除無資料的年份：資料庫自 112 年起，若回推三年時把 111/110 年
+        當成 0 件納入平均，中心線會被拉垮，導致實績全部假性「突破上界」——
+        實測 113H1 曾算出管制帶 4.0–16.6 而六個月全部誤判為 ▲。
+        """
+        return (db.query(func.count(Crash.id)).filter(
+            extract("year", Crash.occurred_date) == year,
+            extract("month", Crash.occurred_date) == month,
+        ).scalar() or 0) > 0
+
+    months = []
+    consec_below = 0
+    max_consec_below = 0
+    insufficient_baseline = False
+    for m in range(sd.month, ed.month + 1):
+        valid_years = [sd.year - b for b in (1, 2, 3) if _has_coverage(sd.year - b, m)]
+        actual = _month_count(sd.year, m)
+        if len(valid_years) < 2:
+            # 基準年不足 2 年，管制界限無統計意義，誠實回 null 不硬算
+            insufficient_baseline = True
+            consec_below = 0
+            months.append({"month": m, "center": None, "lcl": None, "ucl": None,
+                           "actual": actual, "breach": None,
+                           "baseline_years": len(valid_years)})
+            continue
+        hist = [_month_count(y, m) for y in valid_years]
+        center = round(sum(hist) / len(hist), 1)
+        lcl, ucl = _poisson_limits(center)
+        breach = "below" if actual < lcl else ("above" if actual > ucl else None)
+        if breach == "below":
+            consec_below += 1
+            max_consec_below = max(max_consec_below, consec_below)
+        else:
+            consec_below = 0
+        months.append({
+            "month": m, "center": center, "lcl": lcl, "ucl": ucl,
+            "actual": actual, "breach": breach,
+            "baseline_years": len(valid_years),
+        })
+
+    if insufficient_baseline and all(x["center"] is None for x in months):
+        verdict3 = "基準年資料不足（需至少 2 個同月歷史年），無法建立管制界限"
+    elif max_consec_below >= 3:
+        verdict3 = "連續 3 個月低於下界，達趨勢認定門檻"
+    elif any(x["breach"] == "above" for x in months):
+        verdict3 = "有月份突破上界，需注意"
+    elif max_consec_below > 0:
+        verdict3 = "最多連續 %d 個月低於下界，未達門檻（需連 3 月）" % max_consec_below
+    else:
+        verdict3 = "全數位於管制帶內，尚無趨勢性變化"
+
+    ind1_ok = (ind1["status"] != "alert") if ind1["supported"] else True
+    ind2_ok = diff_ratio is not None and diff_ratio <= 0.85
+    ind3_ok = (max_consec_below >= 3) and not insufficient_baseline
+    can_claim = ind1_ok and ind2_ok and ind3_ok
+
+    return {
+        "topic": topic,
+        "casualty_only": casualty_only,
+        "period": {"start": start_date, "end": end_date},
+        "baseline": {"start": bs.isoformat(), "end": be.isoformat(), "note": baseline_note},
+        "counts": {
+            "topic_now": t_now, "topic_baseline": t_base,
+            "other_now": o_now, "other_baseline": o_base,
+            "topic_share_now": round(share_now * 100, 1),
+            "topic_share_baseline": round(share_base * 100, 1),
+        },
+        "indicator_1_over_representation": ind1,
+        "indicator_2_control_diff": {
+            "topic_ratio": round(t_ratio, 3) if t_ratio else None,
+            "other_ratio": round(o_ratio, 3) if o_ratio else None,
+            "diff_ratio": diff_ratio,
+            "chi2": chi2,
+            "p_value": p_share,
+            "significant": p_share < 0.05,
+            "verdict": verdict2,
+        },
+        "indicator_3_control_limits": {
+            "months": months,
+            "max_consecutive_below": max_consec_below,
+            "insufficient_baseline": insufficient_baseline,
+            "verdict": verdict3,
+        },
+        "can_claim_effectiveness": can_claim,
+        "summary": ("三項指標皆通過，可對外宣稱防制成效" if can_claim
+                    else "未達宣稱成效之門檻——變化尚無法與隨機波動區分"),
+    }
+
+
+@router.get("/enforcement-gap-ratio")
+async def enforcement_gap_ratio(
+    topic: str = Query("elderly", description="主題：elderly/youth/dui/evehicle"),
+    start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    casualty_only: bool = Query(True, description="事故側僅計 A1+A2 傷亡事故"),
+    db: Session = Depends(get_db),
+):
+    """執法落差倍數：該族群占事故的比重 ÷ 占舉發的比重。
+
+    與 Wave 29 的「執法錯位引擎」互補——那個比的是**空間**（事故熱區 vs 取締熱區），
+    這個比的是**對象**（誰在肇事 vs 誰在被取締）。
+
+    實例：高齡者占 115H1 傷亡事故 36.7%，卻只占舉發 4.2%，落差 8.7 倍。
+    ⚠️ 倍數高不等於「應該多開單」——需併看該族群是否多為非肇責方
+    （高齡者 32.8% 為非主責，唯一死亡案即屬此類），此時防制對象應是其他用路人。
+    """
+    from app.api.recommendations import crash_topic_filter
+
+    try:
+        sd = datetime.strptime(start_date, "%Y-%m-%d").date()
+        ed = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="日期格式錯誤，需 YYYY-MM-DD")
+
+    crash_cond = crash_topic_filter(topic)
+    if crash_cond is None:
+        raise HTTPException(status_code=400, detail="未知主題：%s" % topic)
+
+    TICKET_COND = {
+        "elderly": Ticket.is_elderly == True,
+        "youth": Ticket.is_youth == True,
+        "dui": Ticket.topic_dui == True,
+        "evehicle": Ticket.evehicle_type.isnot(None),
+    }
+    ticket_cond = TICKET_COND.get(topic)
+    if ticket_cond is None:
+        return {
+            "topic": topic,
+            "supported": False,
+            "note": "此主題無對應之舉發側欄位（如行人、大型車），無法計算對象落差",
+        }
+
+    cq = db.query(func.count(Crash.id)).filter(
+        Crash.occurred_date >= sd, Crash.occurred_date <= ed
+    )
+    if casualty_only:
+        cq = cq.filter(Crash.severity.in_(("A1", "A2")))
+    crash_total = cq.scalar() or 0
+    crash_topic = cq.filter(crash_cond).scalar() or 0
+
+    tq = db.query(func.count(Ticket.id)).filter(
+        Ticket.violation_date >= sd, Ticket.violation_date <= ed
+    )
+    ticket_total = tq.scalar() or 0
+    ticket_topic = tq.filter(ticket_cond).scalar() or 0
+
+    crash_share = (crash_topic / crash_total * 100) if crash_total else 0.0
+    ticket_share = (ticket_topic / ticket_total * 100) if ticket_total else 0.0
+    gap_ratio = round(crash_share / ticket_share, 1) if ticket_share else None
+
+    if gap_ratio is None:
+        verdict = "舉發側無該族群資料，無法判讀"
+    elif gap_ratio >= 5:
+        verdict = "執法對象與事故對象嚴重錯位，建議檢討專項"
+    elif gap_ratio >= 2:
+        verdict = "存在對象落差，值得檢視"
+    elif gap_ratio >= 0.5:
+        verdict = "事故與舉發之對象結構相當"
+    else:
+        verdict = "舉發相對集中於該族群，高於其事故占比"
+
+    # 肇事後補單比例：舉發子類型含「肇事」者，反映是否為被動執法
+    post_crash = None
+    if ticket_topic:
+        pc = db.query(func.count(Ticket.id)).filter(
+            Ticket.violation_date >= sd, Ticket.violation_date <= ed,
+            ticket_cond, Ticket.enforcement_subtype.like("%肇事%"),
+        ).scalar() or 0
+        post_crash = round(pc / ticket_topic * 100, 1)
+
+    return {
+        "topic": topic,
+        "supported": True,
+        "casualty_only": casualty_only,
+        "period": {"start": start_date, "end": end_date},
+        "crash": {"topic": crash_topic, "total": crash_total,
+                  "share_pct": round(crash_share, 1)},
+        "ticket": {"topic": ticket_topic, "total": ticket_total,
+                   "share_pct": round(ticket_share, 1),
+                   "post_crash_pct": post_crash},
+        "gap_ratio": gap_ratio,
+        "verdict": verdict,
+        "caveat": ("倍數高不等於應多開單：須併看該族群是否多為非肇責方，"
+                   "若是則防制對象應為其他用路人（可查 /recommendations/profile 之責任結構）"),
     }

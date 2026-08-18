@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>高齡者交通事故分析報告（傷亡口徑）— 臺南市政府警察局新化分局 115年上半年</title>
+<style>
+:root{
+  --ink:#0b1220; --ink-2:#475569; --ink-3:#7c8798;
+  --navy:#0f172a; --navy-2:#1e293b; --accent:#0369a1;
+  --surface:#ffffff; --page:#f1f5f9; --panel:#f8fafc;
+  --line:#e2e8f0; --line-2:#cbd5e1;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --critical:#d03b3b; --warning:#fab219; --good:#0ca30c; --serious:#ec835a;
+  --grid:#e8ecf1;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0; background:var(--page); color:var(--ink);
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:15px; line-height:1.75; letter-spacing:.01em;}
+.wrap{max-width:1180px; margin:0 auto; padding:0 20px 80px}
+
+.masthead{background:linear-gradient(135deg,#0f172a 0%,#152a43 55%,#1e3a5f 100%);
+  color:#fff; padding:44px 0 38px; margin-bottom:32px; border-bottom:4px solid var(--accent);}
+.masthead .wrap{padding-bottom:0}
+.mh-org{font-size:14px; letter-spacing:.22em; color:#93c5fd; margin-bottom:14px; font-weight:500}
+.mh-title{font-size:34px; font-weight:800; letter-spacing:-.01em; line-height:1.3; margin:0 0 8px}
+.mh-badge{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+  color:#e0f2fe; font-size:13px; font-weight:600; padding:3px 12px; border-radius:99px; margin-bottom:12px}
+.mh-sub{font-size:16px; color:#cbd5e1; font-weight:400}
+.mh-meta{margin-top:26px; padding-top:18px; border-top:1px solid rgba(255,255,255,.16);
+  display:flex; flex-wrap:wrap; gap:26px 44px; font-size:13.5px; color:#cbd5e1;}
+.mh-meta b{color:#fff; font-weight:600}
+
+section{margin-bottom:38px}
+h2{font-size:21px; font-weight:700; color:var(--navy); margin:0 0 6px;
+  padding-bottom:11px; border-bottom:2px solid var(--navy); letter-spacing:.01em;}
+h2 .en{font-size:12px; color:var(--ink-3); font-weight:400; letter-spacing:.08em; margin-left:10px}
+h3{font-size:16.5px; font-weight:700; color:var(--navy-2); margin:26px 0 10px}
+h3::before{content:"▍"; color:var(--accent); margin-right:6px}
+p{margin:0 0 12px}
+.lead{color:var(--ink-2); font-size:14.5px; margin-bottom:18px}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  padding:22px 24px; margin:16px 0; box-shadow:0 1px 2px rgba(15,23,42,.04);}
+
+.tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(178px,1fr)); gap:14px; margin:20px 0 8px}
+.tile{background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  padding:18px 18px 16px; position:relative; overflow:hidden;}
+.tile::before{content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--s1)}
+.tile.warn::before{background:var(--critical)} .tile.ok::before{background:var(--good)}
+.tile.amber::before{background:var(--warning)}
+.tile .k{font-size:12.5px; color:var(--ink-2); font-weight:600; margin-bottom:8px; letter-spacing:.02em}
+.tile .v{font-size:30px; font-weight:800; line-height:1.05; color:var(--navy); letter-spacing:-.02em}
+.tile .v small{font-size:15px; font-weight:600; color:var(--ink-2); margin-left:3px}
+.tile .n{font-size:12px; color:var(--ink-3); margin-top:7px; line-height:1.5}
+
+.key{background:#fff7ed; border:1px solid #fed7aa; border-left:4px solid var(--s2);
+  border-radius:10px; padding:16px 20px; margin:16px 0;}
+.key.red{background:#fef2f2; border-color:#fecaca; border-left-color:var(--critical)}
+.key.blue{background:#eff6ff; border-color:#bfdbfe; border-left-color:var(--s1)}
+.key.green{background:#f0fdf4; border-color:#bbf7d0; border-left-color:var(--good)}
+.key .t{font-weight:700; color:var(--navy); margin-bottom:6px; font-size:15px}
+.key p{margin:0; font-size:14px; color:var(--ink-2); line-height:1.7}
+.key p+p{margin-top:8px}
+
+table{width:100%; border-collapse:collapse; font-size:13.5px; margin:12px 0}
+thead th{background:var(--navy); color:#fff; font-weight:600; text-align:left;
+  padding:10px 12px; font-size:12.5px; letter-spacing:.03em; white-space:nowrap;}
+tbody td{padding:9px 12px; border-bottom:1px solid var(--line)}
+tbody tr:nth-child(even){background:var(--panel)}
+tbody tr:hover{background:#eef4fb}
+td.num,th.num{text-align:right; font-variant-numeric:tabular-nums}
+.rank{display:inline-flex; width:22px; height:22px; align-items:center; justify-content:center;
+  background:var(--navy); color:#fff; border-radius:6px; font-size:11.5px; font-weight:700}
+.rank.g{background:#b8860b} .rank.s{background:#71797e} .rank.b{background:#8b5a2b}
+.tag{display:inline-block; padding:1px 8px; border-radius:99px; font-size:11.5px; font-weight:600; white-space:nowrap}
+.tag.red{background:#fee2e2; color:#991b1b} .tag.amber{background:#fef3c7; color:#92400e}
+.tag.blue{background:#dbeafe; color:#1e40af} .tag.gray{background:#e2e8f0; color:#475569}
+.tag.green{background:#dcfce7; color:#166534}
+.tag.note{white-space:normal; display:inline; padding:2px 8px; line-height:1.7}
+/* 建議區塊內之標籤多為長句說明，一律允許換行（表格內短標籤仍維持 nowrap） */
+.rec-b .tag{white-space:normal; display:inline; padding:2px 8px; line-height:1.7}
+
+.chart{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:20px 22px 14px; margin:16px 0}
+.chart .ct{font-size:15px; font-weight:700; color:var(--navy); margin-bottom:2px}
+.chart .cs{font-size:12.5px; color:var(--ink-3); margin-bottom:14px}
+.legend{display:flex; gap:20px; flex-wrap:wrap; margin:4px 0 12px; font-size:12.5px; color:var(--ink-2)}
+.legend i{display:inline-block; width:11px; height:11px; border-radius:3px; margin-right:6px; vertical-align:-1px}
+svg{display:block; width:100%; height:auto; overflow:visible}
+.g2{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+.g2>*{min-width:0}
+@media (max-width:860px){.g2{grid-template-columns:1fr}}
+@media (max-width:900px){
+  table{display:block; overflow-x:auto; -webkit-overflow-scrolling:touch}
+  thead th,tbody td{white-space:nowrap}
+}
+
+.rec{border:1px solid var(--line); border-radius:12px; overflow:hidden; margin:14px 0; background:var(--surface)}
+.rec-h{padding:13px 18px; background:var(--panel); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.rec-h .n{font-size:15px; font-weight:700; color:var(--navy)}
+.rec-b{padding:15px 18px; font-size:14px; color:var(--ink-2); line-height:1.75}
+.rec-b .row{display:flex; gap:10px; margin-bottom:9px}
+.rec-b .row:last-child{margin-bottom:0}
+.rec-b .lab{flex:0 0 76px; font-weight:600; color:var(--navy-2); font-size:13px}
+.rec-b .val{flex:1}
+.src{font-size:12px; color:var(--ink-3); word-break:break-all}
+
+.foot{margin-top:44px; padding-top:20px; border-top:2px solid var(--navy); font-size:12.5px; color:var(--ink-3); line-height:1.9}
+.foot b{color:var(--ink-2)}
+ul.tight{margin:6px 0 12px; padding-left:22px} ul.tight li{margin-bottom:5px; font-size:14px; color:var(--ink-2)}
+ol.tight{margin:6px 0 12px; padding-left:22px} ol.tight li{margin-bottom:7px; font-size:14px; color:var(--ink-2)}
+
+@media print{
+  body{background:#fff; font-size:10.5pt}
+  .wrap{max-width:none; padding:0}
+  /* ⚠ A4 列印寬度約 794px，會誤觸發 max-width:900px 之窄螢幕表格內捲規則，
+     導致右側欄位被裁切；此處強制還原為正常表格並允許換行 */
+  table{display:table !important; overflow:visible !important; width:100% !important;
+        table-layout:fixed; font-size:9.5pt}
+  thead th, tbody td{white-space:normal !important; word-break:break-word; padding:5px 6px}
+  .tag{white-space:normal}
+  svg{max-width:100%}
+  .masthead{padding:20px 0 16px; margin-bottom:18px; background:var(--navy) !important}
+  .mh-title{font-size:22pt}
+  section{page-break-inside:auto; margin-bottom:20px}
+  h2,h3{page-break-after:avoid}
+  .card,.chart,.rec,.key,.tile{page-break-inside:avoid; box-shadow:none}
+  table{page-break-inside:auto} tr{page-break-inside:avoid}
+  thead{display:table-header-group}
+  .page-break{page-break-before:always}
+  *{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+}
+@page{size:A4; margin:14mm 12mm}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="mh-org">臺南市政府警察局新化分局　交通組</div>
+    <div class="mh-badge">傷亡事故口徑（A1＋A2）｜已排除 A3 純財損事故</div>
+    <h1 class="mh-title">高齡者交通事故分析報告</h1>
+    <div class="mh-sub">事故與執法綜合研判　·　責任歸屬、易肇事路口、時段、肇因、車種與年齡分層剖析</div>
+    <div class="mh-meta">
+      <div><b>分析期間</b>　中華民國 115 年 1 月 1 日至 6 月 30 日（趨勢分析回溯至 112 年）</div>
+      <div><b>統計口徑</b>　A1（死亡）＋A2（受傷）傷亡事故</div>
+      <div><b>資料來源</b>　警政署 EIS 事故調查表 · 舉發案件資料庫</div>
+      <div><b>分析範圍</b>　新化分局轄區（新化、山上、左鎮區）</div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- ============ 執行摘要 ============ -->
+<section id="summary">
+  <h2>執行摘要 <span class="en">EXECUTIVE SUMMARY</span></h2>
+  <p class="lead">依長官指示，本報告以<strong>傷亡事故（A1＋A2）</strong>為統計口徑，排除 A3 純財損事故。本期轄內共發生傷亡事故 <strong>540 件</strong>，其中<strong>涉及 65 歲以上高齡者計 198 件，占 36.7%</strong>。</p>
+
+  <div class="tiles">
+    <div class="tile"><div class="k">高齡者傷亡事故</div><div class="v">198<small>件</small></div><div class="n">占全般傷亡事故（540 件）36.7%</div></div>
+    <div class="tile ok"><div class="k">A1 死亡事故</div><div class="v">1<small>件</small></div><div class="n">去年同期 4 件，↓75%</div></div>
+    <div class="tile warn"><div class="k">高齡者受傷含死亡</div><div class="v">154<small>人</small></div><div class="n">占有傷勢記載高齡當事者（219 人）70.3%</div></div>
+    <div class="tile warn"><div class="k">75–79 歲受傷率</div><div class="v">100<small>%</small></div><div class="n">捲入傷亡事故之該齡者 26 人全數受傷</div></div>
+    <div class="tile amber"><div class="k">高齡者無肇事責任</div><div class="v">42<small>人</small></div><div class="n">占高齡當事者（220 人）19.1%</div></div>
+    <div class="tile amber"><div class="k">執法投入落差</div><div class="v">8.7<small>倍</small></div><div class="n">事故占比 36.7% vs 舉發占比 4.2%</div></div>
+    <div class="tile ok"><div class="k">高齡事故率（每萬高齡人口）</div><div class="v">157.5</div><div class="n">去年 160.5，<b>率降 1.9%</b>；同期全般事故率升 16.6%</div></div>
+    <div class="tile warn"><div class="k">新化區超額風險</div><div class="v">1.70<small>倍</small></div><div class="n">高齡事故占比 38.5% vs 人口占比 22.6%</div></div>
+  </div>
+
+  <div class="key green">
+    <div class="t">核心研判一｜高齡事故增幅遠低於全般，占比實質下降；死亡風險大幅改善</div>
+    <p>本期全般傷亡事故 540 件，較去年同期 466 件<strong>大增 74 件（＋15.9%）</strong>；同期高齡者傷亡事故 198 件，僅較去年 194 件<strong>微增 4 件（＋2.1%）</strong>。<strong>高齡者占全般傷亡事故之比例自 41.6% 降至 36.7%（－4.9 個百分點）</strong>。</p>
+    <p>死亡面向：A1 事故自 4 件降為 1 件、死亡人數自 5 人降為 1 人（<strong>↓80%</strong>）。<b>惟高齡者受傷人數仍自 234 人增至 262 人（＋12.0%）、EPDO 傷害能量增 4.2%，絕對風險尚未下降。</b></p>
+    <p><b>介接政府人口資料後之進一步佐證：</b>轄內高齡人口一年增加 489 人（＋4.0%），<strong>換算「每萬名高齡人口事故率」自 160.5 降為 157.5（−1.9%）</strong>；同期全般事故率則自 88.0 升至 102.6（<strong>＋16.6%</strong>）。<b>在全般風險密度大增之背景下，高齡族群風險密度逆勢下降</b>（詳肆章）。</p>
+  </div>
+
+  <div class="key red">
+    <div class="t">核心研判二｜高齡者以「駕駛人」身分涉入為壓倒性主體，且以機車為主要載具</div>
+    <p>高齡當事者 220 人中，以<strong>駕駛人身分涉入者 206 人（93.6%）</strong>，行人僅 6 人（2.7%）、乘客 8 人。就車種，<strong>機車 126 人（61.2%）</strong>為絕對主流，遠高於小客車 53 人（25.7%）；<strong>機車與慢速載具（自行車、微電車、電輔車、農機）合計 152 人，占高齡駕駛 73.8%</strong>。</p>
+    <p>在傷亡口徑下此特徵更為凸顯——A3 財損事故多為汽車碰撞，一旦排除，<strong>「高齡機車騎士」即為本轄傷亡事故之核心風險族群</strong>。</p>
+  </div>
+
+  <div class="key red">
+    <div class="t">核心研判三｜約三分之一事故中高齡者非肇責方，且<u>唯一死亡案件即屬此類</u></div>
+    <p>依當事者順位與個別肇因研判：高齡者為第一當事者（主責）<strong>114 件（57.6%）</strong>、皆非第一當事者<strong>65 件（32.8%）</strong>、同案兼有 19 件（9.6%）；其中<strong>明確無責之受害案件 28 件（14.1%）</strong>。人員層級有 <strong>42 名（19.1%）高齡當事者完全無肇事責任，其中 34 人受傷（81.0%）</strong>。</p>
+    <p><strong>114 件高齡者主責案件中無任何死亡事故；本期唯一 A1 死亡案，高齡者為非第一當事者。</strong>撞擊無責高齡者之對造逾三分之二為 18–64 歲青壯年，肇因以分心駕駛與未保持行車安全距離為主。<b>此部分風險無法透過高齡者教育或駕照管制防制。</b>（詳柒章）</p>
+  </div>
+
+  <div class="key blue">
+    <div class="t">核心研判四｜高齡事故為「上午型」，與現行勤務時段配置存在落差</div>
+    <p>高齡傷亡事故 <strong>06–11 時計 111 件（56.1%）</strong>，以 07 時 25 件為單一高峰；夜間（20–05 時）僅 8 件（4.0%）。全般傷亡事故則呈雙峰型（07 時 71 件、16–18 時 137 件占 25.4%）。護老勤務應據此配置於上午時段。</p>
+  </div>
+</section>
+
+<!-- ============ 壹、口徑 ============ -->
+<section id="method">
+  <h2>壹、分析概述與口徑說明 <span class="en">SCOPE &amp; DEFINITIONS</span></h2>
+  <div class="card">
+    <h3 style="margin-top:0">統計口徑（本次調整）</h3>
+    <div class="key blue" style="margin-top:8px">
+      <div class="t">⚑ 依長官指示：僅統計 A1＋A2 傷亡事故，排除 A3 純財損事故</div>
+      <p>本報告全部統計（含件數、人數、熱點、肇因、責任歸屬、EPDO）<strong>均已排除 A3 財損事故</strong>。此口徑與機關道安會報之檢討慣例一致——A1（死亡）與 A2（受傷）為人員傷亡事故，係防制核心；A3 為純財損，僅作參考。</p>
+      <p>口徑調整之影響：轄內同期高齡者事故總數由 296 件（含 A3）縮減為 <strong>198 件</strong>；高齡當事者由 324 人縮減為 <strong>220 人</strong>。<b>本報告數據不可與含 A3 之統計直接比較。</b></p>
+    </div>
+
+    <h3>資料來源</h3>
+    <ul class="tight">
+      <li><b>事故資料</b>：警政署 EIS 交通事故調查表（全選條件匯出），115 年 1–6 月傷亡事故 540 件。</li>
+      <li><b>人口資料</b>：臺南市政府民政局「各區人口數按三階段年齡百分比分及其扶養比」（115 年 6 月底／114 年 6 月底），供計算各區高齡事故率之分母。<span class="tag gray">政府公開資料，免申請下載</span></li>
+      <li><b>執法資料</b>：分局舉發案件資料庫同期資料 7,933 件（舉發資料無嚴重度屬性，維持全量，比較時另予說明）。</li>
+      <li><b>比較基期</b>：114 年 1–6 月傷亡事故 466 件。</li>
+      <li><b>趨勢分析期間</b>：資料庫涵蓋 112 年 1 月起。趨勢章節以各年 1–6 月對照（112–115 共四期）確保期間長度一致，並另列 112–114 年完整年度趨勢；115 年因僅有上半年資料，未納入全年比較。各年人口分母取該期末月份（上半年取 6 月底、全年取 12 月底）。</li>
+    </ul>
+
+    <h3>高齡者事故之認定</h3>
+    <p style="font-size:14px">採<strong>「涉及高齡者」口徑</strong>：事故當事者中<strong>任一人年齡達 65 歲以上</strong>者，該案即計入，與交通部道安會報統計一致。</p>
+    <div class="key" style="margin-top:10px">
+      <div class="t">與儀表板系統畫面之差異提醒</div>
+      <p>儀表板「高齡者專區」採<strong>代表當事者</strong>口徑（每案僅取一名代表駕駛判定年齡），會漏計高齡者非代表當事者之案件（如高齡者遭撞）。本報告採當事者全查之完整口徑，<strong>數字高於系統畫面屬正常</strong>，建議後續校正系統口徑。</p>
+    </div>
+
+    <h3>嚴重度與傷害能量</h3>
+    <p style="font-size:14px">死亡採 24 小時內死亡口徑（2–30 日死亡另計，本期高齡者為 0 人）。EPDO 採道安標準公式：<span style="font-family:ui-monospace,monospace;font-size:13px;background:var(--panel);padding:1px 6px;border-radius:4px">30 日內死亡 × 9.5 ＋ 受傷 × 3.5 ＋ 案件數</span>。</p>
+  </div>
+</section>
+
+<!-- ============ 貳、整體態勢 ============ -->
+<section id="overview">
+  <h2>貳、多年趨勢與整體態勢 <span class="en">MULTI-YEAR TREND</span></h2>
+
+  <h3>四年上半年趨勢（112–115 年，同期可比）</h3>
+  <p class="lead">資料庫涵蓋 112 年 1 月起。因 115 年僅有上半年資料，以下先以<strong>各年 1–6 月</strong>對照，確保期間長度一致；全年趨勢另列於後。</p>
+
+  <table>
+    <thead>
+      <tr><th>指標（傷亡口徑）</th><th class="num">112 年 1–6 月</th><th class="num">113 年 1–6 月</th><th class="num">114 年 1–6 月</th><th class="num">115 年 1–6 月</th><th>趨勢研判</th></tr>
+    </thead>
+    <tbody>
+      <tr style="background:#f1f5f9"><td><b>全般傷亡事故</b></td><td class="num">521</td><td class="num">463</td><td class="num">466</td>
+        <td class="num" style="color:var(--critical);font-weight:800">540</td><td><span class="tag red">四年新高</span></td></tr>
+      <tr><td><b>高齡者傷亡事故</b></td><td class="num">175</td><td class="num">153</td><td class="num">194</td>
+        <td class="num" style="color:var(--serious);font-weight:700">198</td><td><span class="tag amber">四年新高</span></td></tr>
+      <tr><td>高齡者占全般比</td><td class="num">33.6%</td><td class="num">33.0%</td><td class="num" style="color:var(--critical)">41.6%</td>
+        <td class="num">36.7%</td><td><span class="tag green">自 114 高點回落</span></td></tr>
+      <tr style="background:var(--panel)"><td>高齡人口（三區合計）</td><td class="num">11,359</td><td class="num">11,758</td><td class="num">12,085</td>
+        <td class="num"><b>12,574</b></td><td><span class="tag gray">四年增 10.7%</span></td></tr>
+      <tr style="background:var(--panel)"><td>高齡人口占比</td><td class="num">21.08%</td><td class="num">21.91%</td><td class="num">22.81%</td>
+        <td class="num"><b>23.89%</b></td><td><span class="tag gray">逐年攀升 +2.81pp</span></td></tr>
+      <tr><td><b>高齡事故率</b>（每萬高齡人口）</td><td class="num">154.1</td><td class="num" style="color:var(--good)">130.1</td>
+        <td class="num" style="color:var(--critical);font-weight:700">160.5</td><td class="num">157.5</td><td><span class="tag amber">高點微降</span></td></tr>
+      <tr><td>全般事故率（每萬人）</td><td class="num">96.7</td><td class="num">86.3</td><td class="num">88.0</td>
+        <td class="num" style="color:var(--critical);font-weight:800">102.6</td><td><span class="tag red">四年新高</span></td></tr>
+      <tr><td>過度代表倍數</td><td class="num">1.59</td><td class="num">1.51</td><td class="num" style="color:var(--critical);font-weight:700">1.83</td>
+        <td class="num" style="color:var(--good)">1.53</td><td><span class="tag green">明顯改善</span></td></tr>
+      <tr><td>A1 死亡事故</td><td class="num">1</td><td class="num">3</td><td class="num" style="color:var(--critical)">4</td>
+        <td class="num" style="color:var(--good);font-weight:700">1</td><td><span class="tag green">回到最低</span></td></tr>
+      <tr><td>死亡人數（24hr）</td><td class="num">1</td><td class="num">3</td><td class="num" style="color:var(--critical);font-weight:700">5</td>
+        <td class="num" style="color:var(--good);font-weight:700">1</td><td><span class="tag green">↓80%</span></td></tr>
+      <tr><td>受傷人數</td><td class="num">234</td><td class="num">206</td><td class="num">234</td>
+        <td class="num" style="color:var(--critical);font-weight:700">262</td><td><span class="tag red">四年新高</span></td></tr>
+      <tr><td>EPDO 傷害能量</td><td class="num">1,003.5</td><td class="num">902.5</td><td class="num">1,079.5</td>
+        <td class="num" style="color:var(--critical);font-weight:700">1,124.5</td><td><span class="tag red">四年新高</span></td></tr>
+      <tr><td>高齡者無照駕駛</td><td class="num">22</td><td class="num">13</td><td class="num" style="color:var(--critical)">33</td>
+        <td class="num">24</td><td><span class="tag amber">高點回落</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="chart">
+    <div class="ct">高齡事故率與全般事故率之四年走勢</div>
+    <div class="cs">上半年比較；高齡＝每萬高齡人口事故件數，全般＝每萬人事故件數</div>
+    <div class="legend">
+      <span><i style="background:#2a78d6"></i>高齡事故率（每萬高齡人口）</span>
+      <span><i style="background:#eb6834"></i>全般事故率（每萬人）</span>
+    </div>
+    <svg id="c-trend-rate" viewBox="0 0 760 260" role="img" aria-label="高齡與全般事故率四年走勢"></svg>
+  </div>
+
+  <div class="key red">
+    <div class="t">⚑ 四年趨勢之三項判讀</div>
+    <p><b>一、114 年為各項指標之惡化高峰，115 年上半年多數已回落。</b>114 年上半年高齡事故率 160.5、過度代表 1.83、死亡 5 人、無照 33 人，均為四年最差；<strong>115 年上半年死亡降至 1 人、過度代表降至 1.53、事故率降至 157.5</strong>。惟<strong>件數（198）、受傷（262）、EPDO（1,124.5）仍創四年新高</strong>——嚴重度改善但規模擴大。</p>
+    <p><b>二、113 年之「四年最佳」經查核為統計假象，非可複製之成效。</b>113 年上半年高齡事故率 130.1 雖為四年最低，惟該降幅<b>未達統計顯著</b>（率比 0.845，p = 0.136），且同期非高齡事故同步下降（率比 0.909），高齡占比幾無變化（p = 0.910）；減少之 22 件中有 86% 來自僅占 9.8% 量體之山上、左鎮二區，並於 114 年全數反彈。<strong>四年間唯一具統計顯著性之變化為 114 年高齡占比跳升（33.0%→41.6%，p = 0.008），應追查者為 114 年之惡化成因，而非 113 年之虛假改善</strong>（詳見專題附錄）。</p>
+    <p><b>三、結構性壓力持續累積：高齡人口四年增 10.7%、占比升 2.81 個百分點。</b>高齡人口自 11,359 人增至 12,574 人，占比自 21.08% 升至 23.89%。<strong>即使事故率維持不變，高齡事故絕對件數仍將因人口結構自然增加</strong>——防制目標應設定為「事故率下降」而非「件數持平」。</p>
+  </div>
+
+  <h3>全年趨勢（112–114 年完整年度）</h3>
+  <table>
+    <thead><tr><th>指標</th><th class="num">112 年</th><th class="num">113 年</th><th class="num">114 年</th><th>研判</th></tr></thead>
+    <tbody>
+      <tr><td>全般傷亡事故</td><td class="num">986</td><td class="num">898</td><td class="num">921</td><td><span class="tag gray">谷底回升</span></td></tr>
+      <tr><td><b>高齡者傷亡事故</b></td><td class="num">323</td><td class="num">305</td><td class="num" style="color:var(--critical);font-weight:700">361</td><td><span class="tag red">三年新高</span></td></tr>
+      <tr><td>高齡者占全般比</td><td class="num">32.8%</td><td class="num">34.0%</td><td class="num" style="color:var(--critical)">39.2%</td><td><span class="tag red">持續上升</span></td></tr>
+      <tr><td><b>高齡事故率</b>（每萬高齡人口）</td><td class="num">279.3</td><td class="num" style="color:var(--good)">256.2</td><td class="num" style="color:var(--critical);font-weight:700">292.3</td><td><span class="tag red">三年新高</span></td></tr>
+      <tr><td>死亡人數（24hr）</td><td class="num">4</td><td class="num">3</td><td class="num" style="color:var(--critical);font-weight:800">7</td><td><span class="tag red">倍增</span></td></tr>
+      <tr><td>2–30 日死亡</td><td class="num">0</td><td class="num">3</td><td class="num" style="color:var(--critical)">4</td><td><span class="tag red">上升</span></td></tr>
+      <tr><td>EPDO 傷害能量</td><td class="num">1,869.5</td><td class="num">1,755.0</td><td class="num" style="color:var(--critical);font-weight:700">2,103.5</td><td><span class="tag red">三年新高</span></td></tr>
+      <tr><td>過度代表倍數</td><td class="num">1.53</td><td class="num">1.52</td><td class="num" style="color:var(--critical)">1.68</td><td><span class="tag red">惡化</span></td></tr>
+      <tr><td>高齡者無照駕駛</td><td class="num">44</td><td class="num">40</td><td class="num" style="color:var(--critical)">57</td><td><span class="tag red">上升</span></td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:14px;color:var(--ink-2)"><strong>114 年全年高齡者死亡 7 人（另有 2–30 日死亡 4 人）、事故率 292.3 均為三年最高</strong>，與上半年觀察一致。115 年上半年之改善若能延續至下半年，全年可望明顯優於 114 年。</p>
+
+  <h3>結構變化：載具與年齡組成</h3>
+  <div class="g2">
+    <div class="chart">
+      <div class="ct">高齡駕駛之載具結構變化</div>
+      <div class="cs">上半年比較，人數；機車與慢速載具占比持續上升</div>
+      <div class="legend">
+        <span><i style="background:#eb6834"></i>機車</span>
+        <span><i style="background:#2a78d6"></i>小客車</span>
+        <span><i style="background:#1baf7a"></i>慢速載具</span>
+      </div>
+      <svg id="c-trend-veh" viewBox="0 0 480 250" role="img" aria-label="高齡駕駛載具結構四年變化"></svg>
+    </div>
+    <div class="chart">
+      <div class="ct">各區高齡事故率走勢</div>
+      <div class="cs">上半年比較，每萬高齡人口；新化區單調上升</div>
+      <div class="legend">
+        <span><i style="background:#d03b3b"></i>新化區</span>
+        <span><i style="background:#2a78d6"></i>左鎮區</span>
+        <span><i style="background:#1baf7a"></i>山上區</span>
+      </div>
+      <svg id="c-trend-dist" viewBox="0 0 480 250" role="img" aria-label="各區高齡事故率四年走勢"></svg>
+    </div>
+  </div>
+
+  <div class="key">
+    <div class="t">結構變化研判</div>
+    <p><b>載具持續「機車化」。</b>高齡駕駛中機車自 112 年上半年 100 人增至 115 年 <strong>126 人（＋26%）</strong>，慢速載具自 18 人增至 <strong>26 人（＋44%）</strong>；小客車則由 47 人增至 53 人（＋13%）。<strong>機車與慢速載具合計占比自 69.4% 升至 73.8%</strong>——防護力最弱之載具占比逐年擴大，與傷害能量創新高互相呼應。</p>
+    <p><b>新化區為唯一單調惡化之行政區。</b>其高齡事故率四期為 168.1 → 157.7 → 177.2 → <strong>181.0</strong>，除 113 年微降外持續攀升，且 115 年為四年最高。左鎮區自 96.1 升至 113.3（惟 113 年僅 29.3，波動大）；山上區則在 129.8 與 64.2 間大幅震盪。<span class="tag amber note">左鎮、山上兩區高齡事故各年僅 4–21 件，單一年度變動極易受隨機波動影響，其趨勢線僅供參考，判讀應以新化區為主</span></p>
+  </div>
+
+  <h3>115 年上半年 vs 去年同期（重點對照）</h3>
+
+  <table>
+    <thead><tr><th>指標（傷亡口徑）</th><th class="num">115年1–6月</th><th class="num">114年1–6月</th><th class="num">增減</th><th>研判</th></tr></thead>
+    <tbody>
+      <tr style="background:#f1f5f9"><td><b>全般傷亡事故</b></td><td class="num"><b>540</b></td><td class="num">466</td><td class="num" style="color:var(--critical);font-weight:800">+74（+15.9%）</td><td><span class="tag red">大幅上升</span></td></tr>
+      <tr><td><b>高齡者傷亡事故</b></td><td class="num"><b>198</b></td><td class="num">194</td><td class="num" style="color:var(--serious)">+4（+2.1%）</td><td><span class="tag amber">微升</span></td></tr>
+      <tr><td>高齡者占全般比例</td><td class="num">36.7%</td><td class="num">41.6%</td><td class="num" style="color:var(--good);font-weight:700">−4.9pp</td><td><span class="tag green">占比下降</span></td></tr>
+      <tr><td>A1 死亡事故</td><td class="num">1</td><td class="num">4</td><td class="num" style="color:var(--good);font-weight:700">−3</td><td><span class="tag green">大幅改善</span></td></tr>
+      <tr><td>A2 受傷事故</td><td class="num">197</td><td class="num">190</td><td class="num" style="color:var(--serious)">+7</td><td><span class="tag amber">微升</span></td></tr>
+      <tr><td>死亡人數（24hr）</td><td class="num">1</td><td class="num">5</td><td class="num" style="color:var(--good);font-weight:700">−4（−80%）</td><td><span class="tag green">大幅改善</span></td></tr>
+      <tr><td>2–30 日死亡人數</td><td class="num">0</td><td class="num">2</td><td class="num" style="color:var(--good)">−2</td><td><span class="tag green">改善</span></td></tr>
+      <tr><td>受傷人數</td><td class="num">262</td><td class="num">234</td><td class="num" style="color:var(--critical)">+28（+12.0%）</td><td><span class="tag red">上升</span></td></tr>
+      <tr><td>EPDO 傷害能量</td><td class="num">1,124.5</td><td class="num">1,079.5</td><td class="num" style="color:var(--serious)">+45.0（+4.2%）</td><td><span class="tag amber">微升</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="key">
+    <div class="t">態勢研判：相對表現改善，絕對風險未降</div>
+    <p><b>正面訊號：</b>全般傷亡事故大增 15.9% 之背景下，高齡者事故僅增 2.1%，<strong>占比自 41.6% 降至 36.7%</strong>；死亡人數自 7 人（含 2–30 日）降為 1 人。顯示既有作為在<strong>降低致死結果</strong>與<strong>相對風險</strong>上已見成效。</p>
+    <p><b>警訊：</b>高齡者受傷人數仍增 28 人（＋12.0%）、EPDO 增 4.2%。<strong>事故發生頻率與受傷規模未受控制</strong>，僅嚴重度下降。且全般傷亡事故大增 15.9% 本身即為分局整體警訊，須併同檢視。</p>
+  </div>
+
+  <h3>傷害脆弱度對照</h3>
+  <div class="g2">
+    <div class="chart">
+      <div class="ct">傷亡事故中之受傷比例</div>
+      <div class="cs">當事者層級，含死亡；排除年齡或傷勢未記載者</div>
+      <svg id="c-frailty" viewBox="0 0 480 150" role="img" aria-label="高齡與非高齡當事者受傷比例對照"></svg>
+    </div>
+    <div class="card" style="margin:16px 0">
+      <p style="font-size:14px;margin-bottom:10px"><strong>高齡當事者受傷率 70.3%</strong>（219 人中 154 人受傷或死亡），較 65 歲以下之 65.3%（838 人中 547 人）<strong>高出 5.0 個百分點</strong>。</p>
+      <p style="font-size:14px;margin:0">在傷亡口徑下（事故本身即已造成傷亡），受傷率之差距雖收斂，仍可見高齡者之<strong>生理脆弱性</strong>——同一起傷亡事故中，高齡當事者更可能成為受傷之一方。此差距於 <strong>75–79 歲達到 100%</strong>（詳參章）。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 參、年齡分層 ============ -->
+<section id="ageband" class="page-break">
+  <h2>參、年齡分層剖析 <span class="en">AGE-BAND ANALYSIS</span></h2>
+  <p class="lead">以 5 歲級距分層，納入 60–64 歲「初老」與 59 歲以下對照組，辨識風險轉折點與載具轉移軌跡。</p>
+
+  <table>
+    <thead>
+      <tr><th>年齡層</th><th class="num">當事者</th><th class="num">涉入事故</th><th class="num">駕駛</th>
+        <th class="num">受傷含死亡</th><th class="num">受傷率</th><th class="num">無照</th><th class="num">無照率</th><th>主要車種</th></tr>
+    </thead>
+    <tbody>
+      <tr style="background:#f1f5f9"><td>59 以下（基準）</td><td class="num">762</td><td class="num">469</td><td class="num">703</td><td class="num">494</td><td class="num">65.4%</td><td class="num">48</td><td class="num">6.8%</td><td>機車 433｜小客車 203</td></tr>
+      <tr><td>60–64（初老對照）</td><td class="num">84</td><td class="num">79</td><td class="num">78</td><td class="num">53</td><td class="num">63.9%</td><td class="num">6</td><td class="num">7.7%</td><td>機車 48｜小客車 28</td></tr>
+      <tr><td><b>65–69</b></td><td class="num">89</td><td class="num">83</td><td class="num">84</td><td class="num">55</td><td class="num">61.8%</td><td class="num">6</td><td class="num">7.1%</td><td>機車 51｜小客車 27</td></tr>
+      <tr><td><b>70–74</b></td><td class="num">78</td><td class="num">75</td><td class="num">75</td><td class="num">53</td><td class="num" style="color:var(--serious);font-weight:700">67.9%</td><td class="num">9</td><td class="num" style="color:var(--serious)">12.0%</td><td><b>機車 51</b>｜小客車 19</td></tr>
+      <tr><td><b>75–79</b></td><td class="num">26</td><td class="num">24</td><td class="num">23</td><td class="num">26</td><td class="num" style="color:var(--critical);font-weight:800">100.0%</td><td class="num">6</td><td class="num" style="color:var(--critical);font-weight:800">26.1%</td><td><b>機車 16</b>｜微電車 4</td></tr>
+      <tr><td><b>80–84</b></td><td class="num">20</td><td class="num">20</td><td class="num">17</td><td class="num">16</td><td class="num" style="color:var(--critical);font-weight:700">80.0%</td><td class="num">3</td><td class="num" style="color:var(--serious)">17.6%</td><td><b>機車 8</b>｜小客車 4</td></tr>
+      <tr><td><b>85 以上</b></td><td class="num">7</td><td class="num">7</td><td class="num">7</td><td class="num">4</td><td class="num">66.7%<sup>※</sup></td><td class="num">0</td><td class="num">0%</td><td><b>腳踏車 3</b>｜農機 1</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:12.5px;color:var(--ink-3)">
+    ※ 85 歲以上僅 7 人，樣本過小，統計穩定性不足，僅供參考。<br>
+    <b>⚠ 件數與人數區分：</b>「當事者」「駕駛」「受傷」「無照」為<b>人數</b>；「涉入事故」為<b>件數</b>，且<b>各年齡層之件數不可相加</b>——同一事故若有 2 名以上不同年齡層當事者，於各該層均計 1 件。本期 198 件高齡傷亡事故中，<b>21 件</b>涉及 2 名以上高齡者（高齡當事者共 220 人）。「受傷率」分母為該層<b>有傷勢記載</b>之人數；「無照率」分母為該層<b>駕駛人數</b>。
+  </p>
+
+  <div class="chart">
+    <div class="ct">受傷率年齡梯度</div>
+    <div class="cs">虛線為 59 歲以下基準（65.4%）；75–79 歲捲入傷亡事故者全數受傷</div>
+    <svg id="c-hurtrate" viewBox="0 0 760 250" role="img" aria-label="各年齡層受傷率長條圖"></svg>
+  </div>
+
+  <div class="chart">
+    <div class="ct">駕駛車種隨年齡之轉移</div>
+    <div class="cs">各年齡層駕駛人使用車種構成比；傷亡口徑下機車全面主導，85 歲以上轉向自行車與農機</div>
+    <div class="legend">
+      <span><i style="background:#eb6834"></i>機車</span>
+      <span><i style="background:#2a78d6"></i>小客車</span>
+      <span><i style="background:#1baf7a"></i>腳踏自行車</span>
+      <span><i style="background:#eda100"></i>微型電動二輪車</span>
+      <span><i style="background:#94a3b8"></i>其他（含農機、電輔車）</span>
+    </div>
+    <svg id="c-vehshift" viewBox="0 0 760 260" role="img" aria-label="各年齡層車種構成比堆疊圖"></svg>
+  </div>
+
+  <div class="key red">
+    <div class="t">年齡分層之三項政策訊號</div>
+    <p><b>一、70 歲為明確分水嶺，75–79 歲為極值。</b>65–69 歲受傷率 61.8%（低於青壯年 65.4%），70–74 歲升至 67.9%，<strong>75–79 歲達 100%——捲入傷亡事故之該齡 26 人全數受傷</strong>，80–84 歲仍達 80.0%。防制資源應以 <b>70 歲以上</b>為優先標的。</p>
+    <p><b>二、無照駕駛隨齡惡化。</b>無照率自 65–69 歲之 7.1% 升至 70–74 歲 12.0%、<strong>75–79 歲達 26.1%</strong>（23 名駕駛中 6 人無照）、80–84 歲 17.6%，為青壯年 6.8% 之 <strong>2.6 至 3.8 倍</strong>。推測與駕照逾期未換、體檢或認知功能測驗未過有關。</p>
+    <p><b>三、載具風險疊加。</b>傷亡口徑下各層均以機車為主，惟高齡層小客車占比隨齡快速下降（65–69 歲 27 人 → 75–79 歲 2 人），<strong>85 歲以上轉為腳踏自行車與農耕用車</strong>。<strong>機車與慢速載具合計占 65 歲以上駕駛之 73.8%（152／206 人）</strong>，防護力最弱之族群比重最高。</p>
+  </div>
+</section>
+
+<!-- ============ 肆、時空 ============ -->
+<section id="spacetime" class="page-break">
+  <h2>肆、時間與空間分布 <span class="en">TEMPORAL &amp; SPATIAL PATTERN</span></h2>
+
+  <div class="chart">
+    <div class="ct">傷亡事故發生時段分布（高齡 vs 全般）</div>
+    <div class="cs">縱軸為該族群事故之時段占比，便於不同總量之型態比較</div>
+    <div class="legend">
+      <span><i style="background:#2a78d6"></i>高齡者傷亡事故（198 件）</span>
+      <span><i style="background:#eb6834"></i>全般傷亡事故（540 件）</span>
+    </div>
+    <svg id="c-hour" viewBox="0 0 760 280" role="img" aria-label="高齡與全般傷亡事故之24小時分布"></svg>
+  </div>
+
+  <div class="key blue">
+    <div class="t">時段型態差異</div>
+    <p><strong>高齡者呈單峰上午型</strong>：06–11 時 111 件（56.1%），07 時 25 件為高峰；夜間 20 時至翌日 05 時僅 8 件（4.0%）。</p>
+    <p><strong>全般則為雙峰型</strong>：07 時 71 件外，另有 16–18 時之下午峰（137 件，25.4%）。差異反映高齡者生活作息集中於清晨至中午（早市採買、農作、就醫、晨運）。</p>
+    <p><b>勤務意涵：</b>護老性質之路口指揮、攔查與宣導，應配置於 <strong>06–11 時</strong>，而非依一般通勤思維配置於下午尖峰。</p>
+  </div>
+
+  <div class="g2">
+    <div class="chart"><div class="ct">月別趨勢</div><div class="cs">高齡者傷亡事故件數</div>
+      <svg id="c-month" viewBox="0 0 480 220" role="img" aria-label="月別趨勢"></svg></div>
+    <div class="chart"><div class="ct">星期分布</div><div class="cs">高齡者傷亡事故件數</div>
+      <svg id="c-dow" viewBox="0 0 480 220" role="img" aria-label="星期分布"></svg></div>
+  </div>
+
+  <h3>行政區與轄區派出所分布</h3>
+  <table>
+    <thead><tr><th>轄區單位</th><th class="num">高齡傷亡事故</th><th class="num">占比</th><th>行政區</th><th>研判</th></tr></thead>
+    <tbody>
+      <tr><td><b>新化派出所</b></td><td class="num">86</td><td class="num">43.4%</td><td>新化區</td><td><span class="tag red">首要責任區</span></td></tr>
+      <tr><td><b>唪口派出所</b></td><td class="num">59</td><td class="num">29.8%</td><td>新化區</td><td><span class="tag red">次要責任區</span></td></tr>
+      <tr><td>知義派出所</td><td class="num">18</td><td class="num">9.1%</td><td>新化區</td><td><span class="tag amber">中度</span></td></tr>
+      <tr><td>左鎮分駐所</td><td class="num">16</td><td class="num">8.1%</td><td>左鎮區</td><td><span class="tag gray">低度</span></td></tr>
+      <tr><td>山上分駐所</td><td class="num">11</td><td class="num">5.6%</td><td>山上區</td><td><span class="tag gray">低度</span></td></tr>
+      <tr><td>那拔派出所</td><td class="num">8</td><td class="num">4.0%</td><td>新化區</td><td><span class="tag gray">低度</span></td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:14px;color:var(--ink-2)">高齡傷亡事故高度集中於<strong>新化區（171 件，86.4%）</strong>，左鎮區 16 件、山上區 11 件。新化、唪口兩所合計承擔 <strong>73.2%</strong>，為資源配置首要標的。</p>
+
+  <h3>風險密度：以人口為分母之事故率（政府公開資料介接）</h3>
+  <p class="lead">絕對件數受人口規模影響，無法公平比較三區。本節以<strong>臺南市政府民政局公布之各區戶籍人口</strong>為分母，換算為「每萬名高齡人口之高齡傷亡事故件數」，並與去年同期對照。</p>
+
+  <table>
+    <thead>
+      <tr><th>行政區</th><th class="num">高齡人口</th><th class="num">高齡占比</th><th class="num">高齡傷亡事故</th>
+        <th class="num">每萬高齡人口事故率</th><th class="num">去年同期率</th><th class="num">率變動</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><b>新化區</b></td><td class="num">9,449</td><td class="num">22.59%</td><td class="num">171</td>
+        <td class="num" style="color:var(--critical);font-weight:800">181.0</td><td class="num">177.2</td>
+        <td class="num" style="color:var(--serious)">+2.1%</td></tr>
+      <tr><td><b>左鎮區</b></td><td class="num">1,412</td><td class="num" style="color:var(--critical);font-weight:700">34.68%</td><td class="num">16</td>
+        <td class="num" style="font-weight:700">113.3</td><td class="num">110.1</td>
+        <td class="num" style="color:var(--serious)">+2.9%</td></tr>
+      <tr><td><b>山上區</b></td><td class="num">1,713</td><td class="num">25.44%</td><td class="num">11</td>
+        <td class="num" style="color:var(--good);font-weight:700">64.2</td><td class="num">112.0</td>
+        <td class="num" style="color:var(--good);font-weight:800">−42.7%</td></tr>
+      <tr style="background:#f1f5f9"><td><b>分局合計</b></td><td class="num"><b>12,574</b></td><td class="num"><b>23.89%</b></td><td class="num"><b>198</b></td>
+        <td class="num"><b>157.5</b></td><td class="num">160.5</td>
+        <td class="num" style="color:var(--good);font-weight:800">−1.9%</td></tr>
+      <tr><td style="color:var(--ink-3)">臺南市（對照）</td><td class="num" style="color:var(--ink-3)">386,774</td>
+        <td class="num" style="color:var(--ink-3)">20.93%</td><td class="num" style="color:var(--ink-3)">—</td>
+        <td class="num" style="color:var(--ink-3)">—</td><td class="num" style="color:var(--ink-3)">—</td><td class="num" style="color:var(--ink-3)">—</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:12.5px;color:var(--ink-3)">
+    人口資料：臺南市政府民政局「各區人口數按三階段年齡百分比分及其扶養比」115 年 6 月底／114 年 6 月底。<br>
+    <b>⚠ 方法學限制：</b>事故以<b>發生地</b>行政區歸戶，人口以<b>戶籍地</b>計算，二者非完全對應（外區民眾於本轄發生之事故仍計入發生地）。高齡者活動範圍多在居住地周邊，故此近似尚可接受，惟跨區道路（如省道臺20線）之事故會使該區事故率略為高估。
+  </p>
+
+  <div class="chart">
+    <div class="ct">各區高齡事故率與同期比較</div>
+    <div class="cs">每萬名高齡人口之高齡傷亡事故件數；虛線為分局合計（157.5）</div>
+    <div class="legend">
+      <span><i style="background:#2a78d6"></i>115 年 1–6 月</span>
+      <span><i style="background:#cbd5e1"></i>114 年 1–6 月</span>
+    </div>
+    <svg id="c-rate" viewBox="0 0 760 250" role="img" aria-label="各區高齡事故率與去年同期對照"></svg>
+  </div>
+
+  <h3>過度代表分析：高齡者在事故中是否「超額」出現</h3>
+  <table>
+    <thead><tr><th>行政區</th><th class="num">高齡人口占該區比</th><th class="num">高齡事故占該區事故比</th><th class="num">過度代表倍數</th><th>研判</th></tr></thead>
+    <tbody>
+      <tr><td><b>新化區</b></td><td class="num">22.59%</td><td class="num">38.5%</td>
+        <td class="num" style="color:var(--critical);font-weight:800">1.70 倍</td><td><span class="tag red">明顯超額風險</span></td></tr>
+      <tr><td>左鎮區</td><td class="num">34.68%</td><td class="num">32.7%</td>
+        <td class="num" style="color:var(--good);font-weight:700">0.94 倍</td><td><span class="tag green">未超額</span></td></tr>
+      <tr><td>山上區</td><td class="num">25.44%</td><td class="num">23.4%</td>
+        <td class="num" style="color:var(--good);font-weight:700">0.92 倍</td><td><span class="tag green">未超額</span></td></tr>
+      <tr style="background:#f1f5f9"><td><b>分局合計</b></td><td class="num">23.89%</td><td class="num">36.7%</td>
+        <td class="num" style="font-weight:800">1.54 倍</td><td><span class="tag amber">整體超額</span></td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:12.5px;color:var(--ink-3)">過度代表倍數＝高齡事故占該區事故比 ÷ 高齡人口占該區人口比。等於 1 表示高齡者在事故中之出現比例與其人口比例相當；大於 1 表示超額出現。</p>
+
+  <div class="key red">
+    <div class="t">⚑ 風險密度分析之三項關鍵發現（此為本次介接政府人口資料後始能得出）</div>
+    <p><b>一、分局整體高齡事故率不升反降，與全般事故率形成強烈對比。</b>高齡人口一年增加 489 人（＋4.0%），高齡事故僅增 4 件，<strong>換算事故率自 160.5 降為 157.5（−1.9%）</strong>；同期全般事故率則自 88.0 升至 102.6（<strong>＋16.6%</strong>）。<b>在全般事故率大增之背景下，高齡族群之風險密度逆勢下降</b>，為本期最具說服力之成效指標。</p>
+    <p><b>二、左鎮區高齡化最嚴重（34.68%，為全市 20.93% 之 1.66 倍），但高齡事故率並非最高。</b>其事故率 113.3 低於新化區之 181.0。<strong>「高齡化程度高」不等於「高齡事故風險高」</strong>——左鎮區高齡事故多係人口結構自然反映（過度代表倍數 0.94，未超額）。</p>
+    <p><b>三、新化區為唯一存在「超額風險」之行政區。</b>高齡人口僅占該區 22.59%（三區中最低），卻承擔該區 38.5% 之事故，<strong>過度代表達 1.70 倍</strong>，且事故率 181.0 為三區最高。<b>新化區之高齡風險並非人口結構所致，而是真實之超額風險</b>，資源應據此集中。</p>
+    <p><b>附帶觀察：</b>山上區高齡事故率自 112.0 大降至 64.2（−42.7%），為三區最大降幅，<b>惟未達統計顯著（p = 0.148）</b>；該區高齡事故僅 11 件，<span class="tag amber note">樣本數小，且四期呈 129.8→67.0→112.0→64.2 之高低振盪而非持續改善，建議持續追蹤 2–3 期再判定為趨勢</span></p>
+  </div>
+</section>
+
+<!-- ============ 伍、熱點 ============ -->
+<section id="hotspot" class="page-break">
+  <h2>伍、高齡者易肇事路口（傷亡口徑） <span class="en">HIGH-RISK LOCATIONS</span></h2>
+  <p class="lead">以 GPS 座標 100 公尺半徑聚類，依 EPDO 傷害能量排序。本清冊已排除 A3 財損事故，聚焦實際造成人員傷亡之點位。</p>
+
+  <table>
+    <thead><tr><th class="num">序</th><th>路口／路段</th><th>行政區</th><th class="num">傷亡件數</th><th class="num">EPDO</th><th class="num">A1</th><th class="num">A2</th><th>特性研判</th></tr></thead>
+    <tbody id="tb-hot"></tbody>
+  </table>
+
+  <div class="chart">
+    <div class="ct">高齡傷亡事故熱點傷害能量排名</div>
+    <div class="cs">EPDO 值，前十名</div>
+    <svg id="c-hot" viewBox="0 0 760 340" role="img" aria-label="熱點 EPDO 排名"></svg>
+  </div>
+
+  <div class="key red">
+    <div class="t">熱點研判</div>
+    <p><b>一、市區主幹道路口為絕對核心。</b>前十名<strong>全數位於新化市區</strong>，其中中山路、中正路系統即占 5 處。此區為長者日常採買、就醫、洽公之主要動線。</p>
+    <p><b>二、首位「中山路／中正路口」9 件、EPDO 47.5，且全數為 A2 傷亡</b>，為全轄區高齡傷害能量最高之單一點位，建議列為<strong>優先會勘標的</strong>。</p>
+    <p><b>三、排名變動之意義：</b>與含 A3 之清冊相較，<strong>省道臺20線／臺39線口自第 3 名降至第 6 名</strong>（該處財損事故比例較高），而<strong>中正路／和平街口自第 4 名升至第 2 名</strong>（6 件全為傷亡）。<b>排除財損後之清冊更能反映真實傷害風險，應以本清冊作為會勘排序依據。</b></p>
+  </div>
+</section>
+
+<!-- ============ 陸、型態肇因 ============ -->
+<section id="cause" class="page-break">
+  <h2>陸、事故型態、肇因與違規行為 <span class="en">CRASH TYPE &amp; CAUSATION</span></h2>
+
+  <div class="g2">
+    <div class="chart"><div class="ct">事故型態構成</div><div class="cs">高齡者傷亡事故，件數</div>
+      <svg id="c-ctype" viewBox="0 0 480 260" role="img" aria-label="事故型態構成"></svg></div>
+    <div class="chart"><div class="ct">道路型態與號誌狀況</div><div class="cs">高齡者傷亡事故，件數</div>
+      <svg id="c-road" viewBox="0 0 480 260" role="img" aria-label="道路型態與號誌"></svg></div>
+  </div>
+
+  <div class="key">
+    <div class="t">型態研判：路口衝突為主戰場</div>
+    <p><strong>側撞 60 件</strong>為最大宗，其次為其他 46 件、<strong>路上翻車／摔倒 17 件</strong>與追撞 17 件、路口交岔撞 14 件。就道路型態，<strong>路口類（四岔路 61＋三岔路 40＋多岔路 11）合計 112 件，占有記載案件 56.9%</strong>。</p>
+    <p>就號誌狀況，<strong>無號誌路段／路口 112 件，占有記載案件 56.9%</strong>，多於有行車管制號誌者（68 件），另有閃光號誌 15 件。高齡者事故大量發生於<strong>缺乏號誌管制、須自行判斷路權</strong>之環境。</p>
+    <p><b>另值注意：</b>「路上翻車、摔倒」17 件全數落在高齡者主責案件中，屬<strong>單車事故（自摔）</strong>型態，與機車、自行車為主要載具之特性相符。</p>
+  </div>
+
+  <h3>肇事原因分析（高齡當事者個別肇因）</h3>
+  <div class="chart">
+    <div class="ct">高齡當事者肇因排名</div>
+    <div class="cs">當事者層級之個別初步分析研判，前 14 項</div>
+    <svg id="c-cause" viewBox="0 0 760 470" role="img" aria-label="高齡當事者肇因排名"></svg>
+  </div>
+
+  <div class="key blue">
+    <div class="t">肇因結構研判</div>
+    <p><b>一、「恍神、緊張、心不在焉分心駕駛」45 人次為首位</b>（另有 42 人次為「尚未發現肇事因素」，即無肇事責任，詳柒章）。此項符合文獻所指高齡者<strong>注意力分配與情境覺察退化</strong>之特徵，且無外顯違規事實、難以事前取締。</p>
+    <p><b>二、路口「未讓」類為第二大群體。</b>有號誌路口轉彎車未讓直行車 17＋左轉彎未依規定 10＋違反閃光號誌 8＋無號誌路口轉彎車未讓 6＋右轉彎未依規定 3，<strong>合計 44 人次</strong>，規模接近首位肇因。此類為<strong>路權判斷失誤</strong>，與號誌設計、視距條件高度相關。</p>
+    <p><b>三、起步時未注意安全 13 人次</b>為高齡者特徵型肇因，反映起步前後方確認之身體轉動能力受限。</p>
+  </div>
+
+  <h3>側撞衝突方向剖析</h3>
+  <table>
+    <thead><tr><th>衝突型態</th><th class="num">件數</th><th>工程意涵</th></tr></thead>
+    <tbody>
+      <tr><td><b>對向直行、左轉</b></td><td class="num">15</td><td><b>對向左轉未讓直行 → 左轉專用時相／待轉區</b></td></tr>
+      <tr><td>橫向直行、左轉（不同方向）</td><td class="num">15</td><td>橫交穿越衝突 → 號誌時制／停讓管制</td></tr>
+      <tr><td>同向直行、左轉</td><td class="num">14</td><td>左轉車道配置／標線引導不足</td></tr>
+      <tr><td>同向直行、右轉</td><td class="num">9</td><td>右轉視野死角／內輪差</td></tr>
+      <tr><td>橫向直行、右轉（不同方向）</td><td class="num">5</td><td>橫交右轉衝突</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:14px;color:var(--ink-2)"><strong>左轉相關衝突合計 44 件，占有記載側撞行向案件（60 件）之 73.3%</strong>，為高齡者側撞事故之絕對主因。左轉需同時判斷對向車速、距離與間隙，屬認知負荷最高之駕駛行為，對高齡者尤為不利——此為<strong>工程改善（左轉保護時相）之最強證據</strong>。</p>
+
+  <h3>各年齡層肇因差異</h3>
+  <table>
+    <thead><tr><th>年齡層</th><th>首要肇因</th><th>次要肇因</th><th>特徵</th></tr></thead>
+    <tbody>
+      <tr><td>60–64</td><td>無肇事因素（被撞）</td><td>恍神分心</td><td>受害比例相對高</td></tr>
+      <tr><td>65–69</td><td>無肇事因素 19</td><td>恍神分心 13、有號誌路口轉彎未讓 10</td><td>路口未讓類開始顯現</td></tr>
+      <tr><td>70–74</td><td><b>恍神分心 16</b></td><td>無肇事因素 15、有號誌路口轉彎未讓 6</td><td>分心躍升為首位</td></tr>
+      <tr><td>75–79</td><td><b>恍神分心 10</b></td><td>無肇事因素 4、無號誌路口轉彎未讓 2</td><td>分心占該層肇因近半</td></tr>
+      <tr><td>80–84</td><td>無肇事因素 4</td><td><b>左轉彎未依規定 3</b>、恍神分心 3</td><td>路權違規類升為主要</td></tr>
+      <tr><td>85 以上</td><td>恍神分心 3</td><td>闖紅燈直行 1、無號誌路口轉彎未讓 1</td><td>樣本小；出現重大違規樣態</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:14px;color:var(--ink-2)">趨勢顯示：<strong>「分心／注意力」類肇因於 70–79 歲達到頂峰，80 歲以上轉為「路權判斷與違規」類</strong>。宣導與工程對策應依年齡層區隔設計。</p>
+</section>
+
+<!-- ============ 柒、責任歸屬 ============ -->
+<section id="liability" class="page-break">
+  <h2>柒、肇事責任歸屬分析 <span class="en">LIABILITY ATTRIBUTION</span></h2>
+  <p class="lead">高齡者究竟是「肇事者」還是「受害者」，決定對策應施於高齡族群本身或其他用路人。本章依當事者順位與個別肇因研判責任歸屬。</p>
+
+  <div class="card">
+    <h3 style="margin-top:0">口徑與方法驗證</h3>
+    <p style="font-size:14px">EIS「<strong>當事者順位</strong>」依肇事責任輕重排序，<strong>第一當事者為主要肇責方</strong>；每名當事者另有「初步分析研判（個別）」欄位，若為<strong>「尚未發現肇事因素」即代表該人無肇事責任</strong>。</p>
+    <p style="font-size:14px;margin-bottom:0">以全體資料驗證：本期高齡當事者中，<strong>第一當事者被判「尚未發現肇事因素」者僅 2 人（1.5%）</strong>，而<strong>第二以後當事者達 40 人（46.0%）</strong>。差距懸殊，確認順位與責任歸屬之對應關係成立。</p>
+  </div>
+
+  <h3>責任歸屬分布（件數與人數分列）</h3>
+  <div class="g2">
+    <div class="card" style="margin:16px 0">
+      <p style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">■ 案件層級（198 件）</p>
+      <table style="margin-top:0">
+        <thead><tr><th>責任歸屬</th><th class="num">件數</th><th class="num">占比</th><th class="num">A1</th><th class="num">A2</th></tr></thead>
+        <tbody>
+          <tr><td><b>高齡者為第一當事者</b>（主責）</td><td class="num">114</td><td class="num">57.6%</td><td class="num">0</td><td class="num">114</td></tr>
+          <tr style="background:#fef2f2"><td><b>高齡者皆非第一當事者</b></td><td class="num">65</td><td class="num">32.8%</td><td class="num" style="color:var(--critical);font-weight:800">1</td><td class="num">64</td></tr>
+          <tr><td>同案兼有主責與次責高齡者</td><td class="num">19</td><td class="num">9.6%</td><td class="num">0</td><td class="num">19</td></tr>
+          <tr style="background:#fff7ed"><td>—其中<b>明確無責受害案</b><sup>※</sup></td><td class="num">28</td><td class="num">14.1%</td><td class="num">0</td><td class="num">28</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:12px;color:var(--ink-3);margin:6px 0 0">※ 該案全部高齡當事者之個別肇因均為「尚未發現肇事因素」，屬「皆非第一當事者」之子集。</p>
+    </div>
+    <div class="card" style="margin:16px 0">
+      <p style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">■ 人員層級（220 人）</p>
+      <table style="margin-top:0">
+        <thead><tr><th>順位</th><th class="num">人數</th><th class="num">占比</th><th class="num">無肇事因素</th><th class="num">受傷率</th></tr></thead>
+        <tbody>
+          <tr><td><b>第一當事者</b></td><td class="num">133</td><td class="num">60.5%</td><td class="num">2</td><td class="num">70.7%</td></tr>
+          <tr><td>第二當事者</td><td class="num">76</td><td class="num">34.5%</td><td class="num" rowspan="3" style="vertical-align:middle;color:var(--critical);font-weight:800">40</td><td class="num" rowspan="3" style="vertical-align:middle">69.8%</td></tr>
+          <tr><td>第三當事者</td><td class="num">10</td><td class="num">4.5%</td></tr>
+          <tr><td>第四當事者</td><td class="num">1</td><td class="num">0.5%</td></tr>
+          <tr style="background:#fff7ed"><td colspan="2"><b>個別肇因＝無肇事因素（完全無責）</b></td><td class="num" colspan="2"><b>42 人（19.1%）</b></td><td class="num">81.0%</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:12px;color:var(--ink-3);margin:6px 0 0">第二以後當事者合計 87 人（39.5%）。</p>
+    </div>
+  </div>
+
+  <div class="key red">
+    <div class="t">⚠ 最重要之單一發現：本期唯一 A1 死亡事故，高齡者為「非第一當事者」</div>
+    <p>114 件高齡者主責案件中<strong>無任何死亡事故</strong>；<strong>唯一之 A1 死亡案件，發生於高齡者非主要肇責方之情形</strong>。高齡者最致命之風險，並非來自其自身駕駛疏失，而是<strong>來自其他用路人之撞擊，加上生理脆弱性所致之高致死轉化</strong>。</p>
+    <p>此發現直接推翻「高齡事故＝高齡者開車不好」之單一歸因，也說明<strong>僅針對高齡者施以教育或駕照管制，無法防制最嚴重之死亡結果</strong>。</p>
+  </div>
+
+  <h3>無責受害高齡者之樣態剖析（42 人）</h3>
+  <div class="g2">
+    <div class="chart"><div class="ct">受撞當下之行動狀態</div>
+      <div class="cs">個別肇因判定為「尚未發現肇事因素」之高齡當事者</div>
+      <svg id="c-victim-action" viewBox="0 0 480 230" role="img" aria-label="無責高齡者受撞時行動狀態"></svg></div>
+    <div class="chart"><div class="ct">事故型態</div>
+      <div class="cs">無責高齡者所涉事故之碰撞型態</div>
+      <svg id="c-victim-type" viewBox="0 0 480 230" role="img" aria-label="無責高齡者事故型態"></svg></div>
+  </div>
+
+  <div class="key">
+    <div class="t">被動受撞之型態特徵</div>
+    <p>42 名無責高齡者中，<strong>34 人受傷（81.0%）</strong>——顯著高於高齡者整體之 70.3%。就受撞當下之行動狀態：<strong>「向前直行中」27 人、「等待（引擎未熄火）」3 人、「靜止（引擎熄火）」1 人、「靜立」1 人</strong>——合計 32 人（<strong>76.2%</strong>）處於<strong>正常直行或完全靜止之被動狀態</strong>，無任何閃避或應變可能。</p>
+    <p>事故型態以<strong>追撞 10 件</strong>最多，其次為側撞 6 件。就車種，<strong>普通重型機車 22 人</strong>為最大宗，即「高齡機車騎士依速限正常行駛，遭後方或側方車輛撞擊」之樣態。</p>
+  </div>
+
+  <h3>肇責方（撞擊高齡者之對造）分析</h3>
+  <div class="g2">
+    <div class="card" style="margin:16px 0">
+      <p style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">■ 對造之肇事原因</p>
+      <table style="margin-top:0">
+        <thead><tr><th>肇因</th><th class="num">人次</th></tr></thead>
+        <tbody>
+          <tr><td>恍神、緊張、心不在焉分心駕駛</td><td class="num">10</td></tr>
+          <tr style="background:#fef2f2"><td style="color:var(--critical);font-weight:700">未保持行車安全距離</td><td class="num" style="color:var(--critical);font-weight:700">8</td></tr>
+          <tr><td>其他不當駕車行為</td><td class="num">5</td></tr>
+          <tr><td>左轉彎未依規定</td><td class="num">3</td></tr>
+          <tr><td>起步時未注意安全</td><td class="num">3</td></tr>
+          <tr><td>闖紅燈直行</td><td class="num">2</td></tr>
+          <tr><td>有號誌路口轉彎車未讓直行車</td><td class="num">2</td></tr>
+          <tr><td>違規超車</td><td class="num">2</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card" style="margin:16px 0">
+      <p style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">■ 對造之年齡與車種</p>
+      <table style="margin-top:0">
+        <thead><tr><th>屬性</th><th class="num">人次</th><th class="num">占比</th></tr></thead>
+        <tbody>
+          <tr style="background:#fef2f2"><td><b>18–64 歲（青壯年）</b></td><td class="num"><b>31</b></td><td class="num" style="color:var(--critical);font-weight:700">67.4%</td></tr>
+          <tr><td>65 歲以上</td><td class="num">12</td><td class="num">26.1%</td></tr>
+          <tr><td>未滿 18 歲</td><td class="num">3</td><td class="num">6.5%</td></tr>
+          <tr><td colspan="3" style="background:var(--panel);font-weight:600;font-size:12.5px">車種</td></tr>
+          <tr><td>普通重型機車</td><td class="num">25</td><td class="num">56.8%</td></tr>
+          <tr><td>自用小客車</td><td class="num">15</td><td class="num">34.1%</td></tr>
+          <tr><td>微型電動二輪車</td><td class="num">3</td><td class="num">6.8%</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:12px;color:var(--ink-3);margin:6px 0 0">撞擊無責高齡者之對造，逾三分之二為青壯年駕駛人，且以機車居多。</p>
+    </div>
+  </div>
+
+  <h3>追撞專項：高齡者遭後車追撞</h3>
+  <div class="tiles" style="margin-top:8px">
+    <div class="tile"><div class="k">高齡涉入追撞</div><div class="v">17<small>件</small></div><div class="n">高齡當事者 21 人次</div></div>
+    <div class="tile warn"><div class="k">其中純被追撞</div><div class="v">10<small>人</small></div><div class="n">個別肇因為無肇事因素，占 47.6%</div></div>
+    <div class="tile amber"><div class="k">受傷含死亡</div><div class="v">15<small>人</small></div><div class="n">涉入追撞之高齡者逾七成受傷</div></div>
+    <div class="tile"><div class="k">被動狀態</div><div class="v">16<small>人</small></div><div class="n">直行中 12、停等中 2、靜止 2</div></div>
+  </div>
+  <p style="font-size:14px;color:var(--ink-2)">高齡者涉入之追撞事故中，<strong>近半數（10／21）之高齡當事者無任何肇事因素</strong>，且多處於直行或停等之被動狀態。對照案件層級：<strong>高齡者非主責案件中追撞占 11 件；主責案件中則未進入前五大型態</strong>——追撞為「高齡者受害型」事故之標誌性型態。</p>
+
+  <h3>慢速車輛之受害風險</h3>
+  <div class="key red">
+    <div class="t">慢速載具高齡駕駛：受傷率 92.0%，為所有族群之最高</div>
+    <p>駕駛<strong>腳踏自行車（11 人）、微型電動二輪車（11 人）、電動輔助自行車（3 人）、農耕用車（1 人）</strong>之高齡者共 26 人，其中<strong>23 人受傷或死亡（92.0%）</strong>，遠高於高齡者整體之 70.3%，亦高於高齡機車騎士。</p>
+    <p>此類載具<strong>速度慢、車體無防護、於混合車流中易遭快車追撞或側撞</strong>，加上高齡駕駛人本身脆弱性，形成三重風險疊加。<span class="tag amber note">農耕用車本期僅 1 人，樣本過小不足以單獨統計；惟其低速、體積大、常於產業道路與省道混流之特性，屬同一風險類型，建議併同管理</span></p>
+  </div>
+
+  <div class="key blue">
+    <div class="t">責任歸屬對對策設計之意涵</div>
+    <p><b>高齡者主責之 114 件</b>（57.6%）→ 對策施於高齡者本身：駕駛能力維持、認知功能篩檢、路口路權判斷支援之工程改善、駕照資格管理。</p>
+    <p><b>高齡者非主責之 65 件</b>（32.8%，含明確無責 28 件）→ <strong>對策必須施於其他用路人</strong>：防追撞執法（未保持安全距離）、分心駕駛宣導、慢車與農機之標識與照明強化、路段速度管理。<strong>此部分無論如何加強高齡者教育都無法防制，且唯一死亡案件即屬此類。</strong></p>
+    <p>兩者比例約為 <strong>6:4</strong>，防制策略應雙軌並行，不可偏廢。</p>
+  </div>
+</section>
+
+<!-- ============ 捌、風險因子 ============ -->
+<section id="risk">
+  <h2>捌、關鍵風險因子 <span class="en">RISK FACTORS</span></h2>
+
+  <div class="g2">
+    <div class="card">
+      <h3 style="margin-top:0">駕駛資格狀況（高齡駕駛 206 人）</h3>
+      <table style="margin-top:4px">
+        <thead><tr><th>駕照狀態</th><th class="num">人數</th></tr></thead>
+        <tbody>
+          <tr><td>有適當之駕照</td><td class="num">154</td></tr>
+          <tr><td>非汽（機）車駕駛人<sup>※</sup></td><td class="num">25</td></tr>
+          <tr style="background:#fef2f2"><td style="color:var(--critical);font-weight:700">無照（已達考照年齡）</td><td class="num" style="color:var(--critical);font-weight:700">24</td></tr>
+          <tr><td style="color:var(--critical)">駕照被吊（註）銷</td><td class="num" style="color:var(--critical)">1</td></tr>
+          <tr><td>不明／未記載</td><td class="num">2</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:12.5px;color:var(--ink-3);margin:6px 0 0">※ 指腳踏自行車、微型電動二輪車等免駕照之慢車駕駛人，非屬違規。</p>
+      <p style="font-size:14px;margin-top:12px"><strong>無照駕駛 24 人、駕照遭吊銷仍駕駛 1 人</strong>，合計 25 人屬<strong>資格不符之高齡駕駛，占高齡駕駛人 12.1%</strong>（含 A3 時為 8.7%）。<b>排除財損事故後比例反而升高，顯示無照駕駛與傷亡結果之關聯性更強。</b></p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">保護裝備使用（高齡當事者 220 人）</h3>
+      <table style="margin-top:4px">
+        <thead><tr><th>裝備狀況</th><th class="num">人數</th></tr></thead>
+        <tbody>
+          <tr><td>戴非半罩式安全帽</td><td class="num">86</td></tr>
+          <tr><td>繫安全帶</td><td class="num">57</td></tr>
+          <tr style="background:#fff7ed"><td>戴半罩式安全帽</td><td class="num">54</td></tr>
+          <tr><td>無需使用保護裝備</td><td class="num">12</td></tr>
+          <tr style="background:#fef2f2"><td style="color:var(--critical);font-weight:700">未戴安全帽／未繫安全帶</td><td class="num" style="color:var(--critical);font-weight:700">8</td></tr>
+          <tr><td>不明／未記載</td><td class="num">3</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:14px;margin-top:12px">未依規定使用保護裝備者 8 人。<strong>更值注意者為「半罩式安全帽」54 人（占戴帽者 38.6%）</strong>——該型對顏面與下顎保護力較低，於高齡者顏面骨折風險偏高之情形下，宜於宣導時併同提示改用全罩式或 3/4 罩式。</p>
+    </div>
+  </div>
+
+  <div class="key red">
+    <div class="t">高齡無照駕駛：可立即行動之標的</div>
+    <p>事故側 25 名資格不符之高齡駕駛，執法側同期亦舉發<strong>「未領有駕駛執照駕駛機車」14 件</strong>，相互印證此現象之真實性。以年齡層觀察，<strong>75–79 歲無照率 26.1% 為各層之冠</strong>（23 名駕駛中 6 人），推測多屬駕照逾期未換（現行規定 75 歲以上須每 3 年換照並通過認知功能測驗）。</p>
+    <p><b>分局層級可即刻推動</b>：透過村里長、社區關懷據點協力清查，配合監理單位辦理到宅或社區換照服務，可同時降低無照風險並促成認知功能篩檢。</p>
+  </div>
+</section>
+
+<!-- ============ 玖、執法對照 ============ -->
+<section id="enforcement" class="page-break">
+  <h2>玖、執法作為對照分析 <span class="en">ENFORCEMENT CROSS-ANALYSIS</span></h2>
+  <p class="lead">將事故資料與同期舉發資料交叉比對，檢視執法資源配置與實際風險分布之對應程度。</p>
+  <p style="font-size:13px;color:var(--ink-3);background:var(--panel);padding:10px 14px;border-radius:8px;border:1px solid var(--line)">
+    <b>口徑說明：</b>舉發資料無「嚴重度」屬性，無法比照事故側排除 A3，故舉發統計維持全量 7,933 件。以下「事故占比」係指高齡者<b>傷亡事故</b>占全般<b>傷亡事故</b>之比例（36.7%），與舉發占比（4.2%）並列比較。
+  </p>
+
+  <div class="tiles" style="margin-top:8px">
+    <div class="tile"><div class="k">高齡者舉發件數</div><div class="v">336<small>件</small></div><div class="n">占全般舉發 7,933 件之 4.2%</div></div>
+    <div class="tile warn"><div class="k">風險–執法落差</div><div class="v">8.7<small>倍</small></div><div class="n">傷亡事故占比 36.7% ÷ 舉發占比 4.2%</div></div>
+    <div class="tile warn"><div class="k">肇事後舉發占比</div><div class="v">58.6<small>%</small></div><div class="n">197 件／336 件為事故後開單</div></div>
+    <div class="tile"><div class="k">主動攔查舉發</div><div class="v">123<small>件</small></div><div class="n">占 36.6%，餘為慢車攤販類 16 件</div></div>
+  </div>
+
+  <div class="key red">
+    <div class="t">執法配置研判：高齡族群存在明顯執法真空</div>
+    <p>高齡者涉入 <strong>36.7%</strong> 之傷亡事故，卻僅承受 <strong>4.2%</strong> 之舉發量，落差達 8.7 倍。更關鍵者，高齡舉發中<strong>「攔舉-肇事」197 件（58.6%）係事故發生後始行舉發</strong>，事前主動攔查僅 123 件。</p>
+    <p>此結構顯示<strong>對高齡族群之執法多屬「事後補單」而非「事前預防」</strong>。惟須審慎解讀——對高齡者之執法不宜以舉發量為目標，而應轉化為<strong>「攔查＋勸導＋宣導」之接觸機會</strong>。</p>
+  </div>
+
+  <div class="g2">
+    <div class="card">
+      <h3 style="margin-top:0">高齡者違規舉發項目（前 10 項）</h3>
+      <table style="margin-top:4px">
+        <thead><tr><th>違規事實</th><th class="num">件數</th></tr></thead>
+        <tbody>
+          <tr><td><b>闖紅燈</b>（含累犯講習案）</td><td class="num"><b>42</b></td></tr>
+          <tr><td>汽機車所有人提供無資格者駕駛</td><td class="num">22</td></tr>
+          <tr><td>機車駕駛人未（依規定）戴安全帽</td><td class="num">18</td></tr>
+          <tr><td>不依規定駛入來車道（逆向）</td><td class="num">18</td></tr>
+          <tr><td>紅燈右轉</td><td class="num">16</td></tr>
+          <tr><td><b>轉彎車不讓直行車先行</b></td><td class="num">15</td></tr>
+          <tr style="background:#fef2f2"><td style="color:var(--critical)"><b>未領有駕駛執照駕駛機車</b></td><td class="num" style="color:var(--critical)"><b>14</b></td></tr>
+          <tr><td>轉彎或變換車道不依標誌標線號誌</td><td class="num">10</td></tr>
+          <tr><td>起駛前不讓行進中車輛先行</td><td class="num">9</td></tr>
+          <tr><td>肇事逃逸（無人受傷）</td><td class="num">9</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">執法與事故之項目對應</h3>
+      <table style="margin-top:4px">
+        <thead><tr><th>風險行為</th><th class="num">事故</th><th class="num">舉發</th><th>對應</th></tr></thead>
+        <tbody>
+          <tr><td>路口未讓／轉彎違規</td><td class="num">44</td><td class="num">25</td><td><span class="tag amber">部分對應</span></td></tr>
+          <tr><td>闖紅燈／違反號誌</td><td class="num">13</td><td class="num">58</td><td><span class="tag green">執法充分</span></td></tr>
+          <tr><td>無照駕駛</td><td class="num">24</td><td class="num">14</td><td><span class="tag amber">待強化</span></td></tr>
+          <tr><td>未戴安全帽</td><td class="num">8</td><td class="num">18</td><td><span class="tag green">執法充分</span></td></tr>
+          <tr style="background:#fef2f2"><td style="color:var(--critical)"><b>分心駕駛／未注意</b></td><td class="num"><b>45</b></td><td class="num">—</td><td><span class="tag red">難以執法</span></td></tr>
+          <tr style="background:#fef2f2"><td style="color:var(--critical)"><b>對造未保持安全距離</b></td><td class="num"><b>8</b></td><td class="num">—</td><td><span class="tag red">未見專項</span></td></tr>
+          <tr><td>起步未注意安全</td><td class="num">13</td><td class="num">9</td><td><span class="tag amber">部分對應</span></td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:13px;color:var(--ink-2);margin-top:10px">最大宗肇因「分心駕駛」<strong>本質上無法以路邊攔查取締</strong>；「未保持行車安全距離」則<strong>未見專項執法</strong>，卻是撞擊無責高齡者之第二大肇因。此二項即高齡事故防制無法單靠執法之結構性原因。</p>
+    </div>
+  </div>
+
+  <h3>執法熱點與事故熱點之空間對應</h3>
+  <table>
+    <thead><tr><th>地點</th><th class="num">高齡傷亡事故</th><th class="num">高齡舉發</th><th>對應研判</th></tr></thead>
+    <tbody>
+      <tr><td>中山路（含中正、大智、護安街口）</td><td class="num">18（多點位）</td><td class="num">28</td><td><span class="tag green">布防正確</span></td></tr>
+      <tr><td>中正路（含和平街、太平街口）</td><td class="num">19（多點位）</td><td class="num">24</td><td><span class="tag green">布防正確</span></td></tr>
+      <tr><td>忠孝路（含民權街口）</td><td class="num">9</td><td class="num">9</td><td><span class="tag green">布防正確</span></td></tr>
+      <tr style="background:#fef2f2"><td style="color:var(--critical)"><b>省道臺20線／臺39線口</b></td><td class="num"><b>4</b></td><td class="num" style="color:var(--critical)"><b>0</b></td><td><span class="tag red">執法真空</span></td></tr>
+      <tr style="background:#fef2f2"><td style="color:var(--critical)"><b>大智路系統</b></td><td class="num"><b>8</b></td><td class="num" style="color:var(--critical)"><b>4</b></td><td><span class="tag red">明顯不足</span></td></tr>
+      <tr><td>大新路</td><td class="num">低</td><td class="num">6</td><td><span class="tag amber">可檢討移防</span></td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:14px;color:var(--ink-2)"><strong>省道臺20線／臺39線口高齡傷亡事故 4 件，同期高齡舉發掛零；大智路系統 8 件僅舉發 4 件</strong>。此二處為明確之執法錯位標的。</p>
+  <p style="font-size:12.5px;color:var(--ink-3)">※ 本表以「路線系統」歸戶，路口事故同時歸屬交會之兩條路線（如中山路／中正路口同時計入中山路與中正路），故各列件數不可相加。</p>
+</section>
+
+<!-- ============ 拾、綜合研判 ============ -->
+<section id="conclusion" class="page-break">
+  <h2>拾、綜合研判 <span class="en">SYNTHESIS</span></h2>
+  <div class="card">
+    <ol class="tight" style="font-size:14.5px">
+      <li><b>規模與趨勢：</b>高齡者傷亡事故 198 件占全般傷亡事故 36.7%。全般傷亡事故較去年大增 15.9%（466→540 件），高齡者僅增 2.1%（194→198 件），<strong>占比自 41.6% 降至 36.7%</strong>；死亡人數自 7 人降為 1 人。惟受傷人數增 12.0%、EPDO 增 4.2%，<strong>「相對表現改善、絕對風險未降」</strong>。</li>
+      <li><b>族群定位：</b>93.6% 之高齡當事者以<strong>駕駛人</strong>身分涉入（行人僅 2.7%），且<strong>機車 126 人占 61.2%</strong>、機車與慢速載具合計占 73.8%。防制主軸為<strong>高齡機車騎士</strong>而非行人設施。</li>
+      <li><b>責任歸屬：</b>高齡者主責 114 件（57.6%）、非主責 65 件（32.8%，含明確無責 28 件）、兼有 19 件；人員層級 <strong>42 人（19.1%）完全無肇事責任</strong>。責任分布約主責 6：非主責 4。</li>
+      <li><b>致命風險來自對造：</b><strong>114 件主責案件中無死亡事故；唯一 A1 死亡案高齡者為非第一當事者。</strong>無責受害之 42 人中 81.0% 受傷、76.8% 受撞當下處於直行或停等之被動狀態；撞擊者<strong>逾三分之二為 18–64 歲青壯年</strong>，肇因以分心駕駛（10）與<strong>未保持行車安全距離（8）</strong>為主。</li>
+      <li><b>風險轉折：</b>70 歲為受傷率分水嶺，<strong>75–79 歲受傷率 100%、無照率 26.1% 雙雙為各層之冠</strong>，應列第一優先介入族群。</li>
+      <li><b>載具風險疊加：</b>高齡層小客車占比隨齡快速下降、機車與慢速載具占比上升，85 歲以上轉為自行車與農機。<strong>慢速載具高齡駕駛受傷率 92.0%</strong>，為所有族群最高。</li>
+      <li><b>時段錯位：</b>高齡傷亡事故集中 06–11 時（56.1%），與一般通勤尖峰導向之勤務配置存在落差。</li>
+      <li><b>空間集中：</b>86.4% 集中新化區，新化、唪口兩所合計 73.2%；<strong>中山路／中正路口為傷害能量最高之單一點位</strong>（9 件全為 A2、EPDO 47.5）。排除財損後熱點排序明顯變動，應以本清冊為會勘依據。</li>
+      <li><b>四年趨勢（112–115）：</b>114 年為各項指標之惡化高峰（上半年事故率 160.5、過度代表 1.83、死亡 5 人、無照 33 人皆為四年最差；全年死亡 7 人、事故率 292.3 為三年最高）；<strong>115 年上半年死亡、過度代表、事故率均已回落，惟件數 198、受傷 262、EPDO 1,124.5 仍創四年新高</strong>。113 年之「四年最佳」（事故率 130.1）經檢定為統計假象——降幅不顯著（p = 0.136）且非高齡同步下降，該年不存在針對高齡之有效作為（詳見專題附錄）。<b>結構性壓力持續：高齡人口四年增 10.7%、占比升 2.81 個百分點，載具持續機車化（機車＋慢速載具占比自 69.4% 升至 73.8%）；新化區事故率四期為 168.1→157.7→177.2→181.0，末三期連續上升且末期為四期最高，是三區中唯一未見回落者（惟四期趨勢檢定 p = 0.341，尚未達統計顯著）。</b></li>
+      <li><b>風險密度（介接政府人口資料）：</b>分局高齡事故率 157.5／萬高齡人口，<strong>較去年 160.5 降 1.9%</strong>，同期全般事故率則升 16.6%。分區觀察：<strong>新化區事故率 181.0 最高且過度代表達 1.70 倍，為唯一存在「超額風險」之行政區</strong>；左鎮區雖高齡化最嚴重（34.68%，全市 1.66 倍），事故率 113.3 且過度代表 0.94 倍（未超額）；山上區率降 42.7% 為三區最大降幅，惟未達統計顯著（p = 0.148）且四期呈 129.8→67.0→112.0→64.2 之高低振盪，非持續改善，需續追。<b>「高齡化程度高」不等於「高齡事故風險高」，資源應以超額風險而非人口結構配置。</b></li>
+      <li><b>肇因結構：</b>「分心駕駛」45 人次為首位，<strong>「路口未讓／轉彎違規」合計 44 人次</strong>為第二大群體；側撞事故中<strong>左轉相關衝突占 73.3%</strong>——指向左轉保護之工程需求。</li>
+      <li><b>環境條件：</b>56.9% 之高齡傷亡事故發生於<strong>無號誌</strong>環境，56.9% 發生於路口類道路型態，<strong>路權判斷負荷</strong>為關鍵致因環境。</li>
+      <li><b>執法落差與侷限：</b>傷亡事故占比 36.7% 對舉發占比 4.2%（落差 8.7 倍），58.6% 之高齡舉發係肇事後補單；且最大宗肇因「分心駕駛」與對造「未保持安全距離」<strong>均無專項執法對應</strong>，證明防制須採<strong>工程、教育、執法、制度四軌並進</strong>。</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============ 拾壹、改善建議 ============ -->
+<section id="recommend" class="page-break">
+  <h2>拾壹、改善建議 <span class="en">RECOMMENDATIONS</span></h2>
+  <p class="lead">依前述研判並參酌國內外實證研究，分列工程改善、執法策略、教育宣導、制度政策四類。各項均標註實證效果、來源與分局權責範圍。</p>
+
+  <div class="key red">
+    <div class="t">⚠ 前提：本轄區圖像與全國政策主軸存在關鍵差異，對策須在地化調整</div>
+    <p>全國高齡交通安全政策以<strong>行人保護</strong>為主軸——警政署統計顯示 65 歲以上行人死亡占全體行人死亡達 <b>75.2%</b>（109 年），故中央資源集中於行人庇護島、行人早開時相等設施。</p>
+    <p><strong>惟本轄區傷亡事故資料呈現截然不同之圖像</strong>：高齡當事者 220 人中，行人僅 <b>6 人（2.7%）</b>，駕駛人達 <b>206 人（93.6%）</b>，且以<b>機車</b>為主要載具。若逕行複製中央之行人導向對策，將導致資源錯置。</p>
+    <p><b>本報告之對策主軸：高齡「機車騎士」之路口路權判斷支援、被撞風險防護、載具風險管理與駕駛資格治理。</b></p>
+  </div>
+
+  <h3>一、工程改善（分局為提報者，需公路／工務單位配合）</h3>
+
+  <div class="rec">
+    <div class="rec-h"><span class="tag red">最優先</span><span class="n">A1　市區主幹道路口設置左轉保護時相或左轉管制</span></div>
+    <div class="rec-b">
+      <div class="row"><div class="lab">本轄依據</div><div class="val">有記載側撞行向之 60 件中，<strong>左轉相關衝突達 44 件（73.3%）</strong>；肇因「路口未讓／轉彎違規」合計 44 人次。左轉需同時判讀對向車速、距離與間隙，為認知負荷最高之駕駛行為。</div></div>
+      <div class="row"><div class="lab">建議標的</div><div class="val">中山路／中正路口（9 件・EPDO 47.5・全為 A2）、中正路／和平街口（6 件）、中山路／大智路口（5 件）、忠孝路／民權街口（5 件）。</div></div>
+      <div class="row"><div class="lab">實證效果</div><div class="val">行人早開時相（LPI）之 CMF 範圍 0.41–0.87；西雅圖實施後<strong>轉彎碰撞減少 48%</strong>、死亡重傷減少 34%。行人專用（全紅）時相可使路口行人–車輛碰撞風險約降低一半。<span class="tag gray">國際實證</span></div></div>
+      <div class="row"><div class="lab">政策依據</div><div class="val">交通部 112 年 6 月《行人專用時相與行人早開時相設置原則》，明訂優先評估<strong>高齡者通行較多之路口</strong>。</div></div>
+      <div class="row"><div class="lab">來源</div><div class="val src">FHWA-SA-21-032；CMF Clearinghouse Study #111；Seattle DOT Vision Zero；交通部設置原則</div></div>
+    </div>
+  </div>
+
+  <div class="rec">
+    <div class="rec-h"><span class="tag red">最優先</span><span class="n">A2　無號誌路口增設停讓管制或閃光號誌</span></div>
+    <div class="rec-b">
+      <div class="row"><div class="lab">本轄依據</div><div class="val"><strong>112 件高齡傷亡事故發生於無號誌環境（占有記載案件 56.9%）</strong>，多於有號誌路口（68 件）；另有 8 人次肇因為「違反閃光號誌」。</div></div>
+      <div class="row"><div class="lab">建議標的</div><div class="val">以本報告熱點清冊逐點會勘檢視號誌與停讓標誌配置；大智路（3 件全為 A2）、復興路／和平街口（3 件全為 A2）等小型路口優先。</div></div>
+      <div class="row"><div class="lab">實證效果</div><div class="val">停讓管制單獨 CMF 因設計差異範圍大，<strong>查無可直接引用之統一數值</strong>；FHWA《高齡化道路使用者設計手冊》將路口管制簡化列為 51 項對策之一。<span class="tag amber">效果數據不足，以本轄資料為主要依據</span></div></div>
+      <div class="row"><div class="lab">來源</div><div class="val src">FHWA《Handbook for Designing Roadways for the Aging Population》3rd ed. (FHWA-SA-14-018)</div></div>
+    </div>
+  </div>
+
+  <div class="rec">
+    <div class="rec-h"><span class="tag amber">中期</span><span class="n">A3　新化市區巷弄劃設「高齡友善示範區」（降速 30 km/h）</span></div>
+    <div class="rec-b">
+      <div class="row"><div class="lab">本轄依據</div><div class="val">高齡傷亡事故 86.4% 集中新化區；降速可同時降低事故率與傷害嚴重度，對機車與慢速載具為主之高齡族群效益加倍。</div></div>
+      <div class="row"><div class="lab">實證效果</div><div class="val">日本 Zone 30 制度整備 2,490 處前後比較：<strong>整體事故減少 23.5%、步行者／自行車事故減少 18.6%</strong>。速度–死亡率關係：時速 30 km 撞擊死亡率 10%，40 km 為 35%，50 km 達 85%。<span class="tag gray">日本實績／OECD</span></div></div>
+      <div class="row"><div class="lab">政策依據</div><div class="val">行政院《行人優先交通安全行動綱領》已列「高齡友善示範區：巷弄降速至 30 km/h」。</div></div>
+      <div class="row"><div class="lab">來源</div><div class="val src">日本警察庁交通局／国土交通省；行政院《行人優先交通安全行動綱領》</div></div>
+    </div>
+  </div>
+
+  <div class="rec">
+    <div class="rec-h"><span class="tag gray">次要</span><span class="n">A4　行人庇護島與人行設施改善（長期布局）</span></div>
+    <div class="rec-b">
+      <div class="row"><div class="lab">本轄依據</div><div class="val">本期高齡行人傷亡事故僅 6 件，<strong>就現況並非優先標的</strong>；惟轄區人口高齡化將持續，且交通部已修法規定行穿道超過 25 公尺應設庇護島，宜於既有工程案中一併納入。</div></div>
+      <div class="row"><div class="lab">實證效果</div><div class="val">行人庇護島效果因研究方法差異，範圍約 <strong>18%–46%</strong>。<span class="tag amber">建議採範圍表述，勿單引最高值</span></div></div>
+      <div class="row"><div class="lab">來源</div><div class="val src">FHWA "Medians and Pedestrian Refuge Islands"；NCHRP Report 841；iRAP Road Safety Toolkit</div></div>
+    </div>
+  </div>
+
+  <h3>二、執法策略（分局權責內可直接決行）</h3>
+
+  <div class="rec">
+    <div class="rec-h"><span class="tag red">最優先</span><span class="n">B0　防追撞專項執法：保護「無責受害」之高齡者</span></div>
+    <div class="rec-b">
+      <div class="row"><div class="lab">本轄依據</div><div class="val">高齡者非主責案件 65 件（32.8%），<strong>本期唯一 A1 死亡事故即屬此類</strong>。無責受害之 42 名高齡者中 <strong>81.0% 受傷</strong>、76.8% 處於直行或停等之被動狀態，事故型態以<strong>追撞 10 件</strong>為首；對造肇因以<strong>未保持行車安全距離 8 人次</strong>與分心駕駛 10 人次為主，且<strong>逾三分之二對造為 18–64 歲青壯年</strong>。</div></div>
+      <div class="row"><div class="lab">關鍵意涵</div><div class="val">此類事故<strong>無論如何加強高齡者教育或駕照管制均無法防制</strong>——受害者本身並無疏失。防制對象必須是<strong>其他用路人</strong>。且執法側同期<strong>未見「未保持行車安全距離」之專項舉發</strong>，屬明確缺口。</div></div>
+      <div class="row"><div class="lab">具體作為</div><div class="val">① 於中山路、中正路及省道臺20線等高齡者活動主線，針對<strong>「未保持行車安全距離」「行近慢速車輛未減速」</strong>加強取締；② 併同「違規超車」「變換車道不當」列為同一專項；③ 宣導主軸鎖定<strong>青壯年機車騎士</strong>（占對造 56.8%），透過里民大會、廟會活動、機關內部教育實施。</div></div>
+      <div class="row"><div class="lab">證據限制</div><div class="val"><span class="tag amber">無專屬 CMF</span>「防追撞執法」缺乏針對高齡受害者之獨立效果研究；惟本轄事故資料已明確指出因果鏈，屬<strong>資料驅動之在地對策</strong>。</div></div>
+    </div>
+  </div>
+
+  <div class="rec">
+    <div class="rec-h"><span class="tag red">立即可行</span><span class="n">B1　勤務時段重配：護老勤務移至 06–11 時</span></div>
+    <div class="rec-b">
+      <div class="row"><div class="lab">本轄依據</div><div class="val">高齡傷亡事故 <strong>06–11 時計 111 件（56.1%）</strong>，07 時 25 件為高峰；夜間僅 8 件（4.0%）。</div></div>
+      <div class="row"><div class="lab">具體作為</div><div class="val">於新化派出所（86 件）、唪口派出所（59 件）轄區，<strong>將路口指揮、攔查與宣導勤務優先配置於 07–11 時</strong>，鎖定市場、衛生所、廟口周邊路口。</div></div>
+      <div class="row"><div class="lab">成本</div><div class="val">零新增預算，屬既有勤務時段調整。</div></div>
+    </div>
+  </div>
+
+  <div class="rec">
+    <div class="rec-h"><span class="tag red">立即可行</span><span class="n">B2　執法錯位修正：移入省道臺20／臺39線口與大智路系統</span></div>
+    <div class="rec-b">
+      <div class="row"><div class="lab">本轄依據</div><div class="val"><strong>省道臺20線／臺39線口高齡傷亡事故 4 件，同期高齡舉發 0 件</strong>；大智路系統 8 件僅舉發 4 件。反觀中山路、中正路布防與風險相符。</div></div>
+      <div class="row"><div class="lab">具體作為</div><div class="val">將部分攔查能量自大新路（事故量低、舉發 6 件）移至上述兩處；省道路口以<strong>轉彎未讓、闖紅燈、未保持安全距離</strong>為執法重點，並注意高速差路口之攔查安全。</div></div>
+    </div>
+  </div>
+
+  <div class="rec">
+    <div class="rec-h"><span class="tag amber">配套</span><span class="n">B3　慢速載具辨識度強化與混流管理</span></div>
+    <div class="rec-b">
+      <div class="row"><div class="lab">本轄依據</div><div class="val">駕駛慢速載具之高齡者 26 人，<strong>受傷率達 92.0%</strong>（高齡者整體 70.3%），為所有族群最高。此類載具速度慢、車體無防護，於混合車流中易遭快車追撞或側撞。</div></div>
+      <div class="row"><div class="lab">具體作為</div><div class="val">① 對轄內高齡自行車、微電車使用者發放並宣導<strong>反光標識與尾燈</strong>；② 產業道路與省道交會處加強<strong>農機車輛出入警示標誌</strong>之提報；③ 農忙期於農路匯入省道路段安排疏導；④ 配合微電車強制掛牌與投保之查察。</div></div>
+      <div class="row"><div class="lab">證據限制</div><div class="val"><span class="tag red">數據不足</span>農耕用車本期僅 1 名高齡當事者，樣本過小；本項係基於慢速載具共同風險特性推論，建議<strong>持續累積資料後再評估成效</strong>。</div></div>
+    </div>
+  </div>
+
+  <div class="rec">
+    <div class="rec-h"><span class="tag amber">研議</span><span class="n">B4　高齡者違規之處置裁量原則</span></div>
+    <div class="rec-b">
+      <div class="row"><div class="lab">本轄依據</div><div class="val">最大宗肇因「分心駕駛」45 人次<strong>無外顯違規事實、無從路邊取締</strong>；且高齡舉發 58.6% 係事故後補單。單純提高舉發量對此族群防制效益有限。</div></div>
+      <div class="row"><div class="lab">建議方向</div><div class="val">研議對高齡者初次輕微違規以<strong>「攔查＋勸導＋當場衛教」</strong>取代逕行舉發，將執法接觸轉化為宣導機會。</div></div>
+      <div class="row"><div class="lab">證據限制</div><div class="val"><span class="tag red">查無實證</span>國內外<strong>查無嚴謹研究</strong>比較勸導與舉發對高齡者再犯率／事故率之效果差異。屬政策選項而非已證實有效對策，建議先行試辦並自行蒐集成效資料。</div></div>
+    </div>
+  </div>
+
+  <h3>三、教育宣導（分局權責內可直接推動，本類效益最高）</h3>
+
+  <div class="rec">
+    <div class="rec-h"><span class="tag red">最推薦</span><span class="n">C1　擴大辦理「路老師」社區深入宣講</span></div>
+    <div class="rec-b">
+      <div class="row"><div class="lab">本轄依據</div><div class="val">「分心／注意力」類肇因於 70–79 歲達頂峰且無法以執法介入，唯有透過教育提升自我覺察。新化、山上、左鎮社區關懷據點、老人共餐據點、廟口密度高，具備推展條件。</div></div>
+      <div class="row"><div class="lab">實證效果</div><div class="val"><strong>屏東縣案例：114 年較 113 年同期高齡者交通事故死亡人數減少 11 人，降幅達 40%</strong>；課程針對分心、轉彎不當、未保持安全距離等常見高齡肇因設計，採互動與真實事故情境教學。<span class="tag green">台灣本土最具體之量化教育介入成效</span><span class="tag amber">單一縣市前後比較，非對照組研究，效果量宜審慎解讀</span></div></div>
+      <div class="row"><div class="lab">佐證</div><div class="val">研究發現<strong>傳統單向講習／影片教案對高齡者知識傳遞無顯著成效</strong>；互動與模擬操作型教學則能明顯提升正確駕駛比例。</div></div>
+      <div class="row"><div class="lab">來源</div><div class="val src">自由時報 114.6；中央社 113.1；Airiti《高齡者交通安全教育宣導教材之設計成效探討》</div></div>
+    </div>
+  </div>
+
+  <div class="rec">
+    <div class="rec-h"><span class="tag red">最推薦</span><span class="n">C2　高齡機車騎士專案宣導（本轄核心族群）</span></div>
+    <div class="rec-b">
+      <div class="row"><div class="lab">本轄依據</div><div class="val">傷亡口徑下<strong>機車為高齡駕駛之絕對主流（126 人，61.2%）</strong>；機車與慢速載具合計占 73.8%。另高齡騎士戴用<strong>半罩式安全帽 54 人</strong>（占戴帽者 38.6%），該型對顏面與下顎保護力較低。</div></div>
+      <div class="row"><div class="lab">具體作為</div><div class="val">① 於路老師課程納入「機車起步與路口左轉」情境教學（對應起步未注意 13、左轉未依規定 10 人次）；② 宣導以<strong>全罩式或 3/4 罩式</strong>替換半罩式安全帽；③ 協助轉介監理站機車安駕訓練補助（每人 1,200–1,300 元）。</div></div>
+      <div class="row"><div class="lab">來源</div><div class="val src">行政院《行人優先交通安全行動綱領》；中華民國機車研究發展安全促進協會</div></div>
+    </div>
+  </div>
+
+  <div class="rec">
+    <div class="rec-h"><span class="tag amber">建議辦理</span><span class="n">C3　大型車內輪差體驗式教學</span></div>
+    <div class="rec-b">
+      <div class="row"><div class="lab">本轄依據</div><div class="val">轄內台20線等省道大型車與農機具通行量大，高齡機車、自行車騎士（占高齡駕駛 73.8%）遭捲入風險高。</div></div>
+      <div class="row"><div class="lab">實證效果</div><div class="val"><span class="tag red">無量化數據</span>查無 crash reduction 統計，僅有操作示範案例。惟成本低、易執行、體驗印象深刻。</div></div>
+      <div class="row"><div class="lab">來源</div><div class="val src">公視新聞網「台南長者體驗駕駛視角 認識內輪差潛藏風險」</div></div>
+    </div>
+  </div>
+
+  <div class="rec">
+    <div class="rec-h"><span class="tag gray">可併行</span><span class="n">C4　反光配件發放（低成本補位措施）</span></div>
+    <div class="rec-b">
+      <div class="row"><div class="lab">本轄依據</div><div class="val">高齡傷亡事故 96.0% 發生於日間（夜間 20–05 時僅 8 件），<strong>本轄夜間可視性並非主要風險</strong>；惟對慢速載具使用者仍具基本防護價值。</div></div>
+      <div class="row"><div class="lab">誠實提醒</div><div class="val"><span class="tag red">勿引用未經查證數字</span>網路流傳「反光配件降低事故 85%」等說法，經查<strong>源自反光材料商業行銷網站而非交通安全研究機構</strong>，本報告不予採用。</div></div>
+      <div class="row"><div class="lab">來源</div><div class="val src">高雄市 115 年反光背心發放政策（屬政策宣布，非成效研究）</div></div>
+    </div>
+  </div>
+
+  <h3>四、制度政策（分局為協力與提報角色）</h3>
+
+  <div class="rec">
+    <div class="rec-h"><span class="tag red">最優先</span><span class="n">D1　高齡無照駕駛清查與換照協力</span></div>
+    <div class="rec-b">
+      <div class="row"><div class="lab">本轄依據</div><div class="val">事故側 24 名高齡無照駕駛＋1 名駕照遭吊銷仍駕駛者，<strong>占高齡駕駛 12.1%</strong>（排除財損後比例較含 A3 時之 8.7% 更高）；執法側同期舉發「未領有駕駛執照駕駛機車」14 件相互印證。<strong>75–79 歲無照率 26.1% 為各層之冠</strong>。</div></div>
+      <div class="row"><div class="lab">具體作為</div><div class="val">透過村里長、社區關懷據點協力清查高齡無照與逾期未換照者，<strong>洽請監理單位辦理社區或到宅換照服務</strong>，一次達成三項效果：降低無照風險、促成認知功能篩檢、建立長者接觸管道。</div></div>
+      <div class="row"><div class="lab">制度背景</div><div class="val">114 年 5 月起定期換照年齡下修至 70 歲；75 歲以上須通過認知功能測驗或提供無中度以上失智證明，其後每 3 年換發。試辦階段合格率約 70%。<span class="tag amber">新制甫上路，尚無官方公布之事故減少率追蹤</span></div></div>
+      <div class="row"><div class="lab">來源</div><div class="val src">交通部公路局高齡駕駛人駕照管理制度</div></div>
+    </div>
+  </div>
+
+  <div class="rec">
+    <div class="rec-h"><span class="tag amber">爭取資源</span><span class="n">D2　提報「永續提升人行安全計畫」熱點改善</span></div>
+    <div class="rec-b">
+      <div class="row"><div class="lab">本轄依據</div><div class="val">分局雖非工程權責單位，卻握有第一手事故資料。<strong>本報告之傷亡口徑熱點清冊即為現成之提報依據</strong>，且較含財損之清冊更能反映真實傷害風險。</div></div>
+      <div class="row"><div class="lab">制度背景</div><div class="val">113–116 年計畫總經費 <strong>400 億元</strong>（內政部 260 億＋交通部 140 億），全國盤點 1,000 處行人事故熱點分階段改善。</div></div>
+      <div class="row"><div class="lab">具體作為</div><div class="val">以中山路／中正路口為首之前五名點位，備妥事故清冊、衝突型態分析與現場照片，主動函請市府交通局／工務局辦理會勘。</div></div>
+      <div class="row"><div class="lab">來源</div><div class="val src">內政部國土管理署人本道路資訊網；交通部公路局</div></div>
+    </div>
+  </div>
+
+  <div class="key green">
+    <div class="t">✔ 建議優先順序（分局層級三個月內可啟動）</div>
+    <p><b>第一順位（零預算、即刻可行）：</b>B1 勤務時段移至 06–11 時　＋　B2 省道臺20／臺39線口執法錯位修正　＋　<b>B0 防追撞專項執法</b>。此三項僅需勤務規劃與取締重點調整，可於下個月勤務表即反映；其中 B0 直接對應本期唯一死亡事故之型態，且填補「未保持行車安全距離」之執法空白。</p>
+    <p><b>第二順位（低成本、高實證）：</b>C1 路老師社區宣講（本土實證降幅 40%）　＋　C2 高齡機車騎士專案　＋　D1 無照清查與換照協力。三項可同步推動、互為配套——宣講場合即為清查與轉介之接觸點。</p>
+    <p><b>第三順位（需跨機關協調）：</b>A1 左轉保護時相　＋　A2 無號誌路口管制　＋　D2 提報熱點改善。以本報告作為附件，於年度道安會報提案。</p>
+  </div>
+</section>
+
+<!-- ============ 附錄 ============ -->
+<section id="appendix">
+  <h2>附錄：資料品質查核與限制說明 <span class="en">DATA QUALITY &amp; LIMITATIONS</span></h2>
+
+  <h3>附錄一、資料品質查核結果（112.1–115.7 全期間）</h3>
+  <div class="card">
+    <p style="font-size:14px">為確保本報告結論之可信度，已對全期間 <strong>12,911 筆當事者資料、5,989 件事故</strong>執行完整性與值域查核，結果如下：</p>
+    <table style="margin-top:10px">
+      <thead><tr><th>查核項目</th><th>結果</th><th>判定</th></tr></thead>
+      <tbody>
+        <tr><td>月份完整性</td><td>112 年 1 月至 115 年 7 月共 43 個月，<b>無缺漏月份</b>；各月件數均未偏離月均 ±50%</td><td><span class="tag green">通過</span></td></tr>
+        <tr><td>GPS 座標完整率</td><td>各年度均為 <b>100%</b>（熱點分析基礎穩固）</td><td><span class="tag green">通過</span></td></tr>
+        <tr><td>行政區值域</td><td>僅新化區、山上區、左鎮區三值，<b>無轄外或異常值</b></td><td><span class="tag green">通過</span></td></tr>
+        <tr><td>轄區單位值域</td><td>7 個轄區所，無首見或異常單位名</td><td><span class="tag green">通過</span></td></tr>
+        <tr><td>年齡值域</td><td>−1（未記載哨兵）至 96 歲，<b>無逾 110 歲之異常值</b>；未記載率各年 7.6–9.3% 穩定</td><td><span class="tag green">通過</span></td></tr>
+        <tr><td>日期與時間格式</td><td>異常 0 件</td><td><span class="tag green">通過</span></td></tr>
+        <tr><td>嚴重度分布穩定性</td><td>A1 各年 0.4–0.6%、A2 54.9–60.1%、A3 39.5–44.7%，<b>年際波動合理</b></td><td><span class="tag green">通過</span></td></tr>
+        <tr><td>跨檔重複案件</td><td>115 年 7 月兩檔重疊 27 案，<b>分析時已以案件編號去重</b></td><td><span class="tag blue">已處理</span></td></tr>
+        <tr><td>肇因記載完整性</td><td>詳下方專項說明</td><td><span class="tag amber">需說明</span></td></tr>
+      </tbody>
+    </table>
+
+    <div class="key blue" style="margin-top:16px">
+      <div class="t">專項說明：肇因未記載率逐年上升之根因，及其對本報告之影響（結論：不受影響）</div>
+      <p><b>現象：</b>當事者「個別肇因」未記載率自 112 年 0.1% 升至 115 年 23.6%，初見易誤判為資料品質劣化。</p>
+      <p><b>根因：</b>經交叉比對「處理狀態」欄位確認，此現象<strong>完全由案件調查進度決定，非資料填載品質問題</strong>——
+      「<b>結案通過</b>」之案件肇因未記載率<strong>各年均為 0%</strong>；未記載者全數集中於「初審通過」「已分案」「處理中」等<strong>尚未結案</strong>之案件。近年資料因案件較新、結案比例較低（115 年結案 45%，112 年為 58%），故未記載率較高。</p>
+      <p><b>對本報告之影響：</b>經檢定<strong>本報告所採之傷亡口徑（A1＋A2）駕駛人，肇因未記載率為 112–114 年 0.0%、115 年僅 1.7%</strong>。原因為<strong>傷亡事故依規定須完成調查與責任研判，肇因必填</strong>；未記載者幾乎全部落在 A3 純財損案件。就本報告核心之責任歸屬分析（柒章），115 年上半年 220 名高齡當事者中僅 <b>1 人</b>肇因未記載（占 0.5%），<strong>不影響任何結論</strong>。</p>
+      <p><b>附帶意涵：</b>此查核同時佐證<strong>長官指示排除 A3 之決定具資料品質上之正當性</strong>——A3 案件未結案比例高、肇因大量未填，本即不適合作為肇因與責任分析之基礎。</p>
+    </div>
+  </div>
+
+  <h3>附錄二、資料限制說明</h3>
+  <div class="card">
+    <ul class="tight">
+      <li><b>統計口徑（最重要）：</b>本報告依長官指示<strong>僅統計 A1＋A2 傷亡事故，排除 A3 純財損事故</strong>。所有件數、人數、比率、熱點排序與 EPDO 均據此計算，<strong>不可與含 A3 之統計（含儀表板系統畫面）直接比較</strong>。</li>
+      <li><b>件數與人數之區分：</b>本報告嚴格區分「件」與「人」——同一事故可能有 2 名以上高齡當事者，<strong>不得以人數推估件數</strong>。本期 198 件高齡傷亡事故對應 220 名高齡當事者，其中 21 件涉及 2 名以上高齡者。各年齡層之「涉入事故件數」因同案可能跨層，<strong>不可相加</strong>。</li>
+      <li><b>當事者順位之責任意涵：</b>以「當事者順位」與「初步分析研判（個別）」推論責任歸屬，並以本期資料驗證（高齡第一當事者無肇事因素者僅 1.5%，第二以後達 46.0%）。惟此係<strong>現場初步研判</strong>，非車輛行車事故鑑定委員會之最終鑑定意見，個案責任仍以鑑定或司法認定為準。</li>
+      <li><b>年齡未記載案件：</b>部分當事者年齡欄為未記載（-1），已排除，未計入任何年齡層統計。</li>
+      <li><b>「尚未發現肇事因素」之處理：</b>該項於高齡當事者計 42 人次，係無法歸責之案件，本報告已將其獨立解讀為「無肇事責任」（詳柒章），未計入肇因排名之責任歸屬。</li>
+      <li><b>小樣本限制：</b>85 歲以上僅 7 人、農耕用車僅 1 人，統計穩定性不足，趨勢解讀應審慎。</li>
+      <li><b>照明欄位語意：</b>「有照明未開啟或故障」144 件中多數係<strong>日間事故</strong>（路燈本即不開啟），不應逕行判讀為照明設施缺失；高齡傷亡事故 96.0% 發生於日間。</li>
+      <li><b>執法資料之口徑差異：</b>舉發資料無嚴重度屬性，無法排除對應 A3 之案件，故執法統計維持全量 7,933 件；與事故側之比較係「高齡傷亡事故占比」對「高齡舉發占比」，屬不同基礎之對照，僅供資源配置參考。另舉發統計未涵蓋勸導不舉發案件，實際警民接觸量高於本數。</li>
+      <li><b>空間聚類半徑：</b>熱點採 100 公尺半徑聚類，同一路口不同象限之事故已合併計算。</li>
+      <li><b>事故率之分母限制：</b>事故以<b>發生地</b>行政區歸戶，人口以<b>戶籍地</b>計算，二者非完全對應。跨區幹道（如省道臺20線、臺39線）通過之事故會使該區事故率略為高估；設籍他區而於本轄活動之高齡者亦未納入分母。此為所有以行政區為單元之事故率分析共有之限制，比較時應以趨勢與相對高低為主，不宜過度解讀絕對值。</li>
+      <li><b>年齡層事故率之限制：</b>民政局公開之區級人口僅切至「65 歲以上」單一級距，<b>無法拆分 65–69／70–74／75–79 等五歲組</b>，故本報告僅能計算「65 歲以上整體」之事故率，未能計算各年齡層之事故率。若需五歲組分母，須改用內政部戶政司之鄉鎮市區年齡別人口統計。</li>
+      <li><b>機動車輛分母從缺：</b>經查證，機動車輛登記數之政府公開統計（公路局、社會經濟資料服務平台、政府資料開放平臺）<b>最細僅至縣市層級，無鄉鎮市區資料</b>，故本報告未計算「每萬輛事故率」。若需該指標，須由分局行文交通局或監理機關索取轄內各區車輛登記數。</li>
+    </ul>
+  </div>
+
+  <div class="foot">
+    <b>本報告由精準執法儀表板系統自動產製</b>　·　統計口徑：A1＋A2 傷亡事故（排除 A3 財損）　·　資料截止：中華民國 115 年 6 月 30 日<br>
+    分析口徑依循交通部道安會報標準；EPDO 採 30 日死亡×9.5＋受傷×3.5＋案件數計算。<br>
+    本報告所載統計均為彙總數據，不含任何個人資料。<br><b style="color:#475569">專題附錄</b>　本報告多年趨勢章節之「113 年最佳年」議題，另編有《附錄：113 年「四年最佳」真相查核》乙份，載明控制組對照、統計顯著性檢定、改善來源拆解及建議採用之三項監測指標，應併同閱讀。
+  </div>
+</section>
+
+</div>
+
+<script>
+const D = {
+  hotspots: [
+    {r:1,loc:"中山路 ／ 中正路",d:"新化區",n:9,e:47.5,a1:0,a2:9,note:"市區主幹道十字路口，全數傷亡，能量最高"},
+    {r:2,loc:"中正路 ／ 和平街",d:"新化區",n:6,e:34.0,a1:0,a2:6,note:"6 件全為 A2，傷亡轉化率 100%"},
+    {r:3,loc:"中山路 ／ 大智路",d:"新化區",n:5,e:33.0,a1:0,a2:5,note:"市區主幹道路口，全數傷亡"},
+    {r:4,loc:"大智路（164巷口一帶）",d:"新化區",n:3,e:27.5,a1:0,a2:3,note:"巷口路權衝突，全數傷亡"},
+    {r:5,loc:"忠孝路 ／ 民權街",d:"新化區",n:5,e:26.0,a1:0,a2:5,note:"市區次幹道路口"},
+    {r:6,loc:"省道臺20線 ／ 省道臺39線",d:"新化區",n:4,e:25.0,a1:0,a2:4,note:"高速差省道路口，執法真空"},
+    {r:7,loc:"復興路 ／ 和平街",d:"新化區",n:3,e:24.0,a1:0,a2:3,note:"小型路口，全數傷亡"},
+    {r:8,loc:"中正路 ／ 太平街",d:"新化區",n:4,e:21.5,a1:0,a2:4,note:"市區路口"},
+    {r:9,loc:"忠孝路（路段）",d:"新化區",n:4,e:21.5,a1:0,a2:4,note:"路段型"},
+    {r:10,loc:"中山路 ／ 護安街",d:"新化區",n:4,e:18.0,a1:0,a2:4,note:"市區路口"}
+  ],
+  hourEld: [0,0,0,0,0,1,13,25,16,14,21,22,10,6,10,10,12,15,9,7,6,1,0,0],
+  hourAll: [1,1,0,2,0,6,22,71,36,32,37,39,23,20,26,22,46,50,41,23,22,10,5,5],
+  months: [["1月",43],["2月",31],["3月",36],["4月",30],["5月",24],["6月",34]],
+  dow: [["一",29],["二",37],["三",28],["四",26],["五",33],["六",20],["日",25]],
+  hurtRate: [["60-64",63.9,84],["65-69",61.8,89],["70-74",67.9,78],["75-79",100.0,26],["80-84",80.0,20],["85+",66.7,7]],
+  vehShift: [
+    {b:"59以下",v:[["機車",433],["小客車",203],["腳踏自行車",25],["微電車",25],["其他",17]]},
+    {b:"60-64",v:[["機車",48],["小客車",28],["腳踏自行車",0],["微電車",0],["其他",2]]},
+    {b:"65-69",v:[["機車",51],["小客車",27],["腳踏自行車",3],["微電車",2],["其他",1]]},
+    {b:"70-74",v:[["機車",51],["小客車",19],["腳踏自行車",2],["微電車",2],["其他",1]]},
+    {b:"75-79",v:[["機車",16],["小客車",2],["腳踏自行車",1],["微電車",4],["其他",0]]},
+    {b:"80-84",v:[["機車",8],["小客車",4],["腳踏自行車",2],["微電車",2],["其他",1]]},
+    {b:"85+",v:[["機車",0],["小客車",1],["腳踏自行車",3],["微電車",0],["其他",3]]}
+  ],
+  ctype: [["側撞",60],["其他",46],["路上翻車、摔倒",17],["追撞",17],["路口交岔撞",14],["同向擦撞",12],["衝出路外",6],["對向擦撞",6]],
+  road: [["直路",72],["四岔路",61],["三岔路",40],["多岔路",11],["彎曲路",6],["圓環",4]],
+  signal: [["無號誌",112],["行車管制號誌",68],["閃光號誌",15]],
+  cause: [
+    ["恍神、緊張、心不在焉分心駕駛",45],["有號誌路口，轉彎車未讓直行車先行",17],
+    ["起步時未注意安全",13],["左轉彎未依規定",10],["其他不當駕車行為",10],
+    ["未依規定減速",9],["違反閃光號誌",8],["無號誌路口，轉彎車未讓直行車先行",6],
+    ["其他引起事故之疏失或行為",5],["未保持行車安全間隔",5],["闖紅燈直行",5],
+    ["右轉彎未依規定",3]
+  ],
+  frailty: [["65歲以上",70.3,219],["64歲以下",65.3,838]],
+  rate: [["新化區",181.0,177.2],["左鎮區",113.3,110.1],["山上區",64.2,112.0]],
+  trendLab: ["112上","113上","114上","115上"],
+  trendRate: [{n:"高齡事故率",c:"#2a78d6",d:[154.1,130.1,160.5,157.5]},
+              {n:"全般事故率",c:"#eb6834",d:[96.7,86.3,88.0,102.6]}],
+  trendVeh: [{n:"機車",c:"#eb6834",d:[100,92,114,126]},
+             {n:"小客車",c:"#2a78d6",d:[47,39,63,53]},
+             {n:"慢速載具",c:"#1baf7a",d:[18,16,21,26]}],
+  trendDist: [{n:"新化區",c:"#d03b3b",d:[168.1,157.7,177.2,181.0]},
+              {n:"左鎮區",c:"#2a78d6",d:[96.1,29.3,110.1,113.3]},
+              {n:"山上區",c:"#1baf7a",d:[129.8,67.0,112.0,64.2]}],
+  victimAction: [["向前直行中",27],["其他",4],["等待(引擎未熄火)",3],["不明",3],["步行",1],["靜立(止)",1],["停車操作中",1],["靜止(引擎熄火)",1]],
+  victimType: [["其他",12],["追撞",10],["側撞",6],["路上翻車、摔倒",2],["對向擦撞",2],["同向擦撞",2],["倒車撞",2],["穿越道路中",1]]
+};
+
+const NS="http://www.w3.org/2000/svg";
+const C={s1:"#2a78d6",s2:"#eb6834",s3:"#1baf7a",s4:"#eda100",gray:"#94a3b8",
+  ink:"#0b1220",ink2:"#475569",ink3:"#7c8798",grid:"#e8ecf1",crit:"#d03b3b",ser:"#ec835a",good:"#0ca30c"};
+const el=(t,a={})=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
+const txt=(x,y,s,o={})=>{const t=el("text",{x,y,fill:o.fill||C.ink2,"font-size":o.fs||11,
+  "text-anchor":o.ta||"start","font-weight":o.fw||400,"dominant-baseline":o.db||"auto"});
+  t.textContent=s;return t;};
+
+function hbar(id,data,opt={}){
+  const svg=document.getElementById(id); if(!svg)return;
+  const vb=svg.getAttribute("viewBox").split(" ").map(Number), W=vb[2], H=vb[3];
+  const L=opt.labelW||190, R=opt.valW||52, top=8, bot=opt.bot||6;
+  const n=data.length, gap=opt.gap||8;
+  const bh=Math.max(10,(H-top-bot-(n-1)*gap)/n);
+  const max=Math.max(...data.map(d=>d[1]));
+  const plotW=W-L-R;
+  data.forEach((d,i)=>{
+    const y=top+i*(bh+gap), w=Math.max(2,d[1]/max*plotW);
+    svg.appendChild(txt(L-10,y+bh/2,d[0],{ta:"end",db:"middle",fs:opt.lfs||11.5,fill:C.ink2}));
+    svg.appendChild(el("rect",{x:L,y,width:w,height:bh,fill:opt.colorFn?opt.colorFn(d,i):C.s1,rx:4}));
+    svg.appendChild(txt(L+w+8,y+bh/2,opt.fmt?opt.fmt(d[1]):d[1],{db:"middle",fs:11.5,fw:700,fill:C.ink}));
+  });
+}
+
+function vbar(id,data,opt={}){
+  const svg=document.getElementById(id); if(!svg)return;
+  const vb=svg.getAttribute("viewBox").split(" ").map(Number), W=vb[2], H=vb[3];
+  const L=opt.left||38, R=14, T=opt.top||16, B=opt.bot||40;
+  const pw=W-L-R, ph=H-T-B, n=data.length;
+  const max=opt.max||Math.max(...data.map(d=>d[1]))*1.15;
+  const bw=Math.min(opt.maxBW||56,pw/n*0.62), step=pw/n;
+  const ticks=opt.ticks||4;
+  for(let i=0;i<=ticks;i++){
+    const v=max/ticks*i, y=T+ph-ph*(v/max);
+    svg.appendChild(el("line",{x1:L,x2:W-R,y1:y,y2:y,stroke:C.grid,"stroke-width":1}));
+    svg.appendChild(txt(L-8,y,opt.tickFmt?opt.tickFmt(v):Math.round(v),{ta:"end",db:"middle",fs:10.5,fill:C.ink3}));
+  }
+  if(opt.refLine!==undefined){
+    const y=T+ph-ph*(opt.refLine/max);
+    svg.appendChild(el("line",{x1:L,x2:W-R,y1:y,y2:y,stroke:C.ink3,"stroke-width":1.5,"stroke-dasharray":"5 4"}));
+  }
+  data.forEach((d,i)=>{
+    const x=L+step*i+(step-bw)/2, h=Math.max(2,ph*(d[1]/max)), y=T+ph-h;
+    svg.appendChild(el("rect",{x,y,width:bw,height:h,fill:opt.colorFn?opt.colorFn(d,i):C.s1,rx:4}));
+    svg.appendChild(txt(x+bw/2,y-6,opt.fmt?opt.fmt(d[1]):d[1],{ta:"middle",fs:11.5,fw:700,fill:C.ink}));
+    svg.appendChild(txt(x+bw/2,T+ph+16,d[0],{ta:"middle",fs:11,fill:C.ink2}));
+    if(opt.sub) svg.appendChild(txt(x+bw/2,T+ph+31,opt.sub(d,i),{ta:"middle",fs:10,fill:C.ink3}));
+  });
+  svg.appendChild(el("line",{x1:L,x2:W-R,y1:T+ph,y2:T+ph,stroke:"#cbd5e1","stroke-width":1.5}));
+}
+
+/* 少點數趨勢折線（逐點標值） */
+function tline(id,series,labels,opt={}){
+  const svg=document.getElementById(id); if(!svg)return;
+  const vb=svg.getAttribute("viewBox").split(" ").map(Number), W=vb[2], H=vb[3];
+  const L=46,R=26,T=26,B=38, pw=W-L-R, ph=H-T-B;
+  const max=opt.max||Math.max(...series.flatMap(s=>s.d))*1.22;
+  const step=pw/(labels.length-1);
+  /* 起始刻度(0)之標籤與 X 軸期別標籤位置重疊，故自 i=1 起標示 */
+  for(let i=0;i<=4;i++){
+    const v=max/4*i, y=T+ph-ph*(v/max);
+    svg.appendChild(el("line",{x1:L,x2:W-R,y1:y,y2:y,stroke:C.grid,"stroke-width":1}));
+    if(i>0) svg.appendChild(txt(L-8,y,Math.round(v),{ta:"end",db:"middle",fs:10.5,fill:C.ink3}));
+  }
+  labels.forEach((lb,i)=>svg.appendChild(txt(L+step*i,T+ph+20,lb,{ta:"middle",fs:11,fill:C.ink2,fw:600})));
+  const labelSpecs = [];   // 先蒐集，稍後統一解碰撞
+  series.forEach(s=>{
+    const pts=s.d.map((v,i)=>[L+step*i,T+ph-ph*(v/max)]);
+    svg.appendChild(el("path",{d:pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" "),
+      fill:"none",stroke:s.c,"stroke-width":2.6,"stroke-linejoin":"round","stroke-linecap":"round"}));
+    pts.forEach((p,i)=>{
+      svg.appendChild(el("circle",{cx:p[0],cy:p[1],r:4,fill:"#fff",stroke:s.c,"stroke-width":2.4}));
+      /* 首/末點靠內對齊，避免壓到 Y 軸刻度或右緣 */
+      labelSpecs.push({i, x:p[0] + (i===0?6:(i===pts.length-1?-6:0)), y:p[1]-11,
+        ta: i===0?"start":(i===pts.length-1?"end":"middle"), v:s.d[i], c:s.c});
+    });
+  });
+  /* 同一期別之多序列值標若過近則垂直推開（由上而下維持 15px 間距，大於字高避免框線相碰） */
+  const byX = {};
+  labelSpecs.forEach(sp=>{ (byX[sp.i] = byX[sp.i] || []).push(sp); });
+  Object.values(byX).forEach(g=>{
+    g.sort((a,b)=>a.y-b.y);
+    for(let k=1;k<g.length;k++){
+      if(g[k].y - g[k-1].y < 15) g[k].y = g[k-1].y + 15;
+    }
+  });
+  labelSpecs.forEach(sp=>svg.appendChild(txt(sp.x,sp.y,sp.v,{ta:sp.ta,fs:10.5,fw:700,fill:sp.c})));
+  svg.appendChild(el("line",{x1:L,x2:W-R,y1:T+ph,y2:T+ph,stroke:"#cbd5e1","stroke-width":1.5}));
+}
+
+/* 分組直條（本期 vs 去年同期） */
+function gbar(id,data,opt={}){
+  const svg=document.getElementById(id); if(!svg)return;
+  const vb=svg.getAttribute("viewBox").split(" ").map(Number), W=vb[2], H=vb[3];
+  const L=48,R=16,T=24,B=56, pw=W-L-R, ph=H-T-B;
+  const max=opt.max||Math.max(...data.flatMap(d=>[d[1],d[2]]))*1.25;
+  const step=pw/data.length, bw=Math.min(52,step*0.28), gapIn=6;
+  for(let i=0;i<=4;i++){
+    const v=max/4*i, y=T+ph-ph*(v/max);
+    svg.appendChild(el("line",{x1:L,x2:W-R,y1:y,y2:y,stroke:C.grid,"stroke-width":1}));
+    svg.appendChild(txt(L-8,y,Math.round(v),{ta:"end",db:"middle",fs:10.5,fill:C.ink3}));
+  }
+  if(opt.refLine!==undefined){
+    const y=T+ph-ph*(opt.refLine/max);
+    svg.appendChild(el("line",{x1:L,x2:W-R,y1:y,y2:y,stroke:C.ink3,"stroke-width":1.5,"stroke-dasharray":"5 4"}));
+  }
+  data.forEach((d,i)=>{
+    const cx=L+step*i+step/2;
+    [[d[2],C.gray,-1],[d[1],C.s1,1]].forEach(([v,col,side])=>{
+      const x=cx+(side<0?-(bw+gapIn/2):gapIn/2), h=Math.max(2,ph*(v/max)), y=T+ph-h;
+      svg.appendChild(el("rect",{x,y,width:bw,height:h,fill:col,rx:4}));
+      svg.appendChild(txt(x+bw/2,y-6,v.toFixed(1),{ta:"middle",fs:11,fw:700,
+        fill:side>0?C.ink:C.ink3}));
+    });
+    svg.appendChild(txt(cx,T+ph+19,d[0],{ta:"middle",fs:11.5,fw:600,fill:C.ink2}));
+    const chg=(d[1]-d[2])/d[2]*100;
+    svg.appendChild(txt(cx,T+ph+40,(chg>=0?"+":"")+chg.toFixed(1)+"%",
+      {ta:"middle",fs:10.5,fw:700,fill:chg<-10?C.good:(chg>10?C.crit:C.ink3)}));
+  });
+  svg.appendChild(el("line",{x1:L,x2:W-R,y1:T+ph,y2:T+ph,stroke:"#cbd5e1","stroke-width":1.5}));
+}
+
+function lines(id,series,labels,opt={}){
+  const svg=document.getElementById(id); if(!svg)return;
+  const vb=svg.getAttribute("viewBox").split(" ").map(Number), W=vb[2], H=vb[3];
+  const L=44,R=16,T=14,B=44, pw=W-L-R, ph=H-T-B;
+  const max=opt.max||Math.max(...series.flatMap(s=>s.data))*1.12;
+  const n=labels.length, step=pw/(n-1);
+  for(let i=0;i<=4;i++){
+    const v=max/4*i, y=T+ph-ph*(v/max);
+    svg.appendChild(el("line",{x1:L,x2:W-R,y1:y,y2:y,stroke:C.grid,"stroke-width":1}));
+    svg.appendChild(txt(L-8,y,(opt.pct?v.toFixed(0)+"%":Math.round(v)),{ta:"end",db:"middle",fs:10.5,fill:C.ink3}));
+  }
+  labels.forEach((lb,i)=>{ if(opt.everyOther&&i%2)return;
+    svg.appendChild(txt(L+step*i,T+ph+18,lb,{ta:"middle",fs:10.5,fill:C.ink2})); });
+  series.forEach(s=>{
+    const pts=s.data.map((v,i)=>[L+step*i,T+ph-ph*(v/max)]);
+    svg.appendChild(el("path",{d:pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" "),
+      fill:"none",stroke:s.color,"stroke-width":2.4,"stroke-linejoin":"round","stroke-linecap":"round"}));
+    pts.forEach(p=>svg.appendChild(el("circle",{cx:p[0],cy:p[1],r:3.2,fill:"#fff",stroke:s.color,"stroke-width":2})));
+    if(s.peak!==undefined){
+      const p=pts[s.peak];
+      svg.appendChild(el("circle",{cx:p[0],cy:p[1],r:5.4,fill:s.color,stroke:"#fff","stroke-width":2}));
+      svg.appendChild(txt(p[0],p[1]-13,s.peakLabel,{ta:"middle",fs:11,fw:700,fill:s.color}));
+    }
+  });
+  svg.appendChild(el("line",{x1:L,x2:W-R,y1:T+ph,y2:T+ph,stroke:"#cbd5e1","stroke-width":1.5}));
+}
+
+function stack100(id,rows,colors){
+  const svg=document.getElementById(id); if(!svg)return;
+  const vb=svg.getAttribute("viewBox").split(" ").map(Number), W=vb[2], H=vb[3];
+  const L=58,R=16,T=10,B=46, pw=W-L-R, ph=H-T-B;
+  const bh=Math.min(26,(ph-(rows.length-1)*9)/rows.length), gap=(ph-bh*rows.length)/(rows.length-1);
+  rows.forEach((row,ri)=>{
+    const total=row.v.reduce((a,b)=>a+b[1],0)||1, y=T+ri*(bh+gap);
+    let x=L;
+    svg.appendChild(txt(L-10,y+bh/2,row.b,{ta:"end",db:"middle",fs:11,fill:C.ink2,fw:600}));
+    row.v.forEach((seg,si)=>{
+      if(!seg[1])return;
+      const w=pw*(seg[1]/total);
+      svg.appendChild(el("rect",{x:x+1,y,width:Math.max(0,w-2),height:bh,fill:colors[si],rx:2}));
+      if(w>40) svg.appendChild(txt(x+w/2,y+bh/2,Math.round(seg[1]/total*100)+"%",
+        {ta:"middle",db:"middle",fs:10.5,fw:700,fill:"#fff"}));
+      x+=w;
+    });
+  });
+  for(let i=0;i<=4;i++) svg.appendChild(txt(L+pw/4*i,T+ph+18,(i*25)+"%",{ta:"middle",fs:10.5,fill:C.ink3}));
+}
+
+document.getElementById("tb-hot").innerHTML = D.hotspots.map(h=>{
+  const cls = h.r===1?"g":h.r===2?"s":h.r===3?"b":"";
+  return `<tr><td><span class="rank ${cls}">${h.r}</span></td><td><b>${h.loc}</b></td><td>${h.d}</td>
+  <td class="num">${h.n}</td><td class="num" style="font-weight:800;color:${h.e>=30?'#d03b3b':'#0f172a'}">${h.e.toFixed(1)}</td>
+  <td class="num">${h.a1||"—"}</td><td class="num" style="color:#c2410c;font-weight:600">${h.a2}</td>
+  <td style="font-size:12.5px;color:#475569">${h.note}</td></tr>`;
+}).join("");
+
+hbar("c-frailty", D.frailty.map(d=>[d[0],d[1]]), {labelW:86,valW:64,gap:22,lfs:12,
+  fmt:v=>v.toFixed(1)+"%", colorFn:(d,i)=>i===0?C.crit:C.gray});
+(function(){const s=document.getElementById("c-frailty");
+  D.frailty.forEach((d,i)=>{s.appendChild(txt(94,8+i*74+65,`n=${d[2]} 人`,{fs:10.5,fill:C.ink3}));});})();
+
+vbar("c-hurtrate", D.hurtRate.map(d=>[d[0],d[1]]), {
+  left:44,top:22,bot:48,maxBW:62,max:118,ticks:4,
+  tickFmt:v=>Math.round(v)+"%", fmt:v=>v.toFixed(1)+"%",
+  refLine:65.4, sub:(d,i)=>"n="+D.hurtRate[i][2],
+  colorFn:d=>d[1]>=95?C.crit:d[1]>=75?C.ser:d[1]>=66?C.s4:C.s1});
+
+stack100("c-vehshift", D.vehShift, [C.s2,C.s1,C.s3,C.s4,C.gray]);
+
+(function(){
+  const eT=D.hourEld.reduce((a,b)=>a+b,0), aT=D.hourAll.reduce((a,b)=>a+b,0);
+  lines("c-hour",[
+    {data:D.hourAll.map(v=>v/aT*100),color:C.s2},
+    {data:D.hourEld.map(v=>v/eT*100),color:C.s1,peak:7,peakLabel:"07時 12.6%"}
+  ], Array.from({length:24},(_,i)=>String(i).padStart(2,"0")), {pct:true,everyOther:true,max:15});
+})();
+
+tline("c-trend-rate", D.trendRate, D.trendLab, {max:200});
+tline("c-trend-veh", D.trendVeh, D.trendLab, {max:160});
+tline("c-trend-dist", D.trendDist, D.trendLab, {max:220});
+
+gbar("c-rate", D.rate, {refLine:157.5, max:230});
+
+vbar("c-month", D.months, {left:36,top:18,bot:34,maxBW:44,colorFn:()=>C.s1});
+vbar("c-dow", D.dow, {left:36,top:18,bot:34,maxBW:40,colorFn:(d,i)=>i===1?C.s2:C.s1});
+
+hbar("c-ctype", D.ctype, {labelW:104,valW:42,gap:7,lfs:11,
+  colorFn:d=>d[0]==="其他"?C.gray:(d[0]==="側撞"?C.crit:(d[0]==="追撞"?C.s2:C.s1))});
+hbar("c-road", [...D.road,...D.signal], {labelW:104,valW:42,gap:7,lfs:11,
+  colorFn:d=>D.signal.some(s=>s[0]===d[0])?(d[0]==="無號誌"?C.crit:C.s4):C.s1});
+
+hbar("c-cause", D.cause, {labelW:250,valW:44,gap:9,lfs:11.5,bot:34,
+  colorFn:(d,i)=>{
+    const j=["有號誌路口，轉彎車未讓直行車先行","左轉彎未依規定","違反閃光號誌",
+      "闖紅燈直行","無號誌路口，轉彎車未讓直行車先行","右轉彎未依規定"];
+    if(j.includes(d[0]))return C.s2;
+    if(i===0)return C.crit;
+    return C.s1;}});
+(function(){const s=document.getElementById("c-cause");
+  s.appendChild(txt(250,462,"■ 分心／注意力類",{fs:10.5,fill:C.crit,fw:600}));
+  s.appendChild(txt(390,462,"■ 路口未讓／轉彎違規類（合計 44 人次）",{fs:10.5,fill:C.s2,fw:600}));})();
+
+hbar("c-victim-action", D.victimAction, {labelW:118,valW:40,gap:7,lfs:11,
+  colorFn:d=>["向前直行中","等待(引擎未熄火)","靜止(引擎熄火)","靜立(止)"].includes(d[0])?C.crit:C.gray});
+hbar("c-victim-type", D.victimType, {labelW:118,valW:40,gap:7,lfs:11,
+  colorFn:d=>d[0]==="追撞"?C.s2:(d[0]==="其他"?C.gray:C.s1)});
+
+hbar("c-hot", D.hotspots.map(h=>[h.loc,h.e]), {labelW:210,valW:56,gap:8,lfs:11,
+  fmt:v=>v.toFixed(1), colorFn:(d,i)=>i===0?C.crit:i<3?C.ser:C.s1});
+</script>
+</body>
+</html>

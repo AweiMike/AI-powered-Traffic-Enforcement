@@ -106,6 +106,14 @@ def _migrate_eis_columns():
         "ped_death_count": "INTEGER DEFAULT 0",
         "ped_late_death_count": "INTEGER DEFAULT 0",
         "ped_injury_count": "INTEGER DEFAULT 0",
+        # 高齡涉入精確口徑（Wave 32）：由 core_crash_party 重算，
+        # 取代原本的「代表當事者」判定（該判定漏掉被撞的高齡者，實測低估 54%）
+        "elderly_party_count": "INTEGER DEFAULT 0",
+        "elderly_death_count": "INTEGER DEFAULT 0",
+        "elderly_late_death_count": "INTEGER DEFAULT 0",
+        "elderly_injury_count": "INTEGER DEFAULT 0",
+        "elderly_primary_count": "INTEGER DEFAULT 0",
+        "elderly_no_fault_count": "INTEGER DEFAULT 0",
     })
 
     # core_ticket 表可能缺少的欄位

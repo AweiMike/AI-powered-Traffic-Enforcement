@@ -10,6 +10,7 @@ import TrendCardSkeleton from './TrendCardSkeleton';
 
 // recharts 依賴較重，動態載入讓它獨立成 chunk，不灌進主 bundle
 const TrendCard = React.lazy(() => import('./TrendCard'));
+const SignalCheckCard = React.lazy(() => import('./SignalCheckCard'));
 
 // 同期比較標籤
 const YoYBadge: React.FC<{ current: number; previous: number }> = ({ current, previous }) => {
@@ -111,6 +112,8 @@ const ElderlyPreventionPage: React.FC = () => {
         return { startDate: fmt(start), endDate: fmt(now) };
     });
     const [vehicleData, setVehicleData] = useState<any>(null);
+    // 執法落差倍數（對象錯位）：該族群占事故比重 ÷ 占舉發比重
+    const [gapRatio, setGapRatio] = useState<any>(null);
 
     // 去年同期日期
     const prevRange = useMemo(() => getCompareRange(dateRange), [dateRange]);
@@ -131,6 +134,13 @@ const ElderlyPreventionPage: React.FC = () => {
             }
         };
         fetchVehicleData();
+
+        let alive = true;
+        apiClient
+            .getEnforcementGapRatio('elderly', dateRange.startDate, dateRange.endDate, true)
+            .then((d) => { if (alive) setGapRatio(d?.supported ? d : null); })
+            .catch(() => { if (alive) setGapRatio(null); });
+        return () => { alive = false; };
     }, [dateRange]);
 
     return (
@@ -140,6 +150,10 @@ const ElderlyPreventionPage: React.FC = () => {
                 <div>
                     <h2 className="text-2xl font-bold text-nook-text mb-2">👵 高齡者事故防制專區</h2>
                     <p className="text-nook-text/60">針對 65 歲以上長者事故分析與防治建議</p>
+                    <p className="text-xs text-accent mt-1.5 bg-accent-soft/50 inline-block px-2.5 py-1 rounded-lg">
+                        口徑：<b>任一當事者年滿 65 歲</b>即計入（道安會報口徑）。
+                        舊版僅以「代表當事者」判定，會漏掉高齡者<b>被撞</b>的案件而低估 54%。
+                    </p>
                 </div>
                 <DateRangePicker value={dateRange} onChange={setDateRange} showCompare={true} />
             </div>
@@ -176,6 +190,39 @@ const ElderlyPreventionPage: React.FC = () => {
                         <p className="text-4xl font-bold text-blue-600">{hotspots.hotspots.length}</p>
                         <p className="text-sm text-blue-500">發生區域數</p>
                     </div>
+                </div>
+            )}
+
+            {/* 訊號／雜訊判讀：先確認變化是真是假，再往下看趨勢與熱點 */}
+            <React.Suspense fallback={<div className="bg-white/80 rounded-2xl p-6 nook-shadow h-40 animate-pulse" />}>
+                <SignalCheckCard range={dateRange} topic="elderly" />
+            </React.Suspense>
+
+            {/* 執法落差倍數（對象錯位）—— 與 Wave 29 執法錯位引擎（空間錯位）互補 */}
+            {gapRatio && (
+                <div className="bg-white/80 rounded-2xl p-5 nook-shadow flex items-center gap-6 flex-wrap">
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-bold text-nook-text tabular-nums tracking-tight">
+                            {gapRatio.gap_ratio}
+                        </span>
+                        <span className="text-sm font-semibold text-nook-text/70">倍執法落差</span>
+                    </div>
+                    <div className="text-xs text-nook-text/60 leading-relaxed">
+                        高齡者占傷亡事故 <b className="text-nook-text">{gapRatio.crash.share_pct}%</b>
+                        （{gapRatio.crash.topic}／{gapRatio.crash.total} 件），
+                        占舉發僅 <b className="text-nook-text">{gapRatio.ticket.share_pct}%</b>
+                        （{gapRatio.ticket.topic}／{gapRatio.ticket.total} 件）
+                        {typeof gapRatio.ticket.post_crash_pct === 'number' && (
+                            <>；其中 <b className="text-nook-text">{gapRatio.ticket.post_crash_pct}%</b> 為肇事後補單</>
+                        )}
+                    </div>
+                    <div className="text-xs px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 font-semibold">
+                        {gapRatio.verdict}
+                    </div>
+                    <p className="text-[11px] text-nook-text/40 basis-full leading-relaxed">
+                        ⚠️ 倍數高不等於應多開單：高齡者有相當比例為非肇責方（被撞），
+                        此類案件之防制對象應為其他用路人。請併看下方責任結構。
+                    </p>
                 </div>
             )}
 

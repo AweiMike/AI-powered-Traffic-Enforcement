@@ -31,7 +31,19 @@ interface CrashProfileData {
     license_status: ProfileGroupItem[];
     by_shift: ProfileGroupItem[];
     top_routes: ProfileGroupItem[];
+    /** 當事者層年齡分層（單位＝人，非件）。僅 elderly/youth/pedestrian 有值 */
+    party_age_bands?: ProfileGroupItem[];
+    /** 當事者層角色組成（單位＝人） */
+    party_role_mix?: ProfileGroupItem[];
+    /** 路口型態分布（件） */
+    road_form?: ProfileGroupItem[];
+    /** 號誌種類分布（件） */
+    signal_form?: ProfileGroupItem[];
   };
+  /** 無號誌占比（已排除未記載） */
+  no_signal_pct?: number | null;
+  /** 岔路口占比（已排除未記載） */
+  junction_pct?: number | null;
 }
 
 interface ProfileCardProps {
@@ -182,13 +194,48 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ range, topic, title = '當事
         <div className="p-12 text-center text-text-subtle">此區間無符合案件</div>
       ) : (
         <div className="p-4 space-y-4">
+          {/* 當事者層分層（單位＝人）。
+              ⚠️「年齡層」取自代表當事者故單位為件，與 total（任一當事者符合主題即計入）
+              口徑不同——例如高齡 296 件但代表當事者為 65+ 者僅 129 件，差額是
+              「高齡者被撞、代表當事者為對造駕駛」的案件。兩者並陳易被誤讀為資料錯誤，
+              故此處明確標示單位並加註說明。 */}
+          {(g.party_age_bands?.length ?? 0) > 0 && (
+            <div className="bg-accent-soft/40 rounded-xl p-3">
+              <div className="flex items-baseline justify-between mb-2">
+                <h4 className="text-sm font-bold text-nook-text">
+                  當事者年齡分層
+                  <span className="text-xs font-normal text-text-subtle ml-2">單位：人</span>
+                </h4>
+                <span className="text-xs text-text-subtle tabular-nums">
+                  共 {(g.party_age_bands ?? []).reduce((a, b) => a + b.count, 0)} 人
+                  {(g.party_role_mix?.length ?? 0) > 0 && (
+                    <>　（{(g.party_role_mix ?? [])
+                      .map((r) => `${r.name} ${r.count}`).join('／')}）</>
+                  )}
+                </span>
+              </div>
+              <BarListSection title="" items={g.party_age_bands ?? []} />
+              <p className="text-[11px] text-text-subtle mt-2 leading-relaxed">
+                ⚠️ 本區為「人數」，下方「年齡層」為代表當事者之「件數」，兩者口徑不同不可相加。
+                {typeof data.no_signal_pct === 'number' && (
+                  <>　無號誌 {data.no_signal_pct}%、岔路口 {data.junction_pct}%（皆已排除未記載）</>
+                )}
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-            <BarListSection title="年齡層" items={ageGroups} />
+            <BarListSection title="年齡層（代表當事者，件）" items={ageGroups} />
             <BarListSection title="性別" items={gender} />
             <BarListSection title="車種/當事者" items={partyTypes} />
             <BarListSection title="事故型態" items={crashTypes} />
             <BarListSection title="保護裝備" items={protectiveGear} warnHighlight />
             <BarListSection title="駕照狀態" items={licenseStatus} warnHighlight />
+            {(data.groups.road_form?.length ?? 0) > 0 && (
+              <BarListSection title="路口型態" items={data.groups.road_form!} />
+            )}
+            {(data.groups.signal_form?.length ?? 0) > 0 && (
+              <BarListSection title="號誌種類" items={data.groups.signal_form!} />
+            )}
           </div>
 
           <div className="pt-2 border-t border-nook-cream/50">

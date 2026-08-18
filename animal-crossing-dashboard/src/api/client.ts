@@ -1142,6 +1142,30 @@ class APIClient {
   }
 
   /** 當事者特徵剖析（年齡/性別/車種/事故型態/保護裝備/駕照狀態/班別/路線） */
+  /**
+   * 訊號／雜訊判讀（三項監測指標）。
+   * 回答「這個增減是真的，還是隨機波動？」——擋掉把統計假象寫成成效的誤判。
+   * 基準期預設「去年同期」且事前固定；不可看過數據再挑基準期。
+   */
+  async getSignalCheck(
+    topic: string, startDate: string, endDate: string, casualtyOnly = true,
+  ): Promise<any> {
+    return this.request(
+      `/stats/signal-check?topic=${topic}&start_date=${startDate}` +
+      `&end_date=${endDate}&casualty_only=${casualtyOnly}`,
+    );
+  }
+
+  /** 執法落差倍數（對象錯位）：該族群占事故比重 ÷ 占舉發比重 */
+  async getEnforcementGapRatio(
+    topic: string, startDate: string, endDate: string, casualtyOnly = true,
+  ): Promise<any> {
+    return this.request(
+      `/stats/enforcement-gap-ratio?topic=${topic}&start_date=${startDate}` +
+      `&end_date=${endDate}&casualty_only=${casualtyOnly}`,
+    );
+  }
+
   async getCrashProfile(topic: string, startDate: string, endDate: string): Promise<any> {
     return this.request(`/recommendations/profile?topic=${topic}&start_date=${startDate}&end_date=${endDate}`);
   }

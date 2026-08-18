@@ -1,7 +1,9 @@
 """
 維度表模型（無個資）
 """
-from sqlalchemy import Column, Integer, String, Float
+from datetime import datetime
+
+from sqlalchemy import Column, Integer, String, Float, DateTime, Index
 
 from app.database import Base
 
@@ -202,3 +204,31 @@ def init_shift_data(db):
 
     db.commit()
     print(f"[OK] 班別資料初始化完成 (12 筆)")
+
+
+class Population(Base):
+    """
+    行政區人口（高齡事故率與過度代表倍數之分母）
+
+    資料來源：臺南市政府民政局「各區人口數按三階段年齡百分比分及其扶養比」
+    https://bca.tainan.gov.tw/News_Content.aspx?n=1134&s=8157
+    一檔含 99.12 起每月一個 sheet；⚠️ 僅切至「65 歲以上」單一級距，無法拆 5 歲組。
+    ⚠️ 需人工定期更新（下載 xls → 執行 backend/scripts/seed_population.py）；
+       端點會回傳 data_through 供介面標示資料截止月份，避免用過期分母誤導。
+    """
+
+    __tablename__ = "dim_population"
+
+    id = Column(Integer, primary_key=True, index=True)
+    year_month = Column(String(7), index=True, comment="民國年月，如 115-06")
+    district = Column(String(20), index=True, comment="行政區（新化區/山上區/左鎮區）")
+    total_pop = Column(Integer, comment="總人口")
+    elderly_pop = Column(Integer, comment="65 歲以上人口")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_population_ym_district", "year_month", "district", unique=True),
+    )
+
+    def __repr__(self):
+        return f"<Population({self.year_month}, {self.district}, e65={self.elderly_pop})>"

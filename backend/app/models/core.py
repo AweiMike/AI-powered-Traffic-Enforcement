@@ -12,6 +12,7 @@ from sqlalchemy import (
     Boolean,
     Text,
     ForeignKey,
+    Index,
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -153,6 +154,16 @@ class Crash(Base):
     ped_late_death_count = Column(Integer, default=0, comment="行人當事者 2-30 日內死亡數")
     ped_injury_count = Column(Integer, default=0, comment="行人當事者受傷數")
 
+    # === 高齡涉入精確口徑（由 core_crash_party 重算，非代表當事者）===
+    # ⚠️ is_elderly 語意自此改為「任一當事者 ≥65 歲」（道安會報口徑）。
+    #    舊的代表當事者判定會漏掉被撞的高齡者，實測低估 54%。
+    elderly_party_count = Column(Integer, default=0, comment="高齡當事者人數（件≠人，勿相加）")
+    elderly_death_count = Column(Integer, default=0, comment="高齡當事者 24hr 內死亡數")
+    elderly_late_death_count = Column(Integer, default=0, comment="高齡當事者 2-30 日內死亡數")
+    elderly_injury_count = Column(Integer, default=0, comment="高齡當事者受傷數")
+    elderly_primary_count = Column(Integer, default=0, comment="高齡當事者為第一當事者之人數")
+    elderly_no_fault_count = Column(Integer, default=0, comment="高齡當事者無肇事責任之人數")
+
     # === 系統欄位 ===
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -162,6 +173,70 @@ class Crash(Base):
 
     def __repr__(self):
         return f"<Crash(id={self.id}, date={self.occurred_date}, severity={self.severity})>"
+
+
+# ============================================
+# 事故當事者層資料表（去識別化）
+# ============================================
+class CrashParty(Base):
+    """
+    事故當事者（每案 1~N 列；EIS 原始即為 per-當事者 row，全史約 12,854 列）
+
+    ⚠️ 為何需要此表：core_crash 是「案件層 rollup」，年齡/車種等欄位取自
+    **代表當事者**。當高齡者是被撞的一方時，代表當事者是對造駕駛，
+    高齡者就從統計中消失——實測 is_elderly 低估 54%（555 vs 真實 1,211）；
+    青少年僅低估 15%（多為自己事故的駕駛），低估幅度的差異本身即為佐證。
+
+    有了本表，「涉及某族群」可用 EXISTS 精確判定，不必再為每個主題新增
+    一組 rollup 欄位；並解鎖責任歸屬、年齡分層、對造分析等案件層做不到的維度。
+
+    ⚠️ 個資紅線：EIS 的 16.當事者姓名／18.當事者身分證字號／電話／住址／車牌
+    一律不得寫入本表。
+    """
+
+    __tablename__ = "core_crash_party"
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_id = Column(String(50), index=True, nullable=False, comment="對應 core_crash.case_id")
+    party_order = Column(Integer, index=True, comment="當事者順位（1=第一當事者，責任歸屬代理變數）")
+
+    # === 人口屬性 ===
+    age = Column(Integer, comment="事故發生時年齡")
+    age_band = Column(String(10), index=True, comment="5 歲組（65-69/70-74/…/85+）；未滿 65 者粗分組")
+    gender = Column(String(10), comment="17.當事者屬(性)別")
+    is_elderly = Column(Boolean, default=False, index=True, comment="本人 ≥65 歲")
+    is_youth = Column(Boolean, default=False, index=True, comment="本人 12-17 歲")
+
+    # === 當事者屬性 ===
+    party_subtype = Column(String(60), comment="26.當事者區分(類別) 子類別原文")
+    role = Column(String(10), index=True, comment="駕駛／乘客／行人（由子類別判定）")
+    vehicle_group = Column(String(20), index=True, comment="機車／小客車／貨車／慢速載具／其他")
+    license_status = Column(String(30), comment="30.駕照狀態")
+    protective_gear = Column(String(30), comment="24.保護裝備")
+
+    # === 傷亡（本人，非案件總數）===
+    injury = Column(String(20), comment="22.受傷程度原文")
+    is_death_24h = Column(Boolean, default=False, comment="24 小時內死亡")
+    is_death_late = Column(Boolean, default=False, comment="2-30 日內死亡")
+    is_injured = Column(Boolean, default=False, comment="受傷（不含死亡）")
+
+    # === 責任歸屬 ===
+    cause = Column(String(120), comment="34.初步分析研判子類別-個別")
+    is_primary = Column(Boolean, default=False, index=True, comment="順位=1（主要責任代理變數）")
+    no_fault = Column(
+        Boolean, default=False, index=True,
+        comment="個別肇因＝尚未發現肇事因素（無肇事責任）"
+    )
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_crash_party_case_order", "case_id", "party_order"),
+        Index("ix_crash_party_elderly", "is_elderly", "case_id"),
+    )
+
+    def __repr__(self):
+        return f"<CrashParty(case={self.case_id}, order={self.party_order}, age={self.age})>"
 
 
 # ============================================

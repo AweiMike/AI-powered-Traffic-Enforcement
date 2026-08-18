@@ -8,7 +8,7 @@ from typing import Optional, List
 from datetime import datetime, timedelta, date
 
 from app.database import get_db
-from app.models.core import Ticket, Crash
+from app.models.core import Ticket, Crash, CrashParty
 from app.models.dimension import Site
 from app.utils.dui_crash import dui_crash_filter, crash_dui_real_filter
 from app.utils.drug_drive import drug_drive_filter, drug_crash_filter, not_drug_filter
@@ -46,6 +46,10 @@ def crash_topic_filter(topic: str):
         # 輔助代步器材），取代舊版 party_type LIKE 判定（誤把「全案當事者皆人類」
         # 當作行人事故、漏掉「行人被車撞、代表當事者是駕駛」的案件）
         return Crash.involves_pedestrian == True
+    if topic == "youth":
+        # Wave 32：is_youth 口徑＝「任一青少年**駕駛**」（不含乘客/行人）。
+        # 若比照高齡採「任一當事者」，會灌入僅有兒童乘客的案件而扭曲本專區。
+        return Crash.is_youth == True
     if topic == "evehicle":
         return Crash.evehicle_type.isnot(None)
     if topic == "dui":
@@ -2479,6 +2483,54 @@ async def get_topic_profile(
     age_counter = Counter((c.driver_age_group or "未知") for c in crashes)
     age_groups = [{"name": k, "count": age_counter.get(k, 0)} for k in AGE_ORDER]
 
+    # 當事者層年齡分層（單位＝人，非件）
+    # ⚠️ age_groups 取自 driver_age_group＝「代表當事者」，與 total（任一當事者符合
+    #    主題即計入）口徑不同：高齡 296 件，但代表當事者為 65+ 者僅 129 件；相差的
+    #    167 件是「高齡者被撞、代表當事者為對造駕駛」。兩者並陳易被誤讀為資料錯誤，
+    #    故另出當事者層分層並明確標示單位為「人」。
+    party_age_bands = []
+    party_role_mix = []
+    if topic in ("elderly", "youth", "pedestrian"):
+        pq = db.query(CrashParty).join(
+            Crash, Crash.case_id == CrashParty.case_id
+        ).filter(
+            topic_condition,
+            Crash.occurred_date >= sd,
+            Crash.occurred_date <= ed,
+        )
+        if topic == "elderly":
+            pq = pq.filter(CrashParty.is_elderly.is_(True))
+            BAND_ORDER = ["65-69", "70-74", "75-79", "80-84", "85+"]
+        elif topic == "youth":
+            pq = pq.filter(CrashParty.is_youth.is_(True), CrashParty.role == "駕駛")
+            BAND_ORDER = ["<18"]
+        else:
+            pq = pq.filter(CrashParty.role == "行人")
+            BAND_ORDER = ["<18", "18-64", "65-69", "70-74", "75-79", "80-84", "85+"]
+
+        _parties = pq.all()
+        band_counter = Counter((p.age_band or "未知") for p in _parties)
+        party_age_bands = [
+            {"name": k, "count": band_counter.get(k, 0)}
+            for k in BAND_ORDER + (["未知"] if band_counter.get("未知") else [])
+        ]
+        role_counter = Counter((p.role or "未知") for p in _parties)
+        party_role_mix = [{"name": k, "count": v} for k, v in role_counter.most_common()]
+
+    # 路口型態與號誌（Wave 32）：兩欄充填率 87.1%，原本只在會勘卷宗用到，
+    # 未成為任何分析維度。114 年高齡事故惡化 80% 集中於三岔路的發現即出自此二欄。
+    # ⚠️ 空值另計為「未記載」不併入分母，避免低估各型態占比。
+    road_form = [{"name": k, "count": v} for k, v in
+                 Counter((c.road_type or "未記載") for c in crashes).most_common()]
+    signal_form = [{"name": k, "count": v} for k, v in
+                   Counter((c.signal_type or "未記載") for c in crashes).most_common()]
+    _known = [c for c in crashes if c.signal_type]
+    no_signal_pct = (round(sum(1 for c in _known if c.signal_type == "無號誌")
+                           / len(_known) * 100, 1) if _known else None)
+    _kr = [c for c in crashes if c.road_type]
+    junction_pct = (round(sum(1 for c in _kr if "岔路" in (c.road_type or ""))
+                          / len(_kr) * 100, 1) if _kr else None)
+
     # 性別：固定三項（男/女/未知，NULL 併入未知）
     gender_counter = Counter((c.driver_gender or "未知") for c in crashes)
     gender = [
@@ -2504,11 +2556,17 @@ async def get_topic_profile(
     top_routes = top_n([c.route_name for c in crashes], 5)
 
     return {
+        "no_signal_pct": no_signal_pct,       # 無號誌占比（排除未記載）
+        "junction_pct": junction_pct,         # 岔路口占比（排除未記載）
         "topic": topic,
         "period": {"start_date": start_date, "end_date": end_date},
         "total": total,
         "groups": {
             "age_groups": age_groups,
+            "party_age_bands": party_age_bands,   # 單位＝人（當事者層）
+            "party_role_mix": party_role_mix,     # 單位＝人（駕駛/乘客/行人）
+            "road_form": road_form,               # 路口型態分布（件）
+            "signal_form": signal_form,           # 號誌種類分布（件）
             "gender": gender,
             "party_types": party_types,
             "crash_types": crash_types,
