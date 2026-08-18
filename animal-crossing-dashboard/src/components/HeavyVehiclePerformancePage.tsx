@@ -12,6 +12,7 @@ import ProfileCard from './ProfileCard';
 
 // recharts 依賴較重，動態載入讓它獨立成 chunk，不灌進主 bundle
 const TrendCard = React.lazy(() => import('./TrendCard'));
+const SignalCheckCard = React.lazy(() => import('./SignalCheckCard'));
 
 function defaultRange(): DateRange {
   const now = new Date();
@@ -118,6 +119,10 @@ const HeavyVehiclePerformancePage: React.FC = () => {
       </React.Suspense>
 
       {/* 大型車事故特徵剖析（年齡/性別/車種/事故型態/保護裝備/駕照狀態/班別/路線） */}
+      {/* 訊號／雜訊判讀：先確認變化是真是假，再往下看特徵剖析 */}
+      <React.Suspense fallback={<div className="bg-white/80 rounded-2xl p-6 nook-shadow h-40 animate-pulse mb-6" />}>
+        <SignalCheckCard range={range} topic="heavy" />
+      </React.Suspense>
       <ProfileCard topic="heavy" title="大型車事故特徵剖析" range={range} />
 
       {/* 各派出所明細表 */}

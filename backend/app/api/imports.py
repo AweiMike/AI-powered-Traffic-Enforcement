@@ -17,7 +17,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.core import Crash, CrashParty, Ticket, Topic
+from app.models.core import Crash, CrashParty, CrashTextTag, Ticket, Topic
 from app.utils.data_health import run_batch_health_checks
 from app.utils.units import normalize_unit_name
 
@@ -354,6 +354,57 @@ def persist_crash_parties(db, parties_by_case: Dict[str, list]) -> int:
         for cid in chunk:
             for p in parties_by_case[cid]:
                 db.add(CrashParty(**p))
+                written += 1
+        db.flush()
+    return written
+
+
+def collect_and_persist_text_tags(db, df) -> int:
+    """
+    從 EIS 摘要欄抽取特殊致因標籤並落地（以 case 為單位 delete-then-insert，冪等）。
+
+    ⚠️ **只存標籤與命中關鍵詞，不存原文**——摘要含車牌／姓名／地址，
+    原文永遠留在原始 EIS 檔。規則定義見 app/utils/text_tags.py。
+
+    存在理由：結構化「肇因」欄位有系統性盲區——摘要標籤標出「動物竄出」85 件，結構化肇因欄
+    僅 4 件（4.7%）正確歸類，45 件掛「恍神、緊張、心不在焉分心駕駛」——嚴重低登錄。
+    """
+    from app.utils.text_tags import extract_tags
+
+    if df is None or len(df) == 0:
+        return 0
+
+    per_case = {}
+    for _, row in df.iterrows():
+        cid = None
+        for col_name in ["總編號(案件編號)", "總編號（案件編號）", "案件編號", "總編號"]:
+            if col_name in row.index and pd.notna(row.get(col_name)):
+                v = str(row.get(col_name)).strip()
+                if v:
+                    cid = v
+                    break
+        if not cid:
+            continue
+        text = " ".join(
+            _safe_eis_str(row, c) for c in ("現場處理摘要", "回(結)報摘要")
+        )
+        for h in extract_tags(text):
+            per_case.setdefault(cid, set()).add((h["tag"], h["keyword"]))
+
+    if not per_case:
+        return 0
+
+    written = 0
+    cids = list(per_case.keys())
+    for i in range(0, len(cids), 500):
+        chunk = cids[i:i + 500]
+        db.query(CrashTextTag).filter(CrashTextTag.case_id.in_(chunk)).delete(
+            synchronize_session=False
+        )
+        for cid in chunk:
+            for tag, kw in per_case[cid]:
+                db.add(CrashTextTag(case_id=cid[:50], tag=tag[:20],
+                                    keyword=kw[:20], source="rule"))
                 written += 1
         db.flush()
     return written
@@ -1588,6 +1639,9 @@ async def import_crash_file(
                 persist_crash_parties(db, _parties)
                 db.commit()
                 recompute_party_rollups(db, list(_parties.keys()))
+            # 特殊致因文本標籤（只存標籤不存原文）
+            collect_and_persist_text_tags(db, df)
+            db.commit()
 
         # 取得統計
         total_crashes = db.query(Crash).count()
@@ -1748,9 +1802,15 @@ def _do_batch_import(txt_files: list, db):
         db.query(func.count(Crash.id)).scalar() > 0
         and db.query(func.count(CrashParty.id)).scalar() == 0
     )
+    # 文本標籤（Wave 32-B）回補哨兵：標籤表空但已有事故資料
+    text_tag_backfill_needed = (
+        db.query(func.count(Crash.id)).scalar() > 0
+        and db.query(func.count(CrashTextTag.id)).scalar() == 0
+    )
     needs_backfill = (
         needs_backfill_subunit or conflict_backfill_needed or clearance_backfill_needed
         or pedestrian_backfill_needed or party_backfill_needed
+        or text_tag_backfill_needed
     )
 
     for txt_path in txt_files:
@@ -2151,6 +2211,9 @@ def _do_batch_import(txt_files: list, db):
                     persist_crash_parties(db, _parties)
                     db.commit()
                     recompute_party_rollups(db, list(_parties.keys()))
+                # 特殊致因文本標籤（只存標籤不存原文）
+                collect_and_persist_text_tags(db, df)
+                db.commit()
 
             total_stats["files"] += 1
             total_stats["total"] += stats["total"]
@@ -2478,9 +2541,15 @@ async def import_crash_upload_batch(
         db.query(func.count(Crash.id)).scalar() > 0
         and db.query(func.count(CrashParty.id)).scalar() == 0
     )
+    # 文本標籤（Wave 32-B）回補哨兵：標籤表空但已有事故資料
+    text_tag_backfill_needed = (
+        db.query(func.count(Crash.id)).scalar() > 0
+        and db.query(func.count(CrashTextTag.id)).scalar() == 0
+    )
     needs_backfill = (
         needs_backfill_subunit or conflict_backfill_needed or clearance_backfill_needed
         or pedestrian_backfill_needed or party_backfill_needed
+        or text_tag_backfill_needed
     )
 
     for file in files:
@@ -2960,6 +3029,9 @@ async def import_crash_upload_batch(
                     persist_crash_parties(db, _parties)
                     db.commit()
                     recompute_party_rollups(db, list(_parties.keys()))
+                # 特殊致因文本標籤（只存標籤不存原文）
+                collect_and_persist_text_tags(db, df)
+                db.commit()
 
             total_stats["files"] += 1
             total_stats["total"] += stats["total"]

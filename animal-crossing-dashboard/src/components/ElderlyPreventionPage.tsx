@@ -279,7 +279,19 @@ const ElderlyPreventionPage: React.FC = () => {
                         <div className="bg-white/80 rounded-2xl p-6 nook-shadow">
                             <h5 className="font-bold text-nook-text mb-4 text-lg">{peakTimes.district}</h5>
                             <ShiftChart shifts={peakTimes.shifts} peakShifts={peakTimes.recommendations.priority_shifts} />
-                            <div className="mt-6 p-4 bg-orange-50 rounded-xl border border-orange-200">
+                            {/* 分區樣本量警語：三區高齡事故經四期加權卜瓦松趨勢檢定全部不顯著
+                                （新化 p=0.341、山上 p=0.155、左鎮 p=0.371），小樣本雜訊即可
+                                產生 3 倍率比。不標示會讓分區數字被當成可據以調配勤務的訊號。 */}
+                            <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                <p className="text-xs text-slate-600 leading-relaxed">
+                                    ⚠️ <b>分區數字僅供現場經驗佐證，不足以單獨支撐勤務調配。</b>
+                                    三區高齡事故規模為個位數至十餘件，經四期趨勢檢定
+                                    <b>均未達統計顯著</b>（新化 p=0.341／山上 p=0.155／左鎮 p=0.371），
+                                    小樣本卜瓦松雜訊即可產生 3 倍以上之率比。
+                                    如需分區判讀，建議改採「累計三年合併計算」提高樣本量。
+                                </p>
+                            </div>
+                            <div className="mt-4 p-4 bg-orange-50 rounded-xl border border-orange-200">
                                 <h6 className="font-bold text-orange-800 mb-2">💡 防治重點</h6>
                                 <p className="text-sm text-orange-700 mb-2">
                                     長者事故常發生於<strong>晨間運動 (04-06)</strong> 或 <strong>傍晚買菜 (16-18)</strong> 時段。

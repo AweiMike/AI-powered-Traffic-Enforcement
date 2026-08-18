@@ -1332,3 +1332,71 @@ async def enforcement_gap_ratio(
         "caveat": ("倍數高不等於應多開單：須併看該族群是否多為非肇責方，"
                    "若是則防制對象應為其他用路人（可查 /recommendations/profile 之責任結構）"),
     }
+
+
+@router.get("/special-causes")
+async def special_causes(
+    start_date: str = Query(..., description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="結束日期 YYYY-MM-DD"),
+    topic: Optional[str] = Query(None, description="可選：限定主題 elderly/pedestrian/…"),
+    casualty_only: bool = Query(False, description="是否僅計 A1+A2"),
+    db: Session = Depends(get_db),
+):
+    """特殊致因（文本挖掘）：結構化肇因欄看不到的事故成因。
+
+    來源為現場處理摘要之規則式標籤——**資料庫只存標籤，不存原文**
+    （摘要含車牌／姓名／地址，原文永遠留在原始 EIS 檔）。
+
+    存在理由：「動物竄出」85 件中，結構化肇因欄僅 4 件（4.7%）正確歸類，
+    45 件掛「恍神、緊張、心不在焉分心駕駛」——嚴重低登錄。此類特殊致因平時只能靠人工翻閱挖掘。
+    """
+    from app.models.core import CrashTextTag
+    from app.api.recommendations import crash_topic_filter
+
+    try:
+        sd = datetime.strptime(start_date, "%Y-%m-%d").date()
+        ed = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="日期格式錯誤，需 YYYY-MM-DD")
+
+    q = db.query(CrashTextTag.tag, func.count(func.distinct(CrashTextTag.case_id))).join(
+        Crash, Crash.case_id == CrashTextTag.case_id
+    ).filter(Crash.occurred_date >= sd, Crash.occurred_date <= ed)
+
+    base = db.query(func.count(Crash.id)).filter(
+        Crash.occurred_date >= sd, Crash.occurred_date <= ed
+    )
+    if casualty_only:
+        q = q.filter(Crash.severity.in_(("A1", "A2")))
+        base = base.filter(Crash.severity.in_(("A1", "A2")))
+    if topic:
+        cond = crash_topic_filter(topic)
+        if cond is None:
+            raise HTTPException(status_code=400, detail="未知主題：%s" % topic)
+        q = q.filter(cond)
+        base = base.filter(cond)
+
+    rows = q.group_by(CrashTextTag.tag).all()
+    total_cases = base.scalar() or 0
+    # ⚠️ tagged 必須套用與 q 相同的 topic/severity 篩選，否則會回全期間所有標記案件，
+    #    與各標籤加總對不起來（曾出現 tagged=114 但明細加總僅 23 的不一致）。
+    tagged = q.with_entities(
+        func.count(func.distinct(CrashTextTag.case_id))
+    ).scalar() or 0
+
+    items = [
+        {"tag": t, "cases": c,
+         "pct_of_total": round(c / total_cases * 100, 1) if total_cases else 0.0}
+        for t, c in sorted(rows, key=lambda x: -x[1])
+    ]
+    return {
+        "period": {"start": start_date, "end": end_date},
+        "topic": topic,
+        "casualty_only": casualty_only,
+        "total_cases": total_cases,
+        "tagged_cases": tagged,
+        "coverage_pct": round(tagged / total_cases * 100, 1) if total_cases else 0.0,
+        "items": items,
+        "note": ("標籤取自現場處理摘要之規則式比對；資料庫僅存標籤與命中關鍵詞，"
+                 "不存原文。需回查個案原文請至原始 EIS 檔以案件編號檢索。"),
+    }

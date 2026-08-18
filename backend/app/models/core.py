@@ -240,6 +240,41 @@ class CrashParty(Base):
 
 
 # ============================================
+# 事故摘要文本標籤（特殊致因挖掘）
+# ============================================
+class CrashTextTag(Base):
+    """
+    事故摘要文本標籤
+
+    ⚠️ **只存標籤，不存原文。** 現場處理摘要含車牌、姓名、地址等個資，
+    原文永遠留在原始 EIS 檔案，本表僅落地「案件 → 標籤 → 命中關鍵詞」。
+
+    存在理由：結構化「肇因」欄位有系統性盲區——摘要標籤標出「動物竄出」85 件，結構化肇因欄
+    **僅 4 件（4.7%）被正確歸類**，45 件掛「恍神、緊張、心不在焉分心駕駛」。
+    肇因欄有此選項，問題是嚴重低登錄而非完全缺漏。
+    此類特殊致因（動物、農機、油漬、視線遮蔽）平時只能靠人工翻閱挖掘。
+
+    規則定義見 app/utils/text_tags.py。規則引擎為主力（零成本、可稽核、結果穩定）。
+    """
+
+    __tablename__ = "core_crash_text_tag"
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_id = Column(String(50), index=True, nullable=False, comment="對應 core_crash.case_id")
+    tag = Column(String(20), index=True, comment="標籤，如 動物竄出／農機具／油漬路滑")
+    keyword = Column(String(20), comment="命中之關鍵詞（供人工回查原文用，非原文片段）")
+    source = Column(String(12), default="rule", comment="來源：rule（規則引擎）／llm（消歧，暫未啟用）")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_text_tag_case_tag", "case_id", "tag", unique=True),
+    )
+
+    def __repr__(self):
+        return f"<CrashTextTag(case={self.case_id}, tag={self.tag})>"
+
+
+# ============================================
 # 舉發案件核心表（去識別化）
 # ============================================
 class Ticket(Base):

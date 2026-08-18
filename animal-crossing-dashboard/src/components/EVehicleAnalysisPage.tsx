@@ -11,6 +11,7 @@ import SchoolZoneCard from './SchoolZoneCard';
 
 // recharts 依賴較重，動態載入讓它獨立成 chunk，不灌進主 bundle
 const TrendCard = React.lazy(() => import('./TrendCard'));
+const SignalCheckCard = React.lazy(() => import('./SignalCheckCard'));
 
 // 定義類型
 interface EVehicleOverview {
@@ -442,6 +443,10 @@ const EVehicleAnalysisPage: React.FC = () => {
             </React.Suspense>
 
             {/* 微電車當事者特徵剖析 */}
+            {/* 訊號／雜訊判讀：先確認變化是真是假，再往下看特徵剖析 */}
+            <React.Suspense fallback={<div className="bg-white/80 rounded-2xl p-6 nook-shadow h-40 animate-pulse mb-6" />}>
+              <SignalCheckCard range={dateRange} topic="evehicle" />
+            </React.Suspense>
             <ProfileCard topic="evehicle" title="微電車當事者特徵剖析" range={dateRange} />
 
             {/* 校園時段熱區（青少年微電車） */}
